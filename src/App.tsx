@@ -78,7 +78,6 @@ import {
 } from './services/bibleQuestionService';
 import { generateBibleQuestionsBatch } from './services/geminiService';
 import confetti from 'canvas-confetti';
-import { GoogleGenAI } from "@google/genai";
 import { cn } from './lib/utils';
 import { Verse, UserProgress, VerseSet } from './types';
 import { 
