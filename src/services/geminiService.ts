@@ -3,7 +3,17 @@ import { BibleQuestion } from "./bibleQuestionService";
 import { BIBLE_HEROES } from "../lib/bibleHeroes";
 import { BIBLE_SECTIONS } from "../lib/bibleSections";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY environment variable is missing. Please set it in your Vercel project settings.');
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -23,6 +33,7 @@ export const generateBibleQuestionsBatch = async (
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`Generating Bible questions for section "${section?.name}" starting from ${book} ${chapter}:${verse}... (Attempt ${i + 1}/${retries})`);
+      const ai = getAI();
       const model = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Generate a batch of EXACTLY 10 Bible questions for the theme: "${section?.name}".

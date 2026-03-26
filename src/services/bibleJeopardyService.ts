@@ -1,6 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('VITE_GEMINI_API_KEY environment variable is missing. Please set it in your Vercel project settings.');
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
 
 export interface JeopardyQuestion {
   id: string;
@@ -104,6 +114,7 @@ export async function generateJeopardyBoard(
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      const ai = getAI();
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Generate a full Jeopardy game with 5 categories and 5 questions per category.
