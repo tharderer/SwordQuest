@@ -15,15 +15,50 @@ const BIBLE_BOOKS = [
   '1 Peter', '2 Peter', '1 John', '2 John', '3 John', 'Jude', 'Revelation'
 ];
 
+const BOOK_MAPPING: Record<string, string> = {
+  'Gen': 'Genesis', 'Ex': 'Exodus', 'Exo': 'Exodus', 'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
+  'Josh': 'Joshua', 'Judg': 'Judges', 'Ruth': 'Ruth', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
+  '1Kings': '1 Kings', '2Kings': '2 Kings', '1Chron': '1 Chronicles', '2Chron': '2 Chronicles',
+  'Ezra': 'Ezra', 'Neh': 'Nehemiah', 'Esth': 'Esther', 'Job': 'Job', 'Ps': 'Psalm', 'Psa': 'Psalm', 'Prov': 'Proverbs',
+  'Eccl': 'Ecclesiastes', 'Song': 'Song of Solomon', 'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations',
+  'Ezek': 'Ezekiel', 'Dan': 'Daniel', 'Hos': 'Hosea', 'Joel': 'Joel', 'Amos': 'Amos', 'Obad': 'Obadiah',
+  'Jonah': 'Jonah', 'Mic': 'Micah', 'Nah': 'Nahum', 'Hab': 'Habakkuk', 'Zeph': 'Zephaniah', 'Hag': 'Haggai',
+  'Zech': 'Zechariah', 'Mal': 'Malachi', 'Matt': 'Matthew', 'Mark': 'Mark', 'Luke': 'Luke', 'John': 'John',
+  'Acts': 'Acts', 'Rom': 'Romans', '1Cor': '1 Corinthians', '2Cor': '2 Corinthians', 'Gal': 'Galatians',
+  'Eph': 'Ephesians', 'Phil': 'Philippians', 'Col': 'Colossians', '1Thess': '1 Thessalonians', '2Thess': '2 Thessalonians',
+  '1Tim': '1 Timothy', '2Tim': '2 Timothy', 'Titus': 'Titus', 'Philem': 'Philemon', 'Heb': 'Hebrews', 'James': 'James',
+  '1Pet': '1 Peter', '2Pet': '2 Peter', '1John': '1 John', '2John': '2 John', '3John': '3 John', 'Jude': 'Jude',
+  'Rev': 'Revelation', '1 Sam': '1 Samuel', '2 Sam': '2 Samuel', '1 Kin': '1 Kings', '2 Kin': '2 Kings',
+  '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles', '1 Cor': '1 Corinthians', '2 Cor': '2 Corinthians',
+  '1 Thess': '1 Thessalonians', '2 Thess': '2 Thessalonians', '1 Tim': '1 Timothy', '2 Tim': '2 Timothy',
+  '1 Pet': '1 Peter', '2 Pet': '2 Peter', '1 Jo': '1 John', '2 Jo': '2 John', '3 Jo': '3 John'
+};
+
+function normalizeBookName(name: string): string {
+  const trimmed = name.trim();
+  if (BOOK_MAPPING[trimmed]) return BOOK_MAPPING[trimmed];
+  
+  // Try to find a match in BIBLE_BOOKS
+  const match = BIBLE_BOOKS.find(b => b.toLowerCase() === trimmed.toLowerCase());
+  if (match) return match;
+  
+  return trimmed;
+}
+
 function getBookName(bookNum: number): string {
   return BIBLE_BOOKS[bookNum - 1] || `Book ${bookNum}`;
 }
 
 /**
- * No cleaning applied as per user request.
+ * Cleans verse text of common markers while preserving the core KJV text.
  */
 function cleanVerseText(text: string): string {
-  return text || '';
+  if (!text) return '';
+  return text
+    .replace(/\{[^{}]*:[^{}]*\}/g, '') // Remove commentary markers
+    .replace(/[\[\]\{\}\(\)]/g, '')     // Remove brackets/braces
+    .replace(/\s+/g, " ")              // Normalize whitespace
+    .trim();
 }
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -169,7 +204,6 @@ export async function getBooks(): Promise<string[]> {
     const store = tx.objectStore(STORE_NAME);
     const index = store.index('book');
     
-    // Using a cursor with 'nextunique' is the most efficient way to get unique values from an index
     const books: string[] = [];
     let cursor = await index.openCursor(null, 'nextunique');
     while (cursor) {
@@ -177,12 +211,13 @@ export async function getBooks(): Promise<string[]> {
       cursor = await cursor.continue();
     }
     
-    // If we got no books from the DB, fallback
     if (books.length === 0) throw new Error('No books in DB');
     return books;
   } catch (error) {
-    console.warn('GetBooks falling back to local library:', error);
-    return Array.from(new Set(KJV_LIBRARY.map(v => v.book)));
+    console.warn('GetBooks falling back to full book list:', error);
+    // Return all books even if they don't have verses in the fallback library
+    // This allows the user to see the full list in the creator
+    return BIBLE_BOOKS;
   }
 }
 
@@ -229,9 +264,21 @@ export async function seedBible(verses: Verse[]) {
 }
 
 export async function isBibleSeeded(): Promise<boolean> {
+  try {
+    const db = await initBibleDB();
+    const count = await db.count(STORE_NAME);
+    return count > 30000; // KJV has ~31,102 verses
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function clearBibleDB() {
   const db = await initBibleDB();
-  const count = await db.count(STORE_NAME);
-  return count > 30000; // KJV has ~31,102 verses
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  await tx.objectStore(STORE_NAME).clear();
+  await tx.done;
+  console.log('Bible DB cleared');
 }
 
 let isDownloading = false;
@@ -243,11 +290,14 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   try {
     const db = await initBibleDB();
     
-    if (!force) {
+    if (force) {
+      await clearBibleDB();
+    } else {
       const count = await db.count(STORE_NAME);
       if (count > 30000) {
         console.log('Bible already fully downloaded');
         if (onProgress) onProgress(100);
+        isDownloading = false;
         return;
       }
     }
@@ -255,11 +305,11 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   console.log('Downloading Full KJV Bible...');
   
   const sources = [
-    'https://www.openbible.info/data/kjv.txt',
+    'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/kjv/kjv.txt',
     'https://raw.githubusercontent.com/OpenBibleInfo/Bible-Data/master/kjv.txt',
-    '/kjv.txt',
     'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json',
-    'https://raw.githubusercontent.com/getbible/v2/main/json/kjv.json'
+    'https://raw.githubusercontent.com/getbible/v2/main/json/kjv.json',
+    '/kjv.txt'
   ];
 
   let data = null;
@@ -269,15 +319,33 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   for (const url of sources) {
     try {
       console.log(`Attempting to fetch from: ${url}`);
-      const response = await fetch(url);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout per source
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
+        let rawData;
+        let currentIsText = false;
         if (url.endsWith('.txt')) {
-          data = await response.text();
-          isTextFormat = true;
+          rawData = await response.text();
+          currentIsText = true;
         } else {
-          data = await response.json();
-          isTextFormat = false;
+          rawData = await response.json();
+          currentIsText = false;
         }
+
+        // Quick validation: does it look like a full Bible?
+        // KJV is ~4.5MB text. If it's less than 2MB, it's likely truncated.
+        if (typeof rawData === 'string' && rawData.length < 2000000 && url === '/kjv.txt') {
+          console.warn(`Local source ${url} appears truncated (${rawData.length} bytes). Trying next...`);
+          continue;
+        }
+
+        data = rawData;
+        isTextFormat = currentIsText;
         console.log(`Successfully fetched Bible data from ${url}`);
         break;
       } else {
@@ -298,14 +366,17 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      // Format: Book Chapter:Verse Text
-      const match = trimmed.match(/^(.+)\s(\d+):(\d+)\s(.*)$/);
+      // Format: [LineNumber:] Book Chapter:Verse Text
+      // Also handle OpenBible format: Book\tChapter\tVerse\tText
+      // Improved regex to handle optional line numbers with colons or periods, and various spacing
+      const match = trimmed.match(/^(?:\d+[:.]?\s+)?(.+)\s+(\d+)[:.](\d+)\s+(.*)$/) || 
+                    trimmed.match(/^(?:\d+[:.]?\s+)?([^\t]+)\t(\d+)\t(\d+)\t(.*)$/);
       if (match) {
         verses.push({
-          book: match[1].trim(),
+          book: normalizeBookName(match[1]),
           chapter: Number(match[2]),
           verse: Number(match[3]),
-          text: match[4].trim()
+          text: cleanVerseText(match[4])
         });
       }
     }

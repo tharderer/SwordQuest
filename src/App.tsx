@@ -1681,7 +1681,7 @@ const BibleStudyOverlay = ({ reference, questionText, onDelete, onClose }: { ref
             </div>
             <div>
               <h3 className="text-white font-black text-xl tracking-tight uppercase italic">Bible Study</h3>
-              <p className="text-orange-400 font-bold text-xs uppercase tracking-widest">{reference}</p>
+              <p className="text-orange-400 font-bold text-xs uppercase tracking-widest">{reference.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}</p>
             </div>
           </div>
           <button 
@@ -1696,7 +1696,7 @@ const BibleStudyOverlay = ({ reference, questionText, onDelete, onClose }: { ref
           {questionText && (
             <div className="mb-6 p-4 bg-white/5 rounded-2xl border border-white/10">
               <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-1">Question</p>
-              <p className="text-white text-lg font-bold italic tracking-tight leading-tight">"{questionText}"</p>
+              <p className="text-white text-lg font-bold italic tracking-tight leading-tight">"{questionText.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}"</p>
             </div>
           )}
 
@@ -1724,7 +1724,7 @@ const BibleStudyOverlay = ({ reference, questionText, onDelete, onClose }: { ref
                 >
                   <span className="text-orange-500 font-black text-lg italic shrink-0 mt-1">{v.verse}</span>
                   <p className="text-white text-xl font-medium leading-relaxed tracking-tight">
-                    {v.text}
+                    {v.text.replace(/\{[^{}]*:[^{}]*\}/g, "").replace(/[^\w\s]|_/g, "").replace(/[\{\}\[\]\(\)]/g, "").replace(/\s+/g, " ").trim()}
                   </p>
                 </motion.div>
               ))}
@@ -1994,7 +1994,7 @@ const HUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, gameMod
           <div className="bg-blue-600/10 border border-blue-500/20 px-4 py-1.5 rounded-xl flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
             <span className="text-blue-400 font-black text-sm sm:text-xl tracking-tighter italic uppercase whitespace-nowrap">
-              {currentVerse.book} {currentVerse.chapter}:{currentVerse.verse}
+              {`${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
             </span>
           </div>
         ) : (
@@ -2005,7 +2005,7 @@ const HUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, gameMod
           >
             <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
             <span className="text-blue-400 font-black text-sm sm:text-xl tracking-tighter italic uppercase whitespace-nowrap">
-              {currentVerse.book} {currentVerse.chapter}:{currentVerse.verse}
+              {`${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
             </span>
           </motion.div>
         )
@@ -2572,7 +2572,7 @@ const BibleHeroTowerGame = ({
     const now = Date.now();
     const timeDelta = now - lastTapTimeRef.current;
 
-    const isCorrect = choice === currentQuestion.correctAnswer;
+    const isCorrect = choice.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === currentQuestion.correctAnswer.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
 
     if (isCorrect) {
       lastTapTimeRef.current = now;
@@ -2630,10 +2630,10 @@ const BibleHeroTowerGame = ({
           ...prev.stack,
           {
             id: nextIdRef.current++,
-            word: currentQuestion.correctAnswer,
+            word: currentQuestion.correctAnswer.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim(),
             height,
             color: isCombo ? '#fbbf24' : (section?.color || '#3b82f6'),
-            reference: currentQuestion.reference,
+            reference: currentQuestion.reference.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim(),
             questionText: currentQuestion.text
           }
         ]
@@ -2824,8 +2824,13 @@ const BibleHeroTowerGame = ({
         lastUpdateRef={lastUpdateRef}
         setIsSettingsOpen={setIsSettingsOpen}
         lives={lives}
-        deed={currentQuestion?.text || "Loading..."}
-        reference={currentQuestion?.reference}
+        deed={(currentQuestion?.text || "Loading...")
+          .replace(/\{[^{}]*:[^{}]*\}/g, '')
+          .replace(/[\{\}\[\]\(\)]/g, '')
+          .replace(/[^\w\s]|_/g, "")
+          .replace(/\s+/g, " ")
+          .trim()}
+        reference={currentQuestion?.reference?.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
         book={currentQuestion?.book}
         chapter={currentQuestion?.chapter}
         progress={progress}
@@ -2928,7 +2933,7 @@ const BibleHeroTowerGame = ({
                   : "bg-slate-900 border-slate-800 text-white hover:border-orange-500/50"
               )}
             >
-              {opt}
+              {opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
             </motion.button>
           ))}
         </div>
@@ -3712,10 +3717,10 @@ const ChoiceGameUI = memo(({ options, isAskingReference, currentVerse, words, cu
     <div className="h-full p-3 grid grid-cols-2 gap-3">
       {options.map((opt: any, i: number) => {
         const isCorrect = isAskingReference 
-          ? opt === `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`
-          : opt === words[currentIndex];
+          ? opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()
+          : opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === words[currentIndex];
         
-        let displayOpt = opt;
+        let displayOpt = opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
         if (difficulty === 'master' && !isAskingReference) {
           displayOpt = opt[0] + opt.slice(1).replace(/./g, '_');
         }
@@ -4601,8 +4606,13 @@ const EndlessBlitzGame = ({
   const [sessionMasteredKeys, setSessionMasteredKeys] = useState<string[]>([]);
   const [currentVerse, setCurrentVerse] = useState<Verse>(() => getNextEndlessVerse(allVerses, []));
   const words = useMemo(() => {
-    // Remove ALL punctuation as per user request for Star Tower typing mode
-    const cleanText = currentVerse.text.replace(/[^\w\s]|_/g, "");
+    // Remove ALL punctuation and commentary markers as per user request for Star Tower typing mode
+    const cleanText = currentVerse.text
+      .replace(/\{[^{}]*:[^{}]*\}/g, '') // Remove commentary markers
+      .replace(/[\{\}\[\]\(\)]/g, '')     // Remove brackets/braces
+      .replace(/[^\w\s]|_/g, "")         // Remove all other punctuation
+      .replace(/\s+/g, " ")              // Normalize whitespace
+      .trim();
     return cleanText.split(/\s+/).filter(Boolean);
   }, [currentVerse]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -4667,15 +4677,15 @@ const EndlessBlitzGame = ({
 
       return [correct, ...finalDistractors].sort(() => Math.random() - 0.5);
     } else {
-      const correct = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
+      const correct = `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
       const distractors = allVerses
-        .filter(v => `${v.book} ${v.chapter}:${v.verse}` !== correct)
-        .map(v => `${v.book} ${v.chapter}:${v.verse}`)
+        .filter(v => `${v.book} ${v.chapter} ${v.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() !== correct)
+        .map(v => `${v.book} ${v.chapter} ${v.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim())
         .sort(() => Math.random() - 0.5)
         .slice(0, 3);
       
       const finalDistractors = [...distractors];
-      const fallbackPool = ["Genesis 1:1", "John 3:16", "Psalm 23:1", "Psalm 119:105", "Proverbs 3:5"];
+      const fallbackPool = ["Genesis 1 1", "John 3 16", "Psalm 23 1", "Psalm 119 105", "Proverbs 3 5"];
       while (finalDistractors.length < 3) {
         const randomFallback = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
         if (!finalDistractors.includes(randomFallback)) {
@@ -5009,7 +5019,7 @@ const EndlessBlitzGame = ({
   }, [volume]);
 
   const completeVerse = useCallback((choice: string, timeDelta: number) => {
-    const correctRef = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
+    const correctRef = `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
     
     // Play success sound
     playSound(880, 'sine', 0.2, 0.2);
@@ -5081,8 +5091,8 @@ const EndlessBlitzGame = ({
     const timeDelta = now - lastTapTimeRef.current;
 
     if (isAskingReference) {
-      const correctRef = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
-      if (choice === correctRef) {
+      const correctRef = `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+      if (choice.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === correctRef) {
         lastTapTimeRef.current = now;
         completeVerse(choice, timeDelta);
       } else {
@@ -5607,9 +5617,9 @@ const EndlessBlitzGame = ({
           
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-white/10 mb-6 text-left">
             <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest mb-2">Final Verse</p>
-            <p className="text-lg font-bold leading-tight mb-2 italic">"{currentVerse.text}"</p>
+            <p className="text-lg font-bold leading-tight mb-2 italic">"{currentVerse.text.replace(/\{[^{}]*:[^{}]*\}/g, "").replace(/[^\w\s]|_/g, "").replace(/[\{\}\[\]\(\)]/g, "").replace(/\s+/g, " ").trim()}"</p>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-              — {currentVerse.book} {currentVerse.chapter}:{currentVerse.verse}
+              — {`${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
             </p>
           </div>
 
