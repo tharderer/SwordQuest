@@ -8,7 +8,7 @@ const STORE_NAME = 'verses';
 const BIBLE_BOOKS = [
   'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
   '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles', 'Ezra', 'Nehemiah', 'Esther', 'Job', 'Psalm', 'Proverbs',
-  'Ecclesiastes', 'Song of Solomon', 'Isaiah', 'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel', 'Hoshea', 'Joel', 'Amos',
+  'Ecclesiastes', 'Song of Solomon', 'Isaiah', 'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel', 'Hosea', 'Joel', 'Amos',
   'Obadiah', 'Jonah', 'Micah', 'Nahum', 'Habakkuk', 'Zephaniah', 'Haggai', 'Zechariah', 'Malachi', 'Matthew', 'Mark',
   'Luke', 'John', 'Acts', 'Romans', '1 Corinthians', '2 Corinthians', 'Galatians', 'Ephesians', 'Philippians',
   'Colossians', '1 Thessalonians', '2 Thessalonians', '1 Timothy', '2 Timothy', 'Titus', 'Philemon', 'Hebrews', 'James',
@@ -20,7 +20,7 @@ function getBookName(bookNum: number): string {
 }
 
 /**
- * Returns the verse text as-is.
+ * No cleaning applied as per user request.
  */
 function cleanVerseText(text: string): string {
   return text || '';
@@ -86,10 +86,7 @@ export async function searchBible(query: string): Promise<Verse[]> {
     const allVerses = await store.getAll();
     
     const s = query.toLowerCase();
-    return allVerses.map(v => ({
-      ...v,
-      text: cleanVerseText(v.text)
-    })).filter(v => 
+    return allVerses.filter(v => 
       v.book.toLowerCase().includes(s) || 
       v.text.toLowerCase().includes(s) ||
       `${v.book} ${v.chapter}:${v.verse}`.toLowerCase().includes(s)
@@ -97,10 +94,7 @@ export async function searchBible(query: string): Promise<Verse[]> {
   } catch (error) {
     console.warn('Search falling back to local library:', error);
     const s = query.toLowerCase();
-    return KJV_LIBRARY.map(v => ({
-      ...v,
-      text: cleanVerseText(v.text)
-    })).filter(v => 
+    return KJV_LIBRARY.filter(v => 
       v.book.toLowerCase().includes(s) || 
       v.text.toLowerCase().includes(s) ||
       `${v.book} ${v.chapter}:${v.verse}`.toLowerCase().includes(s)
@@ -112,18 +106,10 @@ export async function getVerseByRef(book: string, chapter: number, verse: number
   try {
     const db = await initBibleDB();
     const index = db.transaction(STORE_NAME).store.index('reference');
-    const dbVerse = await index.get([book, chapter, verse]);
-    if (dbVerse) {
-      return { ...dbVerse, text: cleanVerseText(dbVerse.text) };
-    }
-    return undefined;
+    return await index.get([book, chapter, verse]);
   } catch (error) {
     console.warn('GetVerseByRef falling back to local library:', error);
-    const foundVerse = KJV_LIBRARY.find(v => v.book === book && v.chapter === chapter && v.verse === verse);
-    if (foundVerse) {
-      return { ...foundVerse, text: cleanVerseText(foundVerse.text) };
-    }
-    return undefined;
+    return KJV_LIBRARY.find(v => v.book === book && v.chapter === chapter && v.verse === verse);
   }
 }
 
@@ -135,8 +121,7 @@ export async function getVersesByRange(book: string, chapter: number, startVerse
     const index = store.index('reference');
     
     const range = IDBKeyRange.bound([book, chapter, startVerse], [book, chapter, endVerse]);
-    const verses = await index.getAll(range);
-    return verses.map(v => ({ ...v, text: cleanVerseText(v.text) }));
+    return await index.getAll(range);
   } catch (error) {
     console.warn('GetVersesByRange falling back to local library:', error);
     return KJV_LIBRARY.filter(v => 
@@ -144,7 +129,7 @@ export async function getVersesByRange(book: string, chapter: number, startVerse
       v.chapter === chapter && 
       v.verse >= startVerse && 
       v.verse <= endVerse
-    ).map(v => ({ ...v, text: cleanVerseText(v.text) }));
+    );
   }
 }
 
@@ -155,14 +140,12 @@ export async function getVersesByChapter(book: string, chapter: number): Promise
     const store = tx.objectStore(STORE_NAME);
     const index = store.index('reference');
     
-    // We want all verses in this chapter. 
     // The index is ['book', 'chapter', 'verse']
     const range = IDBKeyRange.bound([book, chapter, 0], [book, chapter, 999]);
-    const verses = await index.getAll(range);
-    return verses.map(v => ({ ...v, text: cleanVerseText(v.text) }));
+    return await index.getAll(range);
   } catch (error) {
     console.warn('GetVersesByChapter falling back to local library:', error);
-    return KJV_LIBRARY.filter(v => v.book === book && v.chapter === chapter).map(v => ({ ...v, text: cleanVerseText(v.text) }));
+    return KJV_LIBRARY.filter(v => v.book === book && v.chapter === chapter);
   }
 }
 
@@ -172,11 +155,10 @@ export async function getVersesByBook(book: string): Promise<Verse[]> {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const index = store.index('book');
-    const verses = await index.getAll(book);
-    return verses.map(v => ({ ...v, text: cleanVerseText(v.text) }));
+    return await index.getAll(book);
   } catch (error) {
     console.warn('GetVersesByBook falling back to local library:', error);
-    return KJV_LIBRARY.filter(v => v.book === book).map(v => ({ ...v, text: cleanVerseText(v.text) }));
+    return KJV_LIBRARY.filter(v => v.book === book);
   }
 }
 
@@ -270,22 +252,32 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
       }
     }
 
-  console.log('Downloading Full KJV Bible (Plain Text Optimized)...');
+  console.log('Downloading Full KJV Bible...');
   
   const sources = [
-    'https://raw.githubusercontent.com/getbible/v2/main/json/kjv.json',
-    'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json'
+    'https://www.openbible.info/data/kjv.txt',
+    'https://raw.githubusercontent.com/OpenBibleInfo/Bible-Data/master/kjv.txt',
+    '/kjv.txt',
+    'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json',
+    'https://raw.githubusercontent.com/getbible/v2/main/json/kjv.json'
   ];
 
   let data = null;
   let error = null;
+  let isTextFormat = false;
 
   for (const url of sources) {
     try {
       console.log(`Attempting to fetch from: ${url}`);
       const response = await fetch(url);
       if (response.ok) {
-        data = await response.json();
+        if (url.endsWith('.txt')) {
+          data = await response.text();
+          isTextFormat = true;
+        } else {
+          data = await response.json();
+          isTextFormat = false;
+        }
         console.log(`Successfully fetched Bible data from ${url}`);
         break;
       } else {
@@ -301,105 +293,123 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   
   const verses: Verse[] = [];
   
-  // Normalize data structure
-  // Case 1: Flat array of verses or object with result/verses array
-  const flatList = Array.isArray(data) ? data : (data.result || data.verses);
-  if (Array.isArray(flatList) && flatList.length > 0 && (flatList[0].text || flatList[0].t || flatList[0].v)) {
-    flatList.forEach((v: any) => {
-      const text = String(v.text || v.t || v.v || '');
-      if (text) {
+  if (isTextFormat && typeof data === 'string') {
+    const lines = data.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      // Format: Book Chapter:Verse Text
+      const match = trimmed.match(/^(.+)\s(\d+):(\d+)\s(.*)$/);
+      if (match) {
         verses.push({
-          book: v.book || v.b || 'Unknown',
-          chapter: Number(v.chapter || v.c || 1),
-          verse: Number(v.verse || v.v || v.n || 1),
-          text: cleanVerseText(text)
+          book: match[1].trim(),
+          chapter: Number(match[2]),
+          verse: Number(match[3]),
+          text: match[4].trim()
         });
       }
-    });
-  } 
-  // Case 2: Nested structure (Books -> Chapters -> Verses)
-  else {
-    let books = data.books || data.library || (Array.isArray(data) ? data : []);
-    
-    if (!Array.isArray(books) && typeof data === 'object') {
-      // Maybe it's an object where keys are book names?
-      books = Object.entries(data).map(([name, content]: [string, any]) => ({
-        name,
-        ...content
-      }));
     }
+  } else {
+    // Normalize data structure
+    // Case 1: Flat array of verses or object with result/verses array
+    const flatList = Array.isArray(data) ? data : (data.result || data.verses);
+    if (Array.isArray(flatList) && flatList.length > 0 && (flatList[0].text || flatList[0].t || flatList[0].v)) {
+      flatList.forEach((v: any) => {
+        const text = String(v.text || v.t || v.v || '');
+        if (text) {
+          verses.push({
+            book: v.book || v.b || 'Unknown',
+            chapter: Number(v.chapter || v.c || 1),
+            verse: Number(v.verse || v.v || v.n || 1),
+            text: cleanVerseText(text)
+          });
+        }
+      });
+    } 
+    // Case 2: Nested structure (Books -> Chapters -> Verses)
+    else {
+      let books = data.books || data.library || (Array.isArray(data) ? data : []);
+      
+      if (!Array.isArray(books) && typeof data === 'object') {
+        // Maybe it's an object where keys are book names?
+        books = Object.entries(data).map(([name, content]: [string, any]) => ({
+          name,
+          ...content
+        }));
+      }
 
-    if (Array.isArray(books)) {
-      books.forEach((book: any, bIdx: number) => {
-        const bookName = book.name || book.book || book.title || `Book ${bIdx + 1}`;
-        const chapters = book.chapters || book.chapter || [];
-        
-        if (Array.isArray(chapters)) {
-          chapters.forEach((chapter: any, cIdx: number) => {
-            const chapterNum = chapter.num || chapter.number || (cIdx + 1);
-            
-            // Case 2a: chapter is an array of verses (either strings or objects)
-            if (Array.isArray(chapter)) {
-              chapter.forEach((vData: any, vIdx: number) => {
-                const text = typeof vData === 'string' ? vData : (vData.text || vData.verse || vData.v || '');
-                const verseNum = vData.num || vData.number || vData.v || (vIdx + 1);
-                if (text) {
-                  verses.push({
-                    book: bookName,
-                    chapter: Number(chapterNum),
-                    verse: Number(verseNum),
-                    text: cleanVerseText(String(text))
-                  });
-                }
-              });
-            } 
-            // Case 2b: chapter is an object with a verses array
-            else if (chapter.verses && Array.isArray(chapter.verses)) {
-              chapter.verses.forEach((vData: any, vIdx: number) => {
-                const text = typeof vData === 'string' ? vData : (vData.text || vData.verse || vData.v || '');
-                const verseNum = vData.num || vData.number || vData.v || (vIdx + 1);
-                if (text) {
-                  verses.push({
-                    book: bookName,
-                    chapter: Number(chapterNum),
-                    verse: Number(verseNum),
-                    text: cleanVerseText(String(text))
-                  });
-                }
-              });
-            }
-            // Case 2c: chapter is an object where keys are verse numbers
-            else if (typeof chapter === 'object' && chapter !== null) {
-              Object.entries(chapter).forEach(([vNum, vText]: [string, any]) => {
-                if (vNum !== 'num' && vNum !== 'number') {
-                  const text = typeof vText === 'string' ? vText : (vText.text || vText.verse || vText.v || '');
+      if (Array.isArray(books)) {
+        books.forEach((book: any, bIdx: number) => {
+          const bookName = book.name || book.book || book.title || `Book ${bIdx + 1}`;
+          const chapters = book.chapters || book.chapter || [];
+          
+          if (Array.isArray(chapters)) {
+            chapters.forEach((chapter: any, cIdx: number) => {
+              const chapterNum = chapter.num || chapter.number || (cIdx + 1);
+              
+              // Case 2a: chapter is an array of verses (either strings or objects)
+              if (Array.isArray(chapter)) {
+                chapter.forEach((vData: any, vIdx: number) => {
+                  const text = typeof vData === 'string' ? vData : (vData.text || vData.verse || vData.v || '');
+                  const verseNum = vData.num || vData.number || vData.v || (vIdx + 1);
                   if (text) {
                     verses.push({
                       book: bookName,
                       chapter: Number(chapterNum),
-                      verse: Number(vNum),
+                      verse: Number(verseNum),
                       text: cleanVerseText(String(text))
                     });
                   }
-                }
-              });
-            }
-          });
-        }
-        // Case 2d: book has a verses array directly (some formats skip chapter objects)
-        else if (Array.isArray(book.verses)) {
-          book.verses.forEach((vData: any) => {
-            if (vData.chapter && vData.verse && vData.text) {
-              verses.push({
-                book: bookName,
-                chapter: Number(vData.chapter),
-                verse: Number(vData.verse),
-                text: cleanVerseText(String(vData.text))
-              });
-            }
-          });
-        }
-      });
+                });
+              } 
+              // Case 2b: chapter is an object with a verses array
+              else if (chapter.verses && Array.isArray(chapter.verses)) {
+                chapter.verses.forEach((vData: any, vIdx: number) => {
+                  const text = typeof vData === 'string' ? vData : (vData.text || vData.verse || vData.v || '');
+                  const verseNum = vData.num || vData.number || vData.v || (vIdx + 1);
+                  if (text) {
+                    verses.push({
+                      book: bookName,
+                      chapter: Number(chapterNum),
+                      verse: Number(verseNum),
+                      text: cleanVerseText(String(text))
+                    });
+                  }
+                });
+              }
+              // Case 2c: chapter is an object where keys are verse numbers
+              else if (typeof chapter === 'object' && chapter !== null) {
+                Object.entries(chapter).forEach(([vNum, vText]: [string, any]) => {
+                  if (vNum !== 'num' && vNum !== 'number') {
+                    const text = typeof vText === 'string' ? vText : (vText.text || vText.verse || vText.v || '');
+                    if (text) {
+                      verses.push({
+                        book: bookName,
+                        chapter: Number(chapterNum),
+                        verse: Number(vNum),
+                        text: cleanVerseText(String(text))
+                      });
+                    }
+                  }
+                });
+              }
+            });
+          }
+          // Case 2d: book has a verses array directly (some formats skip chapter objects)
+          else if (Array.isArray(book.verses)) {
+            book.verses.forEach((vData: any) => {
+              if (vData.chapter && vData.verse && vData.text) {
+                verses.push({
+                  book: bookName,
+                  chapter: Number(vData.chapter),
+                  verse: Number(vData.verse),
+                  text: cleanVerseText(String(vData.text))
+                });
+              }
+            });
+          }
+        });
+      }
     }
   }
 

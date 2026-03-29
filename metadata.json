@@ -1,5 +1,5 @@
 {
-  "name": "Sword Quest: Bible Memory",
-  "description": "A gamified Bible memory app for kids with a local KJV plain text asset. Master the KJV with fun challenges like Bible Fall and Hero Tower. Works offline!",
+  "name": "Bible Verse App",
+  "description": "A Bible verse application that downloads and stores the full KJV Bible locally for offline use.",
   "requestFramePermissions": []
 }

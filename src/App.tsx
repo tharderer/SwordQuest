@@ -4601,7 +4601,8 @@ const EndlessBlitzGame = ({
   const [sessionMasteredKeys, setSessionMasteredKeys] = useState<string[]>([]);
   const [currentVerse, setCurrentVerse] = useState<Verse>(() => getNextEndlessVerse(allVerses, []));
   const words = useMemo(() => {
-    const cleanText = currentVerse.text.replace(/[.,!?;:"'()\[\]]/g, "");
+    // Remove ALL punctuation as per user request for Star Tower typing mode
+    const cleanText = currentVerse.text.replace(/[^\w\s]|_/g, "");
     return cleanText.split(/\s+/).filter(Boolean);
   }, [currentVerse]);
   const [currentIndex, setCurrentIndex] = useState(0);
