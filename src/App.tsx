@@ -32,6 +32,9 @@ import {
   Settings,
   Rocket,
   Calculator,
+  Skull,
+  TowerControl as Tower,
+  Quote,
   Volume2,
   Music,
   ChevronUp,
@@ -58,7 +61,9 @@ import {
   Share2,
   Filter,
   ArrowRight,
-  Layout
+  Layout,
+  Compass,
+  Coins
 } from 'lucide-react';
 import { 
   initBibleQuestionDB, 
@@ -78,8 +83,80 @@ import {
 } from './services/bibleQuestionService';
 import { generateBibleQuestionsBatch } from './services/geminiService';
 import confetti from 'canvas-confetti';
+import { MissionaryJourneysGame } from './components/MissionaryJourneysGame';
+import { BibleWitsAndWagersGame } from './components/BibleWitsAndWagersGame';
 import { cn } from './lib/utils';
 import { Verse, UserProgress, VerseSet } from './types';
+
+const PROMINENT_REFERENCES = [
+  "Genesis 1:1", "Genesis 1:26", "Genesis 1:27", "Genesis 2:7", "Genesis 2:24", "Genesis 3:15", "Genesis 12:1", "Genesis 12:2", "Genesis 12:3", "Genesis 15:6", "Genesis 22:12", "Genesis 28:15", "Genesis 50:20",
+  "Exodus 3:14", "Exodus 14:14", "Exodus 15:2", "Exodus 20:3", "Exodus 20:4", "Exodus 20:7", "Exodus 20:8", "Exodus 20:12", "Exodus 20:13", "Exodus 20:14", "Exodus 20:15", "Exodus 20:16", "Exodus 20:17", "Exodus 33:14",
+  "Leviticus 19:2", "Leviticus 19:18", "Leviticus 20:7",
+  "Numbers 6:24", "Numbers 6:25", "Numbers 6:26", "Numbers 23:19",
+  "Deuteronomy 4:29", "Deuteronomy 6:4", "Deuteronomy 6:5", "Deuteronomy 7:9", "Deuteronomy 8:3", "Deuteronomy 10:12", "Deuteronomy 31:6", "Deuteronomy 31:8", "Deuteronomy 32:4",
+  "Joshua 1:8", "Joshua 1:9", "Joshua 24:15",
+  "Judges 21:25",
+  "Ruth 1:16",
+  "1 Samuel 12:24", "1 Samuel 15:22", "1 Samuel 16:7",
+  "2 Samuel 7:22", "2 Samuel 22:31",
+  "1 Kings 8:56", "1 Kings 18:21",
+  "2 Kings 19:19",
+  "1 Chronicles 16:11", "1 Chronicles 16:34", "1 Chronicles 29:11", "1 Chronicles 29:12",
+  "2 Chronicles 7:14", "2 Chronicles 16:9", "2 Chronicles 20:12", "2 Chronicles 20:15",
+  "Ezra 7:10",
+  "Nehemiah 8:10", "Nehemiah 9:6",
+  "Esther 4:14",
+  "Job 1:21", "Job 19:25", "Job 23:10", "Job 28:28", "Job 42:2",
+  "Psalm 1:1", "Psalm 1:2", "Psalm 1:3", "Psalm 8:1", "Psalm 16:11", "Psalm 18:1", "Psalm 18:2", "Psalm 18:30", "Psalm 19:1", "Psalm 19:14", "Psalm 23:1", "Psalm 23:2", "Psalm 23:3", "Psalm 23:4", "Psalm 23:5", "Psalm 23:6", "Psalm 24:1", "Psalm 25:4", "Psalm 25:5", "Psalm 27:1", "Psalm 27:4", "Psalm 27:14", "Psalm 32:8", "Psalm 34:1", "Psalm 34:4", "Psalm 34:8", "Psalm 34:10", "Psalm 34:18", "Psalm 37:4", "Psalm 37:5", "Psalm 37:7", "Psalm 37:23", "Psalm 37:24", "Psalm 40:1", "Psalm 42:1", "Psalm 46:1", "Psalm 46:10", "Psalm 51:1", "Psalm 51:10", "Psalm 51:12", "Psalm 55:22", "Psalm 56:3", "Psalm 62:1", "Psalm 62:5", "Psalm 62:8", "Psalm 63:1", "Psalm 63:3", "Psalm 73:25", "Psalm 73:26", "Psalm 84:10", "Psalm 84:11", "Psalm 86:11", "Psalm 90:12", "Psalm 91:1", "Psalm 91:2", "Psalm 91:11", "Psalm 95:1", "Psalm 100:1", "Psalm 100:2", "Psalm 100:3", "Psalm 100:4", "Psalm 100:5", "Psalm 103:1", "Psalm 103:2", "Psalm 103:8", "Psalm 103:10", "Psalm 103:11", "Psalm 103:12", "Psalm 103:13", "Psalm 107:1", "Psalm 116:15", "Psalm 118:1", "Psalm 118:24", "Psalm 119:9", "Psalm 119:11", "Psalm 119:18", "Psalm 119:105", "Psalm 121:1", "Psalm 121:2", "Psalm 121:3", "Psalm 121:4", "Psalm 121:5", "Psalm 121:6", "Psalm 121:7", "Psalm 121:8", "Psalm 127:1", "Psalm 133:1", "Psalm 136:1", "Psalm 139:1", "Psalm 139:13", "Psalm 139:14", "Psalm 139:23", "Psalm 139:24", "Psalm 143:10", "Psalm 145:18", "Psalm 147:3",
+  "Proverbs 1:7", "Proverbs 3:5", "Proverbs 3:6", "Proverbs 3:9", "Proverbs 3:10", "Proverbs 4:23", "Proverbs 6:6", "Proverbs 8:13", "Proverbs 10:19", "Proverbs 11:2", "Proverbs 11:25", "Proverbs 11:30", "Proverbs 12:22", "Proverbs 13:20", "Proverbs 14:12", "Proverbs 15:1", "Proverbs 15:3", "Proverbs 15:13", "Proverbs 15:33", "Proverbs 16:3", "Proverbs 16:9", "Proverbs 16:18", "Proverbs 16:24", "Proverbs 17:17", "Proverbs 17:22", "Proverbs 18:10", "Proverbs 18:21", "Proverbs 18:24", "Proverbs 19:21", "Proverbs 20:1", "Proverbs 21:23", "Proverbs 22:1", "Proverbs 22:6", "Proverbs 23:23", "Proverbs 24:16", "Proverbs 25:21", "Proverbs 25:22", "Proverbs 27:1", "Proverbs 27:17", "Proverbs 28:13", "Proverbs 29:18", "Proverbs 29:25", "Proverbs 30:5", "Proverbs 31:10", "Proverbs 31:30",
+  "Ecclesiastes 3:1", "Ecclesiastes 3:11", "Ecclesiastes 4:9", "Ecclesiastes 4:10", "Ecclesiastes 4:12", "Ecclesiastes 7:20", "Ecclesiastes 12:1", "Ecclesiastes 12:13",
+  "Song of Solomon 2:4", "Song of Solomon 8:6", "Song of Solomon 8:7",
+  "Isaiah 1:18", "Isaiah 6:8", "Isaiah 7:14", "Isaiah 9:6", "Isaiah 12:2", "Isaiah 26:3", "Isaiah 26:4", "Isaiah 30:15", "Isaiah 30:18", "Isaiah 30:21", "Isaiah 35:3", "Isaiah 35:4", "Isaiah 40:8", "Isaiah 40:11", "Isaiah 40:28", "Isaiah 40:29", "Isaiah 40:30", "Isaiah 40:31", "Isaiah 41:10", "Isaiah 41:13", "Isaiah 43:1", "Isaiah 43:2", "Isaiah 43:19", "Isaiah 44:6", "Isaiah 45:22", "Isaiah 48:17", "Isaiah 53:3", "Isaiah 53:4", "Isaiah 53:5", "Isaiah 53:6", "Isaiah 54:10", "Isaiah 54:17", "Isaiah 55:1", "Isaiah 55:6", "Isaiah 55:7", "Isaiah 55:8", "Isaiah 55:9", "Isaiah 55:11", "Isaiah 57:15", "Isaiah 58:11", "Isaiah 59:1", "Isaiah 59:2", "Isaiah 61:1", "Isaiah 61:3", "Isaiah 64:4", "Isaiah 64:8",
+  "Jeremiah 1:5", "Jeremiah 9:23", "Jeremiah 9:24", "Jeremiah 10:12", "Jeremiah 15:16", "Jeremiah 17:7", "Jeremiah 17:8", "Jeremiah 17:9", "Jeremiah 20:9", "Jeremiah 23:23", "Jeremiah 23:24", "Jeremiah 29:11", "Jeremiah 29:12", "Jeremiah 29:13", "Jeremiah 31:3", "Jeremiah 31:33", "Jeremiah 32:17", "Jeremiah 32:27", "Jeremiah 33:3",
+  "Lamentations 3:22", "Lamentations 3:23", "Lamentations 3:24", "Lamentations 3:25", "Lamentations 3:26",
+  "Ezekiel 11:19", "Ezekiel 18:23", "Ezekiel 18:32", "Ezekiel 33:11", "Ezekiel 34:11", "Ezekiel 36:26", "Ezekiel 36:27",
+  "Daniel 2:20", "Daniel 2:21", "Daniel 2:22", "Daniel 3:17", "Daniel 3:18", "Daniel 4:35", "Daniel 6:26", "Daniel 6:27", "Daniel 12:3",
+  "Hosea 4:6", "Hosea 6:3", "Hosea 6:6", "Hosea 10:12", "Hosea 14:9",
+  "Joel 2:12", "Joel 2:13", "Joel 2:28", "Joel 2:32",
+  "Amos 3:3", "Amos 3:7", "Amos 4:12", "Amos 5:14", "Amos 5:24",
+  "Obadiah 1:15",
+  "Jonah 2:9", "Jonah 4:2",
+  "Micah 6:8", "Micah 7:7", "Micah 7:18", "Micah 7:19",
+  "Nahum 1:7",
+  "Habakkuk 2:4", "Habakkuk 2:14", "Habakkuk 2:20", "Habakkuk 3:17", "Habakkuk 3:18", "Habakkuk 3:19",
+  "Zephaniah 3:17",
+  "Haggai 1:5", "Haggai 2:4", "Haggai 2:9",
+  "Zechariah 4:6", "Zechariah 7:9", "Zechariah 8:16", "Zechariah 9:9", "Zechariah 14:9",
+  "Malachi 3:1", "Malachi 3:6", "Malachi 3:10", "Malachi 4:2",
+  "Matthew 1:21", "Matthew 1:23", "Matthew 3:17", "Matthew 4:4", "Matthew 4:10", "Matthew 4:19", "Matthew 5:3", "Matthew 5:4", "Matthew 5:5", "Matthew 5:6", "Matthew 5:7", "Matthew 5:8", "Matthew 5:9", "Matthew 5:10", "Matthew 5:11", "Matthew 5:12", "Matthew 5:13", "Matthew 5:14", "Matthew 5:16", "Matthew 5:20", "Matthew 5:37", "Matthew 5:44", "Matthew 5:48", "Matthew 6:1", "Matthew 6:6", "Matthew 6:9", "Matthew 6:10", "Matthew 6:11", "Matthew 6:12", "Matthew 6:13", "Matthew 6:14", "Matthew 6:15", "Matthew 6:19", "Matthew 6:20", "Matthew 6:21", "Matthew 6:24", "Matthew 6:25", "Matthew 6:26", "Matthew 6:33", "Matthew 6:34", "Matthew 7:1", "Matthew 7:2", "Matthew 7:7", "Matthew 7:8", "Matthew 7:11", "Matthew 7:12", "Matthew 7:13", "Matthew 7:14", "Matthew 7:21", "Matthew 7:24", "Matthew 7:25", "Matthew 9:37", "Matthew 9:38", "Matthew 10:16", "Matthew 10:28", "Matthew 10:32", "Matthew 10:33", "Matthew 10:37", "Matthew 10:38", "Matthew 10:39", "Matthew 11:28", "Matthew 11:29", "Matthew 11:30", "Matthew 12:30", "Matthew 12:34", "Matthew 12:36", "Matthew 12:37", "Matthew 13:44", "Matthew 15:8", "Matthew 15:11", "Matthew 15:18", "Matthew 15:19", "Matthew 16:15", "Matthew 16:16", "Matthew 16:18", "Matthew 16:24", "Matthew 16:25", "Matthew 16:26", "Matthew 17:20", "Matthew 18:3", "Matthew 18:4", "Matthew 18:11", "Matthew 18:19", "Matthew 18:20", "Matthew 19:6", "Matthew 19:14", "Matthew 19:26", "Matthew 20:26", "Matthew 20:27", "Matthew 20:28", "Matthew 21:22", "Matthew 22:37", "Matthew 22:38", "Matthew 22:39", "Matthew 22:40", "Matthew 23:11", "Matthew 23:12", "Matthew 24:13", "Matthew 24:14", "Matthew 24:35", "Matthew 24:42", "Matthew 24:44", "Matthew 25:21", "Matthew 25:23", "Matthew 25:31", "Matthew 25:40", "Matthew 26:41", "Matthew 28:18", "Matthew 28:19", "Matthew 28:20",
+  "Mark 1:15", "Mark 1:17", "Mark 8:34", "Mark 8:35", "Mark 8:36", "Mark 8:37", "Mark 8:38", "Mark 9:23", "Mark 9:24", "Mark 10:14", "Mark 10:15", "Mark 10:27", "Mark 10:43", "Mark 10:44", "Mark 10:45", "Mark 11:22", "Mark 11:23", "Mark 11:24", "Mark 11:25", "Mark 12:29", "Mark 12:30", "Mark 12:31", "Mark 13:31", "Mark 14:38", "Mark 16:15", "Mark 16:16",
+  "Luke 1:37", "Luke 1:38", "Luke 1:46", "Luke 1:47", "Luke 2:10", "Luke 2:11", "Luke 2:14", "Luke 2:52", "Luke 4:4", "Luke 4:8", "Luke 4:18", "Luke 4:19", "Luke 6:27", "Luke 6:28", "Luke 6:31", "Luke 6:35", "Luke 6:36", "Luke 6:37", "Luke 6:38", "Luke 6:45", "Luke 6:46", "Luke 9:23", "Luke 9:24", "Luke 9:25", "Luke 9:26", "Luke 9:62", "Luke 10:2", "Luke 10:19", "Luke 10:20", "Luke 10:27", "Luke 11:9", "Luke 11:10", "Luke 11:13", "Luke 11:28", "Luke 12:15", "Luke 12:22", "Luke 12:23", "Luke 12:31", "Luke 12:32", "Luke 12:34", "Luke 12:48", "Luke 14:11", "Luke 14:26", "Luke 14:27", "Luke 14:33", "Luke 15:7", "Luke 15:10", "Luke 16:10", "Luke 16:13", "Luke 17:3", "Luke 17:4", "Luke 18:1", "Luke 18:16", "Luke 18:17", "Luke 18:27", "Luke 19:10", "Luke 21:33", "Luke 22:19", "Luke 22:20", "Luke 22:42", "Luke 23:34", "Luke 23:43", "Luke 24:44", "Luke 24:45", "Luke 24:46", "Luke 24:47", "Luke 24:48",
+  "John 1:1", "John 1:2", "John 1:3", "John 1:4", "John 1:5", "John 1:12", "John 1:14", "John 1:17", "John 1:18", "John 1:29", "John 3:3", "John 3:5", "John 3:16", "John 3:17", "John 3:18", "John 3:30", "John 3:36", "John 4:14", "John 4:23", "John 4:24", "John 5:24", "John 5:39", "John 6:35", "John 6:37", "John 6:40", "John 6:44", "John 6:47", "John 6:63", "John 6:68", "John 7:37", "John 7:38", "John 8:12", "John 8:31", "John 8:32", "John 8:36", "John 8:58", "John 10:9", "John 10:10", "John 10:11", "John 10:14", "John 10:27", "John 10:28", "John 10:29", "John 10:30", "John 11:25", "John 11:26", "John 11:35", "John 12:24", "John 12:25", "John 12:26", "John 12:32", "John 12:48", "John 13:7", "John 13:13", "John 13:14", "John 13:15", "John 13:34", "John 13:35", "John 14:1", "John 14:2", "John 14:3", "John 14:6", "John 14:12", "John 14:13", "John 14:14", "John 14:15", "John 14:16", "John 14:17", "John 14:21", "John 14:23", "John 14:26", "John 14:27", "John 15:1", "John 15:2", "John 15:4", "John 15:5", "John 15:7", "John 15:8", "John 15:9", "John 15:10", "John 15:11", "John 15:12", "John 15:13", "John 15:14", "John 15:15", "John 15:16", "John 15:17", "John 15:18", "John 15:19", "John 15:20", "John 16:7", "John 16:8", "John 16:13", "John 16:24", "John 16:33", "John 17:3", "John 17:17", "John 17:21", "John 18:36", "John 18:37", "John 19:30", "John 20:21", "John 20:29", "John 20:31", "John 21:15", "John 21:16", "John 21:17",
+  "Acts 1:8", "Acts 2:21", "Acts 2:38", "Acts 2:42", "Acts 3:19", "Acts 4:12", "Acts 4:19", "Acts 4:20", "Acts 5:29", "Acts 5:41", "Acts 5:42", "Acts 10:34", "Acts 10:35", "Acts 10:43", "Acts 13:38", "Acts 13:39", "Acts 16:31", "Acts 17:11", "Acts 17:24", "Acts 17:25", "Acts 17:26", "Acts 17:27", "Acts 17:28", "Acts 17:30", "Acts 17:31", "Acts 20:24", "Acts 20:28", "Acts 20:32", "Acts 20:35", "Acts 26:18",
+  "Romans 1:16", "Romans 1:17", "Romans 1:20", "Romans 2:4", "Romans 3:10", "Romans 3:23", "Romans 3:24", "Romans 4:5", "Romans 5:1", "Romans 5:2", "Romans 5:5", "Romans 5:8", "Romans 5:9", "Romans 5:10", "Romans 5:12", "Romans 5:19", "Romans 6:1", "Romans 6:2", "Romans 6:4", "Romans 6:6", "Romans 6:11", "Romans 6:12", "Romans 6:13", "Romans 6:14", "Romans 6:23", "Romans 7:15", "Romans 7:18", "Romans 7:19", "Romans 7:24", "Romans 7:25", "Romans 8:1", "Romans 8:2", "Romans 8:5", "Romans 8:6", "Romans 8:9", "Romans 8:11", "Romans 8:13", "Romans 8:14", "Romans 8:15", "Romans 8:16", "Romans 8:17", "Romans 8:18", "Romans 8:26", "Romans 8:27", "Romans 8:28", "Romans 8:29", "Romans 8:30", "Romans 8:31", "Romans 8:32", "Romans 8:33", "Romans 8:34", "Romans 8:35", "Romans 8:37", "Romans 8:38", "Romans 8:39", "Romans 9:16", "Romans 10:9", "Romans 10:10", "Romans 10:13", "Romans 10:17", "Romans 11:33", "Romans 11:34", "Romans 11:35", "Romans 11:36", "Romans 12:1", "Romans 12:2", "Romans 12:3", "Romans 12:4", "Romans 12:5", "Romans 12:9", "Romans 12:10", "Romans 12:11", "Romans 12:12", "Romans 12:13", "Romans 12:14", "Romans 12:15", "Romans 12:16", "Romans 12:17", "Romans 12:18", "Romans 12:19", "Romans 12:21", "Romans 13:1", "Romans 13:8", "Romans 13:10", "Romans 13:14", "Romans 14:7", "Romans 14:8", "Romans 14:10", "Romans 14:11", "Romans 14:12", "Romans 14:17", "Romans 14:19", "Romans 15:4", "Romans 15:5", "Romans 15:6", "Romans 15:7", "Romans 15:13",
+  "1 Corinthians 1:18", "1 Corinthians 1:25", "1 Corinthians 1:27", "1 Corinthians 1:30", "1 Corinthians 2:9", "1 Corinthians 2:10", "1 Corinthians 2:12", "1 Corinthians 2:14", "1 Corinthians 3:6", "1 Corinthians 3:7", "1 Corinthians 3:11", "1 Corinthians 3:16", "1 Corinthians 3:17", "1 Corinthians 4:2", "1 Corinthians 6:12", "1 Corinthians 6:19", "1 Corinthians 6:20", "1 Corinthians 9:24", "1 Corinthians 10:12", "1 Corinthians 10:13", "1 Corinthians 10:31", "1 Corinthians 13:1", "1 Corinthians 13:2", "1 Corinthians 13:3", "1 Corinthians 13:4", "1 Corinthians 13:5", "1 Corinthians 13:6", "1 Corinthians 13:7", "1 Corinthians 13:8", "1 Corinthians 13:11", "1 Corinthians 13:12", "1 Corinthians 13:13", "1 Corinthians 15:3", "1 Corinthians 15:4", "1 Corinthians 15:10", "1 Corinthians 15:20", "1 Corinthians 15:21", "1 Corinthians 15:22", "1 Corinthians 15:33", "1 Corinthians 15:51", "1 Corinthians 15:52", "1 Corinthians 15:54", "1 Corinthians 15:55", "1 Corinthians 15:57", "1 Corinthians 15:58", "1 Corinthians 16:13", "1 Corinthians 16:14",
+  "2 Corinthians 1:3", "2 Corinthians 1:4", "2 Corinthians 1:20", "2 Corinthians 3:17", "2 Corinthians 3:18", "2 Corinthians 4:7", "2 Corinthians 4:16", "2 Corinthians 4:17", "2 Corinthians 4:18", "2 Corinthians 5:1", "2 Corinthians 5:7", "2 Corinthians 5:10", "2 Corinthians 5:14", "2 Corinthians 5:15", "2 Corinthians 5:17", "2 Corinthians 5:18", "2 Corinthians 5:19", "2 Corinthians 5:20", "2 Corinthians 5:21", "2 Corinthians 8:9", "2 Corinthians 9:6", "2 Corinthians 9:7", "2 Corinthians 9:8", "2 Corinthians 9:15", "2 Corinthians 10:3", "2 Corinthians 10:4", "2 Corinthians 10:5", "2 Corinthians 12:9", "2 Corinthians 12:10", "2 Corinthians 13:14",
+  "Galatians 1:8", "Galatians 2:20", "Galatians 3:13", "Galatians 3:26", "Galatians 3:27", "Galatians 3:28", "Galatians 4:4", "Galatians 4:5", "Galatians 4:6", "Galatians 4:7", "Galatians 5:1", "Galatians 5:6", "Galatians 5:13", "Galatians 5:14", "Galatians 5:16", "Galatians 5:17", "Galatians 5:22", "Galatians 5:23", "Galatians 5:24", "Galatians 5:25", "Galatians 6:1", "Galatians 6:2", "Galatians 6:7", "Galatians 6:8", "Galatians 6:9", "Galatians 6:10", "Galatians 6:14",
+  "Ephesians 1:3", "Ephesians 1:4", "Ephesians 1:7", "Ephesians 1:13", "Ephesians 1:14", "Ephesians 2:1", "Ephesians 2:4", "Ephesians 2:5", "Ephesians 2:8", "Ephesians 2:9", "Ephesians 2:10", "Ephesians 2:13", "Ephesians 2:14", "Ephesians 2:19", "Ephesians 2:20", "Ephesians 3:16", "Ephesians 3:17", "Ephesians 3:18", "Ephesians 3:19", "Ephesians 3:20", "Ephesians 3:21", "Ephesians 4:1", "Ephesians 4:2", "Ephesians 4:3", "Ephesians 4:11", "Ephesians 4:12", "Ephesians 4:15", "Ephesians 4:22", "Ephesians 4:23", "Ephesians 4:24", "Ephesians 4:25", "Ephesians 4:26", "Ephesians 4:27", "Ephesians 4:29", "Ephesians 4:30", "Ephesians 4:31", "Ephesians 4:32", "Ephesians 5:1", "Ephesians 5:2", "Ephesians 5:8", "Ephesians 5:15", "Ephesians 5:16", "Ephesians 5:18", "Ephesians 5:19", "Ephesians 5:20", "Ephesians 5:21", "Ephesians 5:22", "Ephesians 5:25", "Ephesians 6:1", "Ephesians 6:2", "Ephesians 6:4", "Ephesians 6:10", "Ephesians 6:11", "Ephesians 6:12", "Ephesians 6:13", "Ephesians 6:14", "Ephesians 6:15", "Ephesians 6:16", "Ephesians 6:17", "Ephesians 6:18",
+  "Philippians 1:6", "Philippians 1:21", "Philippians 1:27", "Philippians 2:3", "Philippians 2:4", "Philippians 2:5", "Philippians 2:6", "Philippians 2:7", "Philippians 2:8", "Philippians 2:9", "Philippians 2:10", "Philippians 2:11", "Philippians 2:12", "Philippians 2:13", "Philippians 2:14", "Philippians 2:15", "Philippians 3:7", "Philippians 3:8", "Philippians 3:10", "Philippians 3:12", "Philippians 3:13", "Philippians 3:14", "Philippians 3:20", "Philippians 3:21", "Philippians 4:4", "Philippians 4:5", "Philippians 4:6", "Philippians 4:7", "Philippians 4:8", "Philippians 4:9", "Philippians 4:11", "Philippians 4:12", "Philippians 4:13", "Philippians 4:19",
+  "Colossians 1:13", "Colossians 1:14", "Colossians 1:15", "Colossians 1:16", "Colossians 1:17", "Colossians 1:18", "Colossians 1:20", "Colossians 1:27", "Colossians 1:28", "Colossians 2:3", "Colossians 2:6", "Colossians 2:7", "Colossians 2:8", "Colossians 2:9", "Colossians 2:10", "Colossians 2:13", "Colossians 2:14", "Colossians 3:1", "Colossians 3:2", "Colossians 3:3", "Colossians 3:4", "Colossians 3:10", "Colossians 3:12", "Colossians 3:13", "Colossians 3:14", "Colossians 3:15", "Colossians 3:16", "Colossians 3:17", "Colossians 3:23", "Colossians 3:24", "Colossians 4:2", "Colossians 4:5", "Colossians 4:6",
+  "1 Thessalonians 1:3", "1 Thessalonians 4:3", "1 Thessalonians 4:13", "1 Thessalonians 4:14", "1 Thessalonians 4:16", "1 Thessalonians 4:17", "1 Thessalonians 4:18", "1 Thessalonians 5:11", "1 Thessalonians 5:16", "1 Thessalonians 5:17", "1 Thessalonians 5:18", "1 Thessalonians 5:19", "1 Thessalonians 5:21", "1 Thessalonians 5:22", "1 Thessalonians 5:23", "1 Thessalonians 5:24",
+  "2 Thessalonians 2:13", "2 Thessalonians 3:3", "2 Thessalonians 3:5", "2 Thessalonians 3:10", "2 Thessalonians 3:13",
+  "1 Timothy 1:15", "1 Timothy 2:1", "1 Timothy 2:2", "1 Timothy 2:4", "1 Timothy 2:5", "1 Timothy 3:16", "1 Timothy 4:8", "1 Timothy 4:12", "1 Timothy 6:6", "1 Timothy 6:7", "1 Timothy 6:8", "1 Timothy 6:10", "1 Timothy 6:11", "1 Timothy 6:12", "1 Timothy 6:17", "1 Timothy 6:18", "1 Timothy 6:19",
+  "2 Timothy 1:7", "2 Timothy 1:8", "2 Timothy 1:9", "2 Timothy 1:12", "2 Timothy 2:1", "2 Timothy 2:3", "2 Timothy 2:11", "2 Timothy 2:12", "2 Timothy 2:13", "2 Timothy 2:15", "2 Timothy 2:19", "2 Timothy 2:21", "2 Timothy 2:22", "2 Timothy 3:12", "2 Timothy 3:14", "2 Timothy 3:15", "2 Timothy 3:16", "2 Timothy 3:17", "2 Timothy 4:2", "2 Timothy 4:5", "2 Timothy 4:7", "2 Timothy 4:8", "2 Timothy 4:18",
+  "Titus 2:11", "Titus 2:12", "Titus 2:13", "Titus 2:14", "Titus 3:4", "Titus 3:5", "Titus 3:6", "Titus 3:7",
+  "Philemon 1:6",
+  "Hebrews 1:1", "Hebrews 1:2", "Hebrews 1:3", "Hebrews 2:1", "Hebrews 2:14", "Hebrews 2:15", "Hebrews 2:18", "Hebrews 3:1", "Hebrews 3:12", "Hebrews 3:13", "Hebrews 4:12", "Hebrews 4:13", "Hebrews 4:14", "Hebrews 4:15", "Hebrews 4:16", "Hebrews 6:10", "Hebrews 6:18", "Hebrews 6:19", "Hebrews 7:25", "Hebrews 9:12", "Hebrews 9:14", "Hebrews 9:22", "Hebrews 9:24", "Hebrews 9:27", "Hebrews 9:28", "Hebrews 10:10", "Hebrews 10:14", "Hebrews 10:19", "Hebrews 10:22", "Hebrews 10:23", "Hebrews 10:24", "Hebrews 10:25", "Hebrews 10:31", "Hebrews 10:35", "Hebrews 10:36", "Hebrews 10:39", "Hebrews 11:1", "Hebrews 11:3", "Hebrews 11:6", "Hebrews 12:1", "Hebrews 12:2", "Hebrews 12:3", "Hebrews 12:4", "Hebrews 12:5", "Hebrews 12:6", "Hebrews 12:11", "Hebrews 12:14", "Hebrews 12:28", "Hebrews 12:29", "Hebrews 13:1", "Hebrews 13:2", "Hebrews 13:5", "Hebrews 13:6", "Hebrews 13:8", "Hebrews 13:14", "Hebrews 13:15", "Hebrews 13:16", "Hebrews 13:17", "Hebrews 13:20", "Hebrews 13:21",
+  "James 1:2", "James 1:3", "James 1:4", "James 1:5", "James 1:6", "James 1:12", "James 1:13", "James 1:17", "James 1:19", "James 1:20", "James 1:21", "James 1:22", "James 1:23", "James 1:24", "James 1:25", "James 1:26", "James 1:27", "James 2:10", "James 2:14", "James 2:17", "James 2:18", "James 2:19", "James 2:20", "James 2:24", "James 2:26", "James 3:1", "James 3:2", "James 3:13", "James 3:17", "James 3:18", "James 4:1", "James 4:2", "James 4:3", "James 4:4", "James 4:6", "James 4:7", "James 4:8", "James 4:10", "James 4:14", "James 4:17", "James 5:13", "James 5:14", "James 5:15", "James 5:16", "James 5:17", "James 5:18", "James 5:19", "James 5:20",
+  "1 Peter 1:3", "1 Peter 1:4", "1 Peter 1:5", "1 Peter 1:7", "1 Peter 1:8", "1 Peter 1:13", "1 Peter 1:14", "1 Peter 1:15", "1 Peter 1:16", "1 Peter 1:18", "1 Peter 1:19", "1 Peter 1:21", "1 Peter 1:23", "1 Peter 1:24", "1 Peter 1:25", "1 Peter 2:2", "1 Peter 2:5", "1 Peter 2:9", "1 Peter 2:11", "1 Peter 2:12", "1 Peter 2:15", "1 Peter 2:16", "1 Peter 2:21", "1 Peter 2:22", "1 Peter 2:23", "1 Peter 2:24", "1 Peter 3:1", "1 Peter 3:7", "1 Peter 3:8", "1 Peter 3:9", "1 Peter 3:10", "1 Peter 3:11", "1 Peter 3:12", "1 Peter 3:15", "1 Peter 3:16", "1 Peter 3:18", "1 Peter 4:7", "1 Peter 4:8", "1 Peter 4:9", "1 Peter 4:10", "1 Peter 4:11", "1 Peter 4:12", "1 Peter 4:13", "1 Peter 4:14", "1 Peter 4:16", "1 Peter 4:19", "1 Peter 5:5", "1 Peter 5:6", "1 Peter 5:7", "1 Peter 5:8", "1 Peter 5:9", "1 Peter 5:10", "1 Peter 5:11",
+  "2 Peter 1:3", "2 Peter 1:4", "2 Peter 1:5", "2 Peter 1:6", "2 Peter 1:7", "2 Peter 1:8", "2 Peter 1:10", "2 Peter 1:11", "2 Peter 1:20", "2 Peter 1:21", "2 Peter 2:9", "2 Peter 3:8", "2 Peter 3:9", "2 Peter 3:10", "2 Peter 3:13", "2 Peter 3:14", "2 Peter 3:18",
+  "1 John 1:1", "1 John 1:2", "1 John 1:3", "1 John 1:5", "1 John 1:7", "1 John 1:8", "1 John 1:9", "1 John 1:10", "1 John 2:1", "1 John 2:2", "1 John 2:3", "1 John 2:4", "1 John 2:5", "1 John 2:6", "1 John 2:15", "1 John 2:16", "1 John 2:17", "1 John 2:25", "1 John 2:27", "1 John 3:1", "1 John 3:2", "1 John 3:3", "1 John 3:4", "1 John 3:5", "1 John 3:8", "1 John 3:9", "1 John 3:10", "1 John 3:11", "1 John 3:14", "1 John 3:16", "1 John 3:17", "1 John 3:18", "1 John 3:20", "1 John 3:22", "1 John 3:23", "1 John 3:24", "1 John 4:1", "1 John 4:4", "1 John 4:7", "1 John 4:8", "1 John 4:9", "1 John 4:10", "1 John 4:11", "1 John 4:12", "1 John 4:13", "1 John 4:14", "1 John 4:15", "1 John 4:16", "1 John 4:17", "1 John 4:18", "1 John 4:19", "1 John 4:20", "1 John 4:21", "1 John 5:1", "1 John 5:3", "1 John 5:4", "1 John 5:5", "1 John 5:11", "1 John 5:12", "1 John 5:13", "1 John 5:14", "1 John 5:15", "1 John 5:20", "1 John 5:21",
+  "2 John 1:6",
+  "3 John 1:2", "3 John 1:4", "3 John 1:11",
+  "Jude 1:20", "Jude 1:21", "Jude 1:24", "Jude 1:25",
+  "Revelation 1:3", "Revelation 1:7", "Revelation 1:8", "Revelation 1:17", "Revelation 1:18", "Revelation 2:4", "Revelation 2:10", "Revelation 3:5", "Revelation 3:10", "Revelation 3:11", "Revelation 3:12", "Revelation 3:15", "Revelation 3:16", "Revelation 3:19", "Revelation 3:20", "Revelation 3:21", "Revelation 4:8", "Revelation 4:11", "Revelation 5:9", "Revelation 5:12", "Revelation 7:9", "Revelation 7:10", "Revelation 7:17", "Revelation 12:11", "Revelation 14:13", "Revelation 15:3", "Revelation 15:4", "Revelation 17:14", "Revelation 19:6", "Revelation 19:7", "Revelation 19:11", "Revelation 19:16", "Revelation 20:11", "Revelation 20:12", "Revelation 20:15", "Revelation 21:1", "Revelation 21:3", "Revelation 21:4", "Revelation 21:5", "Revelation 21:6", "Revelation 21:7", "Revelation 21:27", "Revelation 22:1", "Revelation 22:2", "Revelation 22:3", "Revelation 22:4", "Revelation 22:5", "Revelation 22:7", "Revelation 22:12", "Revelation 22:13", "Revelation 22:14", "Revelation 22:17", "Revelation 22:20", "Revelation 22:21"
+];
+
 import { 
   getProgress, 
   saveProgress, 
@@ -118,7 +195,8 @@ import {
   getVersesByChapter,
   getVersesByBook,
   getBooks,
-  getChapters
+  getChapters,
+  getBibleVerses
 } from './lib/bibleDb';
 import { KJV_LIBRARY } from './lib/bibleData';
 
@@ -1754,17 +1832,25 @@ const BibleStudyOverlay = ({ reference, questionText, onDelete, onClose }: { ref
   );
 };
 
-const HeroHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, setIsSettingsOpen, lives, deed, reference, book, chapter, progress, lastSeen, onStudy, onHint, canHint, sectionId }: any) => {
+const TriviaHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, setIsSettingsOpen, lives, deed, reference, book, chapter, progress, lastSeen, onStudy, onHint, canHint, sectionId, themeColor }: any) => {
   const isNew = !lastSeen;
   const section = BIBLE_SECTIONS.find(s => s.id === sectionId);
 
   return (
-    <div className="h-[14vh] min-h-[100px] max-h-[120px] flex items-center px-1 sm:px-4 z-50 bg-slate-950 border-b border-white/5 shadow-2xl relative">
+    <div className={cn(
+      "flex items-center px-1 sm:px-4 z-50 bg-slate-950 border-b border-white/5 shadow-2xl relative",
+      themeColor === '#10b981' ? "min-h-[120px] py-4" : "h-[14vh] min-h-[100px] max-h-[120px]"
+    )}>
       {/* Left Section: Score & Hearts & Streak */}
       <div className="flex flex-col items-start gap-1 flex-none w-[75px] sm:w-[140px]">
         <div className="relative">
-          <div className="bg-slate-900/60 border border-white/10 px-2 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl flex items-center gap-1.5 sm:gap-3 shadow-inner">
-            <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
+          <div className={cn(
+            "bg-slate-900/60 border border-white/10 px-2 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl flex items-center gap-1.5 sm:gap-3 shadow-inner",
+            themeColor && "border-opacity-50"
+          )}
+          style={themeColor ? { borderColor: `${themeColor}40` } : {}}
+          >
+            <Trophy className={cn("w-4 h-4 sm:w-5 sm:h-5", themeColor ? "" : "text-yellow-400")} style={themeColor ? { color: themeColor } : {}} />
             <span className="text-lg sm:text-2xl font-black text-white tracking-tighter leading-none">{score}</span>
           </div>
           {streak >= 5 && (
@@ -1772,6 +1858,7 @@ const HeroHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, set
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               className="absolute -top-2 -right-2 bg-orange-500 text-white text-[8px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full border border-white/20 shadow-lg z-10"
+              style={themeColor ? { backgroundColor: themeColor } : {}}
             >
               x2
             </motion.div>
@@ -1792,16 +1879,16 @@ const HeroHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, set
       </div>
 
       {/* Center Section: Deed (Question) - Maximized */}
-      <div className="flex-1 flex flex-col items-center justify-center px-0 overflow-hidden h-full">
+      <div className="flex-1 flex flex-col items-center justify-center px-0 h-full">
         <div className="flex items-center gap-2 mb-1">
-          {(reference || book) && (
+          {(reference || book) && themeColor !== '#8b5cf6' && (
             <div className="flex items-center gap-1">
               <span 
                 className="text-[9px] font-black px-2 py-0.5 rounded-full border uppercase tracking-widest flex items-center gap-1"
                 style={{ 
-                  backgroundColor: `${section?.color}20`, 
-                  color: section?.color,
-                  borderColor: `${section?.color}40`
+                  backgroundColor: themeColor ? `${themeColor}20` : `${section?.color}20`, 
+                  color: themeColor || section?.color,
+                  borderColor: themeColor ? `${themeColor}40` : `${section?.color}40`
                 }}
               >
                 <BookOpen size={10} />
@@ -1809,12 +1896,14 @@ const HeroHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, set
               </span>
             </div>
           )}
-          {isNew ? (
-            <span className="bg-emerald-500 text-white text-[7px] font-black px-1 rounded uppercase tracking-tighter">NEW</span>
-          ) : (
-            <span className="bg-blue-500 text-white text-[7px] font-black px-1 rounded uppercase tracking-tighter">REVIEW</span>
+          {lastSeen !== undefined && (
+            isNew ? (
+              <span className="bg-emerald-500 text-white text-[7px] font-black px-1 rounded uppercase tracking-tighter">NEW</span>
+            ) : (
+              <span className="bg-blue-500 text-white text-[7px] font-black px-1 rounded uppercase tracking-tighter">REVIEW</span>
+            )
           )}
-          {section && (
+          {section && !themeColor && (
             <span 
               className="text-white text-[7px] font-black px-1 rounded uppercase tracking-tighter"
               style={{ backgroundColor: section.color }}
@@ -1826,16 +1915,22 @@ const HeroHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, set
         <div className="text-center w-full px-2">
           <p 
             onClick={onStudy}
-            className="text-white font-black leading-[1] tracking-tighter italic uppercase drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] cursor-pointer active:scale-95 transition-transform"
+            className={cn(
+              "text-white font-black tracking-tighter italic drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] cursor-pointer active:scale-95 transition-transform",
+              themeColor !== '#10b981' ? "uppercase leading-[1.1] overflow-hidden text-ellipsis" : "leading-normal"
+            )}
             style={{ 
-              fontSize: 'clamp(0.8rem, 4vw, 1.8rem)',
+              fontSize: themeColor === '#10b981' ? 'clamp(0.85rem, 4.5vw, 1.7rem)' : 'clamp(0.7rem, 3.5vw, 1.4rem)',
+              display: themeColor !== '#10b981' ? '-webkit-box' : 'block',
+              WebkitLineClamp: themeColor !== '#10b981' ? 3 : undefined,
+              WebkitBoxOrient: themeColor !== '#10b981' ? 'vertical' : undefined,
               wordBreak: 'break-word'
             }}
           >
             "{deed}"
           </p>
         </div>
-        {progress && (
+        {progress && !themeColor && (
           <div className="mt-1 w-full max-w-[150px] h-1 bg-white/10 rounded-full overflow-hidden">
             <div 
               className="h-full bg-orange-500 transition-all duration-500" 
@@ -1844,6 +1939,7 @@ const HeroHUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, set
           </div>
         )}
       </div>
+
 
       {/* Right Section: Controls */}
       <div className="flex items-center gap-2 sm:gap-3 flex-none w-[75px] sm:w-[140px] justify-end">
@@ -2036,46 +2132,81 @@ const HUD = memo(({ score, streak, isPaused, setIsPaused, lastUpdateRef, gameMod
   );
 });
 
-const TowerBlock = memo(({ word, height, bottom, color, isPlatform, reference, questionText, onBlockClick }: any) => (
-  <div 
-    className={cn(
-      "absolute left-0 right-0 flex items-center justify-center overflow-hidden",
-      reference && "cursor-pointer hover:brightness-110 active:scale-95 transition-all pointer-events-auto"
-    )}
-    style={{ 
-      bottom: `${bottom}px`,
-      height: `${height}px`,
-    }}
-    onClick={() => reference && onBlockClick?.(reference, word, questionText)}
-  >
-    {/* Word Block - Compact width based on word length */}
+const getLongestWords = (text: string, count: number = 4) => {
+  const cleanText = text
+    .replace(/\{[^{}]*:[^{}]*\}/g, '') // Remove commentary markers
+    .replace(/[\{\}\[\]\(\)]/g, '')     // Remove brackets/braces
+    .replace(/[^\w\s]|_/g, "")         // Remove all other punctuation
+    .replace(/\s+/g, " ")              // Normalize whitespace
+    .trim();
+  const words = cleanText.split(/\s+/);
+  return words
+    .sort((a, b) => b.length - a.length)
+    .slice(0, count)
+    .join(" ");
+};
+
+const TowerBlock = memo(({ word, height, bottom, color, isPlatform, reference, questionText, onBlockClick }: any) => {
+  const charCount = word.length;
+  const baseSize = height * 0.8; 
+  
+  let scaleFactor = 1;
+  if (charCount > 200) scaleFactor = 0.15;
+  else if (charCount > 150) scaleFactor = 0.18;
+  else if (charCount > 120) scaleFactor = 0.22;
+  else if (charCount > 90) scaleFactor = 0.28;
+  else if (charCount > 60) scaleFactor = 0.35;
+  else if (charCount > 40) scaleFactor = 0.45;
+  else if (charCount > 20) scaleFactor = 0.6;
+  else scaleFactor = 0.8;
+
+  const fontSize = Math.min(Math.max(baseSize * scaleFactor, 12), 60);
+  const lineHeight = 1.1;
+  const letterSpacing = charCount > 60 ? '-0.01em' : 'normal';
+
+  return (
     <div 
       className={cn(
-        "flex items-center justify-center text-white font-black text-center px-6 h-full shrink-0",
-        isPlatform ? "w-full" : "w-auto min-w-[45%]"
+        "absolute left-0 right-0 flex items-center justify-center overflow-hidden",
+        reference && "cursor-pointer hover:brightness-110 active:scale-95 transition-all pointer-events-auto"
       )}
       style={{ 
-        backgroundColor: color,
-        borderTop: '2px solid rgba(255,255,255,0.1)',
-        borderBottom: '2px solid rgba(0,0,0,0.2)',
-        boxShadow: 'inset 0 0 20px rgba(0,0,0,0.1)',
+        bottom: `${bottom}px`,
+        height: `${height}px`,
       }}
+      onClick={() => reference && onBlockClick?.(reference, word, questionText)}
     >
-      <span 
-        className="uppercase tracking-tight drop-shadow-2xl whitespace-nowrap"
+      <div 
+        className={cn(
+          "flex items-center justify-center text-white font-black text-center px-4 h-full w-full",
+          isPlatform ? "bg-slate-800" : ""
+        )}
         style={{ 
-          fontSize: `clamp(14px, ${height * 0.6}px, 60px)`,
-          lineHeight: 1
+          backgroundColor: color,
+          borderTop: '2px solid rgba(255,255,255,0.15)',
+          borderBottom: '2px solid rgba(0,0,0,0.25)',
+          boxShadow: 'inset 0 0 30px rgba(0,0,0,0.15)',
         }}
       >
-        {word}
-      </span>
-      {isPlatform && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-      )}
+        <span 
+          className="uppercase tracking-tight drop-shadow-2xl whitespace-normal break-words overflow-hidden w-full"
+          style={{ 
+            fontSize: `${fontSize}px`,
+            lineHeight: lineHeight,
+            letterSpacing: letterSpacing,
+            maxHeight: '95%',
+            display: 'block'
+          }}
+        >
+          {word}
+        </span>
+        {isPlatform && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        )}
+      </div>
     </div>
-  </div>
-));
+  );
+});
 
 const TowerStack = memo(({ stack, onBlockClick }: { stack: any[], onBlockClick?: (ref: string, word: string, qText?: string) => void }) => {
   let currentBottom = 0;
@@ -2105,47 +2236,10 @@ const TowerStack = memo(({ stack, onBlockClick }: { stack: any[], onBlockClick?:
   );
 });
 
-type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced' | 'master';
+type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced' | 'master' | 'extreme';
+type ReferenceTowerDifficulty = 'easy' | 'medium' | 'hard' | 'extreme';
 
-interface HeroProblem {
-  deed: string;
-  options: { name: string, isCorrect: boolean }[];
-  correctHero: BibleHero;
-}
-
-const generateHeroProblem = (score: number, seenHeroNames: string[] = []): HeroProblem => {
-  let availableHeroes = BIBLE_HEROES.filter(h => !seenHeroNames.includes(h.name));
-  if (availableHeroes.length === 0) {
-    availableHeroes = BIBLE_HEROES;
-  }
-  const hero = availableHeroes[Math.floor(Math.random() * availableHeroes.length)];
-  const deed = hero.deeds[Math.floor(Math.random() * hero.deeds.length)];
-  
-  const options = [{ name: hero.name, isCorrect: true }];
-  const otherHeroes = BIBLE_HEROES.filter(h => h.name !== hero.name);
-  
-  // Pick 3 random distractors
-  const distractors = otherHeroes.sort(() => Math.random() - 0.5).slice(0, 3);
-  distractors.forEach(d => options.push({ name: d.name, isCorrect: false }));
-  
-  return {
-    deed,
-    options: options.sort(() => Math.random() - 0.5),
-    correctHero: hero
-  };
-};
-
-const ERA_COLORS: Record<string, string> = {
-  'Patriarchs': '#f59e0b', // amber
-  'Judges': '#10b981', // emerald
-  'Kings': '#3b82f6', // blue
-  'Prophets': '#8b5cf6', // violet
-  'Exile': '#6366f1', // indigo
-  'Apostles': '#ef4444', // red
-  'Early Church': '#ec4899' // pink
-};
-
-const BibleHeroTowerGame = ({ 
+const BibleTriviaTowerGame = ({ 
   onComplete, 
   onMistake, 
   onExit, 
@@ -2178,8 +2272,9 @@ const BibleHeroTowerGame = ({
   const [lives, setLives] = useState(3);
   const [isPaused, setIsPaused] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
-  const [showStart, setShowStart] = useState(false);
-  const [dontShowAgain, setDontShowAgain] = useState(true);
+  const [showStart, setShowStart] = useState(true);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [isRedAlert, setIsRedAlert] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStudyOpen, setIsStudyOpen] = useState(false);
@@ -2428,7 +2523,6 @@ const BibleHeroTowerGame = ({
         }
       }
 
-      if (sinkRateRef.current < 8) sinkRateRef.current = 8;
       sinkRateRef.current += 0.2 * dt; 
 
       requestAnimationFrame(tick);
@@ -2567,19 +2661,87 @@ const BibleHeroTowerGame = ({
     }
   };
 
+  const [gameMode, setGameMode] = useState<'trivia' | 'reference' | 'memory' | 'fourWords'>('trivia');
+  const [referenceDifficulty, setReferenceDifficulty] = useState<ReferenceTowerDifficulty>('easy');
+  const [allVerses, setAllVerses] = useState<Verse[]>([]);
+  const [currentReferenceQuestion, setCurrentReferenceQuestion] = useState<{verse: Verse, options: string[], correctRef: string} | null>(null);
+
+  useEffect(() => {
+    if (gameMode === 'reference' || gameMode === 'memory' || gameMode === 'fourWords') {
+      getBibleVerses().then(setAllVerses);
+    }
+  }, [gameMode]);
+
+  const generateReferenceQuestion = useCallback(() => {
+    if (allVerses.length === 0) return;
+
+    // Filter for prominent verses if in 4 Words or Reference mode
+    const prominentVerses = allVerses.filter(v => {
+      const ref = `${v.book} ${v.chapter}:${v.verse}`;
+      return PROMINENT_REFERENCES.includes(ref);
+    });
+
+    const pool = prominentVerses.length > 0 ? prominentVerses : allVerses;
+    const targetIdx = Math.floor(Math.random() * pool.length);
+    const targetVerse = pool[targetIdx];
+    const correctRef = `${targetVerse.book} ${targetVerse.chapter}:${targetVerse.verse}`;
+    
+    const distractors: string[] = [];
+    const maxDistractors = 3;
+    
+    let range = 0;
+    if (referenceDifficulty === 'medium') range = 2000;
+    if (referenceDifficulty === 'hard') range = 1000;
+    if (referenceDifficulty === 'extreme') range = 500;
+
+    while (distractors.length < maxDistractors) {
+      let dIdx: number;
+      if (referenceDifficulty === 'easy') {
+        dIdx = Math.floor(Math.random() * allVerses.length);
+      } else {
+        const offset = Math.floor(Math.random() * (range * 2)) - range;
+        dIdx = (targetIdx + offset + allVerses.length) % allVerses.length;
+      }
+
+      const dVerse = allVerses[dIdx];
+      const dRef = `${dVerse.book} ${dVerse.chapter}:${dVerse.verse}`;
+      
+      if (dRef !== correctRef && !distractors.includes(dRef)) {
+        distractors.push(dRef);
+      }
+    }
+
+    setCurrentReferenceQuestion({
+      verse: targetVerse,
+      correctRef,
+      options: [...distractors, correctRef].sort(() => Math.random() - 0.5)
+    });
+    lastTapTimeRef.current = Date.now();
+  }, [allVerses, referenceDifficulty]);
+
+  useEffect(() => {
+    if ((gameMode === 'reference' || gameMode === 'fourWords') && allVerses.length > 0 && !currentReferenceQuestion) {
+      generateReferenceQuestion();
+    }
+  }, [gameMode, allVerses, currentReferenceQuestion, generateReferenceQuestion]);
+
   const handleChoice = async (choice: string) => {
-    if (isGameOver || showStart || isPaused || !currentQuestion) return;
+    if (isGameOver || showStart || isPaused || (gameMode === 'trivia' && !currentQuestion) || ((gameMode === 'reference' || gameMode === 'fourWords') && !currentReferenceQuestion)) return;
     const now = Date.now();
     const timeDelta = now - lastTapTimeRef.current;
 
-    const isCorrect = choice.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === currentQuestion.correctAnswer.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+    let isCorrect = false;
+    if (gameMode === 'trivia' && currentQuestion) {
+      isCorrect = choice.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === currentQuestion.correctAnswer.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+    } else if ((gameMode === 'reference' || gameMode === 'fourWords') && currentReferenceQuestion) {
+      isCorrect = choice === currentReferenceQuestion.correctRef;
+    }
 
     if (isCorrect) {
       lastTapTimeRef.current = now;
       playCorrectSound();
       
-      // Update last seen in DB
-      if (currentQuestion.id) {
+      if (gameMode === 'trivia' && currentQuestion?.id) {
         await updateQuestionLastSeen(currentQuestion.id, true);
       }
 
@@ -2588,14 +2750,14 @@ const BibleHeroTowerGame = ({
       const isCombo = lastCorrectTimesRef.current.length >= 5;
       setIsComboActive(isCombo);
       
-      // NEW SCORING: Base 10 + Speed Bonus (up to 20)
-      // If hint is used, no score for this question (penalty already applied in handleHint)
       let points = 0;
-      if (hintsUsed > 0 || hiddenOptions.length > 0) {
+      if (gameMode === 'reference' || gameMode === 'fourWords') {
+        points = Math.max(1, 4 - hiddenOptions.length);
+      } else if (hintsUsed > 0 || hiddenOptions.length > 0) {
         points = 0;
       } else {
         const basePoints = 10;
-        const speedBonus = Math.max(0, 20 - Math.floor(timeDelta / 200)); // Max 20 bonus, drops over 4 seconds
+        const speedBonus = Math.max(0, 20 - Math.floor(timeDelta / 200));
         const multiplier = isCombo ? 2 : 1;
         points = (basePoints + speedBonus) * multiplier;
       }
@@ -2604,84 +2766,84 @@ const BibleHeroTowerGame = ({
       setLastPoints(points);
       setStreak(prev => prev + 1);
       
-      // Reset hints for next question
       setHintsUsed(0);
       setHiddenOptions([]);
       
       const newConsecutive = consecutiveCorrect + 1;
-      if (newConsecutive >= 3) {
+      const streakThreshold = (gameMode === 'reference' || gameMode === 'fourWords') ? 5 : 3;
+      if (newConsecutive >= streakThreshold) {
         setLives(l => Math.min(3, l + 1));
         setConsecutiveCorrect(0);
       } else {
         setConsecutiveCorrect(newConsecutive);
       }
 
-      const maxHeight = containerHeight * 0.30; 
-      const minHeight = containerHeight * 0.16; 
-      const t = Math.max(0, Math.min(1, (timeDelta - 200) / 3800));
-      const height = maxHeight - (maxHeight - minHeight) * t;
+      const height = containerHeight * 0.20; 
       
       towerHeightRef.current += height;
       
-      const section = BIBLE_SECTIONS.find(s => s.id === currentQuestion.sectionId);
-      
-      setTowerData(prev => ({
-        stack: [
-          ...prev.stack,
-          {
-            id: nextIdRef.current++,
-            word: currentQuestion.correctAnswer.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim(),
-            height,
-            color: isCombo ? '#fbbf24' : (section?.color || '#3b82f6'),
-            reference: currentQuestion.reference.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim(),
-            questionText: currentQuestion.text
-          }
-        ]
-      }));
+      if (gameMode === 'trivia' && currentQuestion) {
+        const section = BIBLE_SECTIONS.find(s => s.id === currentQuestion.sectionId);
+        setTowerData(prev => ({
+          stack: [
+            ...prev.stack,
+            {
+              id: nextIdRef.current++,
+              word: currentQuestion.correctAnswer.replace(/[^\w\s:]|_/g, "").replace(/\s+/g, " ").trim(),
+              height,
+              color: isCombo ? '#fbbf24' : (section?.color || '#3b82f6'),
+              reference: currentQuestion.reference.replace(/[^\w\s:]|_/g, "").replace(/\s+/g, " ").trim(),
+              questionText: currentQuestion.text
+            }
+          ]
+        }));
 
-      // Move to next question (80/20 logic)
-      let nextQInSec = questionsInCurrentSection + 1;
-      let nextSecIdx = currentSectionIndex;
-      
-      // Cycle is 5 questions (4 review, 1 new)
-      if (nextQInSec >= 5) {
-        nextQInSec = 0;
-        nextSecIdx = (currentSectionIndex + 1) % BIBLE_SECTIONS.length;
-      }
-      
-      setQuestionsInCurrentSection(nextQInSec);
-      setCurrentSectionIndex(nextSecIdx);
-      
-      // Save progress
-      if (progress) {
-        await updateBibleProgress(progress.sections, nextSecIdx, nextQInSec);
-      }
-      
-      const nextQ = await getNextQuestion(nextSecIdx, nextQInSec);
-      if (nextQ) {
-        setCurrentQuestion(nextQ);
-      } else {
-        // Current section is dry, try to find another one before fetching
-        let foundFallback = false;
-        for (let i = 1; i < BIBLE_SECTIONS.length; i++) {
-          const idx = (nextSecIdx + i) % BIBLE_SECTIONS.length;
-          const fallbackQ = await getNextQuestion(idx, 0);
-          if (fallbackQ) {
-            setCurrentQuestion(fallbackQ);
-            setCurrentSectionIndex(idx);
-            setQuestionsInCurrentSection(0);
-            foundFallback = true;
-            break;
+        let nextQInSec = questionsInCurrentSection + 1;
+        let nextSecIdx = currentSectionIndex;
+        if (nextQInSec >= 5) {
+          nextQInSec = 0;
+          nextSecIdx = (currentSectionIndex + 1) % BIBLE_SECTIONS.length;
+        }
+        setQuestionsInCurrentSection(nextQInSec);
+        setCurrentSectionIndex(nextSecIdx);
+        if (progress) {
+          await updateBibleProgress(progress.sections, nextSecIdx, nextQInSec);
+        }
+        const nextQ = await getNextQuestion(nextSecIdx, nextQInSec);
+        if (nextQ) {
+          setCurrentQuestion(nextQ);
+        } else {
+          let foundFallback = false;
+          for (let i = 1; i < BIBLE_SECTIONS.length; i++) {
+            const idx = (nextSecIdx + i) % BIBLE_SECTIONS.length;
+            const fallbackQ = await getNextQuestion(idx, 0);
+            if (fallbackQ) {
+              setCurrentQuestion(fallbackQ);
+              setCurrentSectionIndex(idx);
+              setQuestionsInCurrentSection(0);
+              foundFallback = true;
+              break;
+            }
           }
+          if (!foundFallback) await fetchNewBatch();
         }
-        
-        if (!foundFallback) {
-          await fetchNewBatch();
-        }
+        fetchNewBatch();
+      } else if ((gameMode === 'reference' || gameMode === 'fourWords') && currentReferenceQuestion) {
+        setTowerData(prev => ({
+          stack: [
+            ...prev.stack,
+            {
+              id: nextIdRef.current++,
+              word: gameMode === 'fourWords' ? currentReferenceQuestion.verse.text : currentReferenceQuestion.correctRef,
+              height,
+              color: gameMode === 'fourWords' ? '#8b5cf6' : '#10b981', // purple-500 or emerald-500
+              reference: currentReferenceQuestion.correctRef,
+              questionText: currentReferenceQuestion.verse.text
+            }
+          ]
+        }));
+        generateReferenceQuestion();
       }
-      
-      // Background fetch
-      fetchNewBatch();
 
     } else {
       playIncorrectSound();
@@ -2690,18 +2852,29 @@ const BibleHeroTowerGame = ({
       setIsComboActive(false);
       lastCorrectTimesRef.current = [];
 
-      // Update last seen in DB (incorrect)
-      if (currentQuestion.id) {
+      if (gameMode === 'trivia' && currentQuestion?.id) {
         await updateQuestionLastSeen(currentQuestion.id, false);
+      } else if ((gameMode === 'reference' || gameMode === 'fourWords') && currentReferenceQuestion) {
+        const key = `${currentReferenceQuestion.verse.book} ${currentReferenceQuestion.verse.chapter}:${currentReferenceQuestion.verse.verse}`;
+        updateVerseLevel(key, 1);
+        
+        const choiceIdx = currentReferenceQuestion.options.indexOf(choice);
+        if (choiceIdx !== -1 && !hiddenOptions.includes(choiceIdx)) {
+          setHiddenOptions(prev => [...prev, choiceIdx]);
+          return; // Allow user to guess again
+        }
       }
 
       const newLives = lives - 1;
       setLives(newLives);
       if (newLives <= 0) {
         setIsGameOver(true);
-        if (progress) {
+        if (gameMode === 'trivia' && progress) {
           await updateBibleProgress(progress.sections, currentSectionIndex, questionsInCurrentSection);
         }
+      }
+      if (gameMode === 'reference' || gameMode === 'fourWords') {
+        generateReferenceQuestion();
       }
     }
   };
@@ -2710,7 +2883,16 @@ const BibleHeroTowerGame = ({
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    sinkRateRef.current = 8;
+    
+    // Set sink rate based on difficulty
+    if (gameMode === 'trivia') {
+      sinkRateRef.current = 8;
+    } else if (gameMode === 'reference') {
+      sinkRateRef.current = referenceDifficulty === 'extreme' ? 15 : referenceDifficulty === 'hard' ? 12 : referenceDifficulty === 'medium' ? 8 : 5;
+    } else {
+      sinkRateRef.current = 8;
+    }
+
     lastTapTimeRef.current = Date.now();
     setShowStart(false);
     if (dontShowAgain) {
@@ -2730,17 +2912,108 @@ const BibleHeroTowerGame = ({
           animate={{ y: 0, opacity: 1 }}
           className="text-center max-w-sm py-8"
         >
-          <div className="w-24 h-24 bg-orange-500 rounded-[2rem] mx-auto mb-6 flex items-center justify-center shadow-2xl shadow-orange-500/20">
-            <Shield size={48} className="text-white" />
+          <div className={cn(
+            "w-24 h-24 rounded-[2rem] mx-auto mb-6 flex items-center justify-center shadow-2xl transition-all",
+            gameMode === 'trivia' ? "bg-orange-500 shadow-orange-500/20" : 
+            gameMode === 'reference' ? "bg-emerald-500 shadow-emerald-500/20" : 
+            gameMode === 'fourWords' ? "bg-purple-500 shadow-purple-500/20" :
+            "bg-blue-500 shadow-blue-500/20"
+          )}>
+            {gameMode === 'trivia' ? <Shield size={48} className="text-white" /> : 
+             gameMode === 'reference' ? <Tower size={48} className="text-white" /> : 
+             gameMode === 'fourWords' ? <Quote size={48} className="text-white" /> :
+             <BookOpen size={48} className="text-white" />}
           </div>
-          <h2 className="text-5xl font-black mb-2 tracking-tighter italic">BIBLE HERO TOWER</h2>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-8">Legendary Deeds & Heroes</p>
+          <h2 className="text-5xl font-black mb-2 tracking-tighter italic uppercase text-white text-center">
+            {gameMode === 'trivia' ? 'TRIVIA TOWER' : 
+             gameMode === 'reference' ? 'REFERENCE TOWER' : 
+             gameMode === 'fourWords' ? '4 WORDS TOWER' :
+             'MEMORY TOWER'}
+          </h2>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-8 text-center">
+            {gameMode === 'trivia' ? 'Legendary Deeds & Heroes' : 
+             gameMode === 'reference' ? 'Identify the Verse' : 
+             gameMode === 'fourWords' ? 'Guess from 4 Words' :
+             'Memorize the Verse'}
+          </p>
           
-          <div className="space-y-4 mb-8 text-left">
+          {/* Mode Selector */}
+          <div className="flex flex-wrap gap-2 p-1 bg-slate-900 rounded-2xl border-2 border-slate-800 mb-8">
+            <button 
+              onClick={() => setGameMode('trivia')}
+              className={cn(
+                "flex-1 min-w-[80px] py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                gameMode === 'trivia' ? "bg-orange-500 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              Trivia
+            </button>
+            <button 
+              onClick={() => setGameMode('reference')}
+              className={cn(
+                "flex-1 min-w-[80px] py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                gameMode === 'reference' ? "bg-emerald-500 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              Ref
+            </button>
+            <button 
+              onClick={() => setGameMode('fourWords')}
+              className={cn(
+                "flex-1 min-w-[80px] py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                gameMode === 'fourWords' ? "bg-purple-500 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              4 Words
+            </button>
+            <button 
+              onClick={() => setGameMode('memory')}
+              className={cn(
+                "flex-1 min-w-[80px] py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
+                gameMode === 'memory' ? "bg-blue-500 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              Memory
+            </button>
+          </div>
+
+          {/* Difficulty Selector */}
+          {(gameMode === 'reference' || gameMode === 'fourWords') && (
+            <div className="mb-8">
+              <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-3 text-center">Select Difficulty</p>
+              <div className="flex gap-2">
+                {(['easy', 'medium', 'hard', 'extreme'] as ReferenceTowerDifficulty[]).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setReferenceDifficulty(d)}
+                    className={cn(
+                      "flex-1 py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all border-2",
+                      referenceDifficulty === d 
+                        ? (gameMode === 'fourWords' ? "bg-purple-500 border-purple-400 text-white shadow-lg" : "bg-emerald-500 border-emerald-400 text-white shadow-lg")
+                        : "bg-slate-900 border-slate-800 text-slate-500 hover:border-emerald-500/50"
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="space-y-4 mb-8 text-left bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
             <div className="flex gap-4">
               <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-orange-400 font-bold">1</div>
               <p className="text-slate-300 text-sm leading-relaxed">
-                <span className="text-white font-bold">Identify the Hero.</span> A legendary deed appears. Pick the hero who did it.
+                <span className="text-white font-bold">
+                  {gameMode === 'trivia' ? 'Identify the Deed.' : 
+                   gameMode === 'reference' ? 'Identify the Verse.' : 
+                   gameMode === 'fourWords' ? 'Guess from 4 Words.' :
+                   'Memorize the Verse.'}
+                </span> 
+                {gameMode === 'trivia' ? ' A legendary deed appears. Pick the hero who did it.' : 
+                 gameMode === 'reference' ? ' A Bible verse appears. Pick the correct reference.' : 
+                 gameMode === 'fourWords' ? ' See the 4 longest words from a verse. Guess the reference.' :
+                 ' Type the words of the verse as they fall to build the tower.'}
               </p>
             </div>
             <div className="flex gap-4">
@@ -2758,7 +3031,13 @@ const BibleHeroTowerGame = ({
             <div className="flex gap-4">
               <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-red-400 font-bold">4</div>
               <p className="text-slate-300 text-sm leading-relaxed">
-                <span className="text-white font-bold">Hints & Speed.</span> Faster answers give <span className="text-emerald-400 font-bold">BONUS POINTS</span>. Using hints removes a wrong option but <span className="text-red-400 font-bold">FORFEITS</span> the score for that question and <span className="text-red-400 font-bold">SUBTRACTS</span> the score from the previous question.
+                <span className="text-white font-bold">Life Recovery.</span> Get {gameMode === 'reference' ? '5' : '3'} correct in a row to <span className="text-emerald-400 font-bold">REGAIN A LIFE</span>.
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-rose-400 font-bold">5</div>
+              <p className="text-slate-300 text-sm leading-relaxed">
+                <span className="text-white font-bold">Stay Above the Line.</span> The tower is sinking. If the <span className="text-rose-400 font-bold underline text-[10px]">TOP</span> of your stack falls below the red laser, you collapse.
               </p>
             </div>
           </div>
@@ -2778,9 +3057,18 @@ const BibleHeroTowerGame = ({
 
           <button 
             onClick={startLaunch}
-            className="w-full py-5 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95"
+            className={cn(
+              "w-full py-5 text-slate-950 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95",
+              gameMode === 'trivia' ? "bg-white" : 
+              gameMode === 'reference' ? "bg-emerald-500 text-white" : 
+              gameMode === 'fourWords' ? "bg-purple-500 text-white" :
+              "bg-blue-500 text-white"
+            )}
           >
-            START HERO TOWER
+            START {gameMode === 'trivia' ? 'TRIVIA TOWER' : 
+                   gameMode === 'reference' ? 'REFERENCE TOWER' : 
+                   gameMode === 'fourWords' ? '4 WORDS TOWER' :
+                   'MEMORY TOWER'}
           </button>
         </motion.div>
       </div>
@@ -2814,9 +3102,27 @@ const BibleHeroTowerGame = ({
     );
   }
 
+  if (gameMode === 'memory' && !showStart) {
+    return (
+      <EndlessBlitzGame 
+        allVerses={allVerses}
+        onComplete={onComplete}
+        onMistake={onMistake}
+        onExit={() => setShowStart(true)}
+        volume={volume}
+        setVolume={setVolume}
+        isMusicEnabled={isMusicEnabled}
+        setIsMusicEnabled={setIsMusicEnabled}
+        musicStatus={musicStatus}
+        setMusicStatus={setMusicStatus}
+        setIsQuestionBankOpen={setIsQuestionBankOpen}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col transition-transform duration-75 h-full overflow-hidden">
-      <HeroHUD 
+      <TriviaHUD 
         score={score}
         streak={streak}
         isPaused={isPaused}
@@ -2824,28 +3130,37 @@ const BibleHeroTowerGame = ({
         lastUpdateRef={lastUpdateRef}
         setIsSettingsOpen={setIsSettingsOpen}
         lives={lives}
-        deed={(currentQuestion?.text || "Loading...")
-          .replace(/\{[^{}]*:[^{}]*\}/g, '')
-          .replace(/[\{\}\[\]\(\)]/g, '')
-          .replace(/[^\w\s]|_/g, "")
-          .replace(/\s+/g, " ")
-          .trim()}
-        reference={currentQuestion?.reference?.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
-        book={currentQuestion?.book}
-        chapter={currentQuestion?.chapter}
+        deed={gameMode === 'trivia' 
+          ? (currentQuestion?.text || "Loading...")
+            .replace(/\{[^{}]*:[^{}]*\}/g, '')
+            .replace(/[\{\}\[\]\(\)]/g, '')
+            .replace(/[^\w\s]|_/g, "")
+            .replace(/\s+/g, " ")
+            .trim()
+          : gameMode === 'fourWords'
+            ? (currentReferenceQuestion ? getLongestWords(currentReferenceQuestion.verse.text) : "Loading...")
+            : (currentReferenceQuestion?.verse.text || "Loading...")}
+        reference={gameMode === 'trivia' ? currentQuestion?.reference?.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() : currentReferenceQuestion?.correctRef}
+        book={gameMode === 'trivia' ? currentQuestion?.book : currentReferenceQuestion?.verse.book}
+        chapter={gameMode === 'trivia' ? currentQuestion?.chapter : currentReferenceQuestion?.verse.chapter}
         progress={progress}
-        lastSeen={currentQuestion?.lastSeen}
-        sectionId={currentQuestion?.sectionId}
+        lastSeen={gameMode === 'trivia' ? currentQuestion?.lastSeen : undefined}
+        sectionId={gameMode === 'trivia' ? currentQuestion?.sectionId : undefined}
         onStudy={() => {
-          if (currentQuestion?.reference) {
+          if (gameMode === 'trivia' && currentQuestion?.reference) {
             setStudyReference(currentQuestion.reference);
             setStudyQuestionText(currentQuestion.text);
             setIsStudyOpen(true);
             setHintsUsed(prev => prev + 1);
+          } else if ((gameMode === 'reference' || gameMode === 'fourWords') && currentReferenceQuestion) {
+            setStudyReference(currentReferenceQuestion.correctRef);
+            setStudyQuestionText(currentReferenceQuestion.verse.text);
+            setIsStudyOpen(true);
           }
         }}
-        onHint={handleHint}
-        canHint={currentQuestion && hiddenOptions.length < currentQuestion.options.length - 1}
+        onHint={gameMode === 'trivia' ? handleHint : undefined}
+        canHint={gameMode === 'trivia' && currentQuestion && hiddenOptions.length < currentQuestion.options.length - 1}
+        themeColor={gameMode === 'reference' ? '#10b981' : gameMode === 'fourWords' ? '#8b5cf6' : gameMode === 'memory' ? '#3b82f6' : '#f97316'}
       />
 
       <SettingsOverlay 
@@ -2916,11 +3231,11 @@ const BibleHeroTowerGame = ({
             <div className="col-span-2 flex items-center justify-center">
               <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : !currentQuestion ? (
+          ) : (gameMode === 'trivia' ? !currentQuestion : !currentReferenceQuestion) ? (
             <div className="col-span-2 flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+              <div className={cn("w-8 h-8 border-4 border-t-transparent rounded-full animate-spin", gameMode === 'trivia' ? "border-orange-500" : (gameMode === 'fourWords' ? "border-purple-500" : "border-emerald-500"))} />
             </div>
-          ) : currentQuestion.options.map((opt, idx) => (
+          ) : (gameMode === 'trivia' ? currentQuestion!.options : currentReferenceQuestion!.options).map((opt, idx) => (
             <motion.button
               key={idx}
               whileTap={{ scale: 0.95 }}
@@ -2930,10 +3245,12 @@ const BibleHeroTowerGame = ({
                 "h-full rounded-2xl border-2 flex items-center justify-center text-base sm:text-xl font-black tracking-tighter transition-all px-2 text-center leading-tight",
                 hiddenOptions.includes(idx) 
                   ? "opacity-0 pointer-events-none" 
-                  : "bg-slate-900 border-slate-800 text-white hover:border-orange-500/50"
+                  : "bg-slate-900 border-slate-800 text-white hover:border-orange-500/50",
+                gameMode === 'reference' && "hover:border-emerald-500/50",
+                gameMode === 'fourWords' && "hover:border-purple-500/50"
               )}
             >
-              {opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
+              {opt.replace(/[^\w\s:]|_/g, "").replace(/\s+/g, " ").trim()}
             </motion.button>
           ))}
         </div>
@@ -4735,7 +5052,7 @@ const EndlessBlitzGame = ({
   const [streak, setStreak] = useState(0);
   const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [showStart, setShowStart] = useState(true);
+  const [showStart, setShowStart] = useState(false);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -4749,9 +5066,7 @@ const EndlessBlitzGame = ({
     containerHeightRef.current = containerHeight;
   }, [containerHeight]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [showTutorial, setShowTutorial] = useState(() => {
-    return localStorage.getItem('endless_tutorial_dismissed') !== 'true';
-  });
+  const [showTutorial, setShowTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [timesSeen, setTimesSeen] = useState(0);
   const [totalNotesPlayed, setTotalNotesPlayed] = useState(0);
@@ -4786,7 +5101,7 @@ const EndlessBlitzGame = ({
 
   useEffect(() => {
     if (containerHeight > 0) {
-      const newHeight = containerHeight * 0.15;
+      const newHeight = containerHeight * 0.20;
       setPlatformHeight(newHeight);
       // If game hasn't started or is resetting, update refs
       if (showStart) {
@@ -4897,7 +5212,6 @@ const EndlessBlitzGame = ({
 
       // 7. ACCELERATION
       // Ensure sink rate is at least 8 and continues to accelerate
-      if (sinkRateRef.current < 8) sinkRateRef.current = 8;
       sinkRateRef.current += 0.05 * dt; 
 
       requestAnimationFrame(tick);
@@ -5063,10 +5377,7 @@ const EndlessBlitzGame = ({
     setConsecutiveCorrect(prev => prev + 1);
     
     // Speed = Height calculation
-    const maxHeight = containerHeight * 0.15; 
-    const minHeight = containerHeight * 0.08; 
-    const t = Math.max(0, Math.min(1, (timeDelta - 200) / 3800));
-    const height = maxHeight - (maxHeight - minHeight) * t;
+    const height = containerHeight * 0.20; 
     
     // ATOMIC UPDATE: Sync refs with state change
     towerHeightRef.current += height;
@@ -5091,8 +5402,8 @@ const EndlessBlitzGame = ({
     const timeDelta = now - lastTapTimeRef.current;
 
     if (isAskingReference) {
-      const correctRef = `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
-      if (choice.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === correctRef) {
+      const correctRef = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
+      if (choice === correctRef) {
         lastTapTimeRef.current = now;
         completeVerse(choice, timeDelta);
       } else {
@@ -5118,10 +5429,7 @@ const EndlessBlitzGame = ({
       const word = words[currentIndex];
       
       // Speed = Height calculation
-      const maxHeight = containerHeight * 0.15; 
-      const minHeight = containerHeight * 0.08; 
-      const t = Math.max(0, Math.min(1, (timeDelta - 200) / 3800));
-      const height = maxHeight - (maxHeight - minHeight) * t;
+      const height = containerHeight * 0.20; 
 
       // ATOMIC UPDATE: Sync refs with state change
       towerHeightRef.current += height;
@@ -5249,10 +5557,7 @@ const EndlessBlitzGame = ({
         setTimeout(() => playSound(880, 'sine', 0.2, 0.2), 100);
         
         // Speed = Height calculation
-        const maxHeight = containerHeight * 0.15; 
-        const minHeight = containerHeight * 0.08; 
-        const t = Math.max(0, Math.min(1, (timeDelta - 300) / 1700));
-        const height = maxHeight - (maxHeight - minHeight) * t;
+        const height = containerHeight * 0.20; 
         
         // Add block to tower
         towerHeightRef.current += height;
@@ -5406,13 +5711,21 @@ const EndlessBlitzGame = ({
     setDifficulty(config.difficulty);
 
     // Reset physics refs for a fresh start
-    const startHeight = containerHeight * 0.15;
+    const startHeight = containerHeight * 0.20;
     const startY = containerHeight * 0.3;
     
     platformYRef.current = DANGER_LINE_PX;
     cameraYRef.current = 0;
     towerHeightRef.current = startHeight;
-    sinkRateRef.current = 15; // Increased base sink rate for better feel
+    
+    // Set sink rate based on difficulty
+    if (difficulty === 'extreme') sinkRateRef.current = 25;
+    else if (difficulty === 'master') sinkRateRef.current = 20;
+    else if (difficulty === 'advanced') sinkRateRef.current = 15;
+    else if (difficulty === 'hard') sinkRateRef.current = 12;
+    else if (difficulty === 'medium') sinkRateRef.current = 8;
+    else sinkRateRef.current = 5;
+
     nextIdRef.current = 0;
     lastUpdateRef.current = performance.now();
     lastTapTimeRef.current = Date.now();
@@ -5607,7 +5920,7 @@ const EndlessBlitzGame = ({
   }
 
   if (isGameOver) {
-    const xpMultiplier = difficulty === 'master' ? 3 : difficulty === 'advanced' ? 2 : difficulty === 'medium' ? 1.5 : 1;
+    const xpMultiplier = difficulty === 'extreme' ? 4 : difficulty === 'master' ? 3 : difficulty === 'advanced' ? 2 : difficulty === 'hard' ? 1.75 : difficulty === 'medium' ? 1.5 : 1;
     const finalXP = Math.round(score * xpMultiplier);
 
     return (
@@ -5765,12 +6078,13 @@ interface MathEquation {
   type: MathOp;
 }
 
-const generateMathProblem = (score: number): { options: MathEquation[], correctEquation: string, type: MathOp } => {
+const generateMathProblem = (score: number, difficulty: Difficulty = 'medium'): { options: MathEquation[], correctEquation: string, type: MathOp } => {
   const ops: MathOp[] = ['addition', 'subtraction', 'multiplication', 'division'];
   const type = ops[Math.floor(Math.random() * ops.length)];
   
-  // Scale range with score
-  const range = 10 + Math.floor(score / 5) * 5;
+  // Scale range with score AND difficulty
+  const diffMultiplier = difficulty === 'extreme' ? 3 : difficulty === 'master' ? 2.5 : difficulty === 'advanced' ? 2 : difficulty === 'hard' ? 1.5 : difficulty === 'medium' ? 1 : 0.5;
+  const range = (10 + Math.floor(score / 5) * 5) * diffMultiplier;
   let a = 0, b = 0, result = 0;
   let equationText = "";
 
@@ -5832,6 +6146,615 @@ const generateMathProblem = (score: number): { options: MathEquation[], correctE
   };
 };
 
+// --- Chronology Tower Logic ---
+
+const BIBLE_EVENTS = [
+  { id: 1, text: "Creation", order: 1 },
+  { id: 2, text: "The Flood", order: 2 },
+  { id: 3, text: "Call of Abraham", order: 3 },
+  { id: 4, text: "Exodus from Egypt", order: 4 },
+  { id: 5, text: "Giving of the Law", order: 5 },
+  { id: 6, text: "Entering Promised Land", order: 6 },
+  { id: 7, text: "Reign of King David", order: 7 },
+  { id: 8, text: "Building First Temple", order: 8 },
+  { id: 9, text: "Babylonian Exile", order: 9 },
+  { id: 10, text: "Birth of Jesus", order: 10 },
+  { id: 11, text: "Baptism of Jesus", order: 11 },
+  { id: 12, text: "Crucifixion", order: 12 },
+  { id: 13, text: "Pentecost", order: 13 },
+  { id: 14, text: "Conversion of Paul", order: 14 }
+];
+
+const generateChronologyQuestion = () => {
+  const baseIdx = Math.floor(Math.random() * (BIBLE_EVENTS.length - 1));
+  const baseEvent = BIBLE_EVENTS[baseIdx];
+  const correctEvent = BIBLE_EVENTS[baseIdx + 1];
+  
+  const distractors = BIBLE_EVENTS
+    .filter(e => e.id !== correctEvent.id && e.id !== baseEvent.id)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+    
+  const options = [correctEvent, ...distractors].sort(() => Math.random() - 0.5);
+  
+  return {
+    baseEvent,
+    correctEvent,
+    options
+  };
+};
+
+// --- Spelling Tower Logic ---
+
+const BIBLE_NAMES = [
+  "ABRAHAM", "ISAAC", "JACOB", "JOSEPH", "MOSES", "JOSHUA", "GIDEON", "SAMSON", "SAMUEL", "DAVID", "SOLOMON", "ELIJAH", "ELISHA", "ISAIAH", "JEREMIAH", "EZEKIEL", "DANIEL", "PETER", "JAMES", "JOHN", "ANDREW", "PHILIP", "THOMAS", "MATTHEW", "PAUL", "TIMOTHY"
+];
+
+const generateSpellingQuestion = (currentName: string, currentIndex: number) => {
+  const name = currentName || BIBLE_NAMES[Math.floor(Math.random() * BIBLE_NAMES.length)];
+  const nextChar = name[currentIndex];
+  
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const distractors: string[] = [];
+  while (distractors.length < 3) {
+    const char = alphabet[Math.floor(Math.random() * alphabet.length)];
+    if (char !== nextChar && !distractors.includes(char)) {
+      distractors.push(char);
+    }
+  }
+  
+  const options = [nextChar, ...distractors].sort(() => Math.random() - 0.5);
+  
+  return {
+    name,
+    nextChar,
+    options
+  };
+};
+
+// --- Parable Tower Logic ---
+
+const BIBLE_PARABLES = [
+  { name: "The Sower", meaning: "Spreading the Word of God" },
+  { name: "The Good Samaritan", meaning: "Loving your neighbor" },
+  { name: "The Prodigal Son", meaning: "God's forgiveness" },
+  { name: "The Lost Sheep", meaning: "God seeks the lost" },
+  { name: "The Mustard Seed", meaning: "Growth of the Kingdom" },
+  { name: "The Hidden Treasure", meaning: "Value of the Kingdom" },
+  { name: "The Persistent Widow", meaning: "Persistence in prayer" },
+  { name: "The Pharisee and Publican", meaning: "Humility in prayer" },
+  { name: "The Ten Virgins", meaning: "Being prepared" },
+  { name: "The Talents", meaning: "Using God's gifts" }
+];
+
+const generateParableQuestion = () => {
+  const correct = BIBLE_PARABLES[Math.floor(Math.random() * BIBLE_PARABLES.length)];
+  const distractors = BIBLE_PARABLES
+    .filter(p => p.name !== correct.name)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+    
+  const options = [correct, ...distractors].sort(() => Math.random() - 0.5);
+  
+  return {
+    parable: correct,
+    options
+  };
+};
+
+const ChronologyTowerGame = ({ 
+  onComplete, 
+  onMistake, 
+  onExit, 
+  isOutOfHearts,
+  volume,
+  setVolume,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  musicStatus,
+  setMusicStatus
+}: { 
+  onComplete: (xp: number) => void, 
+  onMistake: () => void, 
+  onExit: () => void, 
+  isOutOfHearts: boolean,
+  volume: number,
+  setVolume: (v: number) => void,
+  isMusicEnabled: boolean,
+  setIsMusicEnabled: (v: boolean) => void,
+  musicStatus: string,
+  setMusicStatus: (v: string) => void
+}) => {
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [showStart, setShowStart] = useState(true);
+  const [question, setQuestion] = useState(() => generateChronologyQuestion());
+  const [towerData, setTowerData] = useState<{
+    stack: {id: number, word: string, height: number, color: string, isPlatform?: boolean}[]
+  }>({ 
+    stack: [{ id: -1, word: "", height: 100, color: '#1e293b', isPlatform: true }] 
+  });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const towerContainerRef = useRef<HTMLDivElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const lastUpdateRef = useRef(performance.now());
+  const lastTapTimeRef = useRef(Date.now());
+  const nextIdRef = useRef(0);
+  const platformYRef = useRef(DANGER_LINE_PX);
+  const towerHeightRef = useRef(100);
+  const cameraYRef = useRef(0);
+  const sinkRateRef = useRef(8);
+  const [containerHeight, setContainerHeight] = useState(800);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (containerHeight > 0 && showStart) {
+      const h = containerHeight * 0.20;
+      towerHeightRef.current = h;
+      setTowerData({ stack: [{ id: -1, word: "", height: h, color: '#1e293b', isPlatform: true }] });
+    }
+  }, [containerHeight, showStart]);
+
+  useEffect(() => {
+    if (showStart || isGameOver || isOutOfHearts) return;
+    let active = true;
+    const tick = () => {
+      if (!active) return;
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - lastUpdateRef.current) / 1000);
+      lastUpdateRef.current = now;
+      platformYRef.current -= sinkRateRef.current * dt;
+      const topOfTower = platformYRef.current + towerHeightRef.current;
+      const targetCameraY = Math.max(0, topOfTower - containerHeight * 0.6);
+      cameraYRef.current += (targetCameraY - cameraYRef.current) * (1 - Math.exp(-4 * dt));
+      if (topOfTower - cameraYRef.current <= DANGER_LINE_PX) {
+        setIsGameOver(true);
+        return;
+      }
+      if (towerContainerRef.current) {
+        towerContainerRef.current.style.transform = `translate3d(0, ${-(platformYRef.current - cameraYRef.current)}px, 0)`;
+      }
+      sinkRateRef.current += 0.3 * dt;
+      requestAnimationFrame(tick);
+    };
+    lastUpdateRef.current = performance.now();
+    const animId = requestAnimationFrame(tick);
+    return () => { active = false; cancelAnimationFrame(animId); };
+  }, [showStart, isGameOver, isOutOfHearts, containerHeight]);
+
+  const handleChoice = (event: any) => {
+    if (isGameOver || showStart) return;
+    if (event.id === question.correctEvent.id) {
+      setScore(s => s + 10);
+      setStreak(s => s + 1);
+      const h = containerHeight * 0.20;
+      towerHeightRef.current += h;
+      setTowerData(prev => ({
+        stack: [...prev.stack, { id: nextIdRef.current++, word: event.text, height: h, color: '#f43f5e' }]
+      }));
+      setQuestion(generateChronologyQuestion());
+      lastTapTimeRef.current = Date.now();
+    } else {
+      setStreak(0);
+      onMistake();
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden flex flex-col">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500/50 z-20" style={{ bottom: DANGER_LINE_PX }} />
+      </div>
+
+      <div ref={towerContainerRef} className="absolute left-0 right-0 bottom-0 flex flex-col-reverse items-center transition-transform duration-75 ease-out will-change-transform">
+        {towerData.stack.map((block) => (
+          <TowerBlock key={block.id} {...block} containerHeight={containerHeight} />
+        ))}
+      </div>
+
+      <div className="relative z-30 p-6 flex flex-col h-full">
+        <div className="flex justify-between items-center mb-4">
+          <button onClick={onExit} className="p-2 bg-white/10 rounded-xl text-white"><ArrowLeft /></button>
+          <div className="text-white font-black text-2xl">SCORE: {score}</div>
+          <div className="w-10" />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {showStart ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="w-24 h-24 bg-rose-500 rounded-3xl flex items-center justify-center text-white mb-6 shadow-2xl"><Shuffle size={48} /></div>
+              <h2 className="text-4xl font-black text-white mb-4 italic tracking-tighter">CHRONOLOGY TOWER</h2>
+              <p className="text-rose-200 mb-8 font-bold uppercase tracking-widest">Stack events in order!</p>
+              <button onClick={() => setShowStart(false)} className="px-12 py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform">START MISSION</button>
+            </motion.div>
+          ) : isGameOver ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <h2 className="text-6xl font-black text-white mb-4 italic tracking-tighter">TOWER FELL!</h2>
+              <p className="text-rose-200 mb-8 text-xl font-bold">Final Score: {score}</p>
+              <button onClick={() => onComplete(score)} className="px-12 py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-xl">COLLECT XP</button>
+            </motion.div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border-2 border-white/20 mb-8">
+                <p className="text-rose-200 text-xs font-black uppercase tracking-widest mb-2">What happened after...</p>
+                <h3 className="text-2xl font-black text-white italic tracking-tight">{question.baseEvent.text}</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-3 mt-auto mb-8">
+                {question.options.map((opt) => (
+                  <button key={opt.id} onClick={() => handleChoice(opt)} className="w-full py-5 bg-white rounded-2xl font-black text-slate-900 shadow-xl active:scale-95 transition-transform hover:bg-rose-50">
+                    {opt.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+const SpellingTowerGame = ({ 
+  onComplete, 
+  onMistake, 
+  onExit, 
+  isOutOfHearts,
+  volume,
+  setVolume,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  musicStatus,
+  setMusicStatus
+}: { 
+  onComplete: (xp: number) => void, 
+  onMistake: () => void, 
+  onExit: () => void, 
+  isOutOfHearts: boolean,
+  volume: number,
+  setVolume: (v: number) => void,
+  isMusicEnabled: boolean,
+  setIsMusicEnabled: (v: boolean) => void,
+  musicStatus: string,
+  setMusicStatus: (v: string) => void
+}) => {
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [showStart, setShowStart] = useState(true);
+  const [currentName, setCurrentName] = useState("");
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [question, setQuestion] = useState(() => generateSpellingQuestion("", 0));
+  const [towerData, setTowerData] = useState<{
+    stack: {id: number, word: string, height: number, color: string, isPlatform?: boolean}[]
+  }>({ 
+    stack: [{ id: -1, word: "", height: 100, color: '#1e293b', isPlatform: true }] 
+  });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const towerContainerRef = useRef<HTMLDivElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const lastUpdateRef = useRef(performance.now());
+  const lastTapTimeRef = useRef(Date.now());
+  const nextIdRef = useRef(0);
+  const platformYRef = useRef(DANGER_LINE_PX);
+  const towerHeightRef = useRef(100);
+  const cameraYRef = useRef(0);
+  const sinkRateRef = useRef(8);
+  const [containerHeight, setContainerHeight] = useState(800);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (containerHeight > 0 && showStart) {
+      const h = containerHeight * 0.20;
+      towerHeightRef.current = h;
+      setTowerData({ stack: [{ id: -1, word: "", height: h, color: '#1e293b', isPlatform: true }] });
+    }
+  }, [containerHeight, showStart]);
+
+  useEffect(() => {
+    if (showStart || isGameOver || isOutOfHearts) return;
+    let active = true;
+    const tick = () => {
+      if (!active) return;
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - lastUpdateRef.current) / 1000);
+      lastUpdateRef.current = now;
+      platformYRef.current -= sinkRateRef.current * dt;
+      const topOfTower = platformYRef.current + towerHeightRef.current;
+      const targetCameraY = Math.max(0, topOfTower - containerHeight * 0.6);
+      cameraYRef.current += (targetCameraY - cameraYRef.current) * (1 - Math.exp(-4 * dt));
+      if (topOfTower - cameraYRef.current <= DANGER_LINE_PX) {
+        setIsGameOver(true);
+        return;
+      }
+      if (towerContainerRef.current) {
+        towerContainerRef.current.style.transform = `translate3d(0, ${-(platformYRef.current - cameraYRef.current)}px, 0)`;
+      }
+      sinkRateRef.current += 0.3 * dt;
+      requestAnimationFrame(tick);
+    };
+    lastUpdateRef.current = performance.now();
+    const animId = requestAnimationFrame(tick);
+    return () => { active = false; cancelAnimationFrame(animId); };
+  }, [showStart, isGameOver, isOutOfHearts, containerHeight]);
+
+  const handleChoice = (char: string) => {
+    if (isGameOver || showStart) return;
+    if (char === question.nextChar) {
+      const nextIdx = currentIndex + 1;
+      const h = containerHeight * 0.20;
+      
+      if (nextIdx >= question.name.length) {
+        setScore(s => s + 50);
+        towerHeightRef.current += h;
+        setTowerData(prev => ({
+          stack: [...prev.stack, { id: nextIdRef.current++, word: question.name, height: h, color: '#06b6d4' }]
+        }));
+        const newQ = generateSpellingQuestion("", 0);
+        setQuestion(newQ);
+        setCurrentName(newQ.name);
+        setCurrentIndex(0);
+      } else {
+        setScore(s => s + 5);
+        setCurrentIndex(nextIdx);
+        setQuestion(generateSpellingQuestion(question.name, nextIdx));
+      }
+      lastTapTimeRef.current = Date.now();
+    } else {
+      setStreak(0);
+      onMistake();
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden flex flex-col">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500/50 z-20" style={{ bottom: DANGER_LINE_PX }} />
+      </div>
+
+      <div ref={towerContainerRef} className="absolute left-0 right-0 bottom-0 flex flex-col-reverse items-center transition-transform duration-75 ease-out will-change-transform">
+        {towerData.stack.map((block) => (
+          <TowerBlock key={block.id} {...block} containerHeight={containerHeight} />
+        ))}
+      </div>
+
+      <div className="relative z-30 p-6 flex flex-col h-full">
+        <div className="flex justify-between items-center mb-4">
+          <button onClick={onExit} className="p-2 bg-white/10 rounded-xl text-white"><ArrowLeft /></button>
+          <div className="text-white font-black text-2xl">SCORE: {score}</div>
+          <div className="w-10" />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {showStart ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="w-24 h-24 bg-cyan-500 rounded-3xl flex items-center justify-center text-white mb-6 shadow-2xl"><Edit2 size={48} /></div>
+              <h2 className="text-4xl font-black text-white mb-4 italic tracking-tighter">SPELLING TOWER</h2>
+              <p className="text-cyan-200 mb-8 font-bold uppercase tracking-widest">Spell Bible names to build!</p>
+              <button onClick={() => setShowStart(false)} className="px-12 py-4 bg-cyan-500 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform">START MISSION</button>
+            </motion.div>
+          ) : isGameOver ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <h2 className="text-6xl font-black text-white mb-4 italic tracking-tighter">TOWER FELL!</h2>
+              <p className="text-cyan-200 mb-8 text-xl font-bold">Final Score: {score}</p>
+              <button onClick={() => onComplete(score)} className="px-12 py-4 bg-cyan-500 text-white rounded-2xl font-black text-xl shadow-xl">COLLECT XP</button>
+            </motion.div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border-2 border-white/20 mb-8 text-center">
+                <p className="text-cyan-200 text-xs font-black uppercase tracking-widest mb-4">Spell the name...</p>
+                <div className="flex justify-center gap-2">
+                  {question.name.split('').map((char, i) => (
+                    <div key={i} className={cn(
+                      "w-10 h-12 rounded-lg flex items-center justify-center font-black text-2xl border-2",
+                      i < currentIndex ? "bg-cyan-500 border-cyan-400 text-white" : "bg-white/5 border-white/20 text-white/20"
+                    )}>
+                      {i < currentIndex ? char : '?'}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-auto mb-8">
+                {question.options.map((opt, i) => (
+                  <button key={i} onClick={() => handleChoice(opt)} className="w-full py-8 bg-white rounded-2xl font-black text-4xl text-slate-900 shadow-xl active:scale-95 transition-transform hover:bg-cyan-50">
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+const ParableTowerGame = ({ 
+  onComplete, 
+  onMistake, 
+  onExit, 
+  isOutOfHearts,
+  volume,
+  setVolume,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  musicStatus,
+  setMusicStatus
+}: { 
+  onComplete: (xp: number) => void, 
+  onMistake: () => void, 
+  onExit: () => void, 
+  isOutOfHearts: boolean,
+  volume: number,
+  setVolume: (v: number) => void,
+  isMusicEnabled: boolean,
+  setIsMusicEnabled: (v: boolean) => void,
+  musicStatus: string,
+  setMusicStatus: (v: string) => void
+}) => {
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [showStart, setShowStart] = useState(true);
+  const [question, setQuestion] = useState(() => generateParableQuestion());
+  const [towerData, setTowerData] = useState<{
+    stack: {id: number, word: string, height: number, color: string, isPlatform?: boolean}[]
+  }>({ 
+    stack: [{ id: -1, word: "", height: 100, color: '#1e293b', isPlatform: true }] 
+  });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const towerContainerRef = useRef<HTMLDivElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const lastUpdateRef = useRef(performance.now());
+  const lastTapTimeRef = useRef(Date.now());
+  const nextIdRef = useRef(0);
+  const platformYRef = useRef(DANGER_LINE_PX);
+  const towerHeightRef = useRef(100);
+  const cameraYRef = useRef(0);
+  const sinkRateRef = useRef(8);
+  const [containerHeight, setContainerHeight] = useState(800);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (containerHeight > 0 && showStart) {
+      const h = containerHeight * 0.20;
+      towerHeightRef.current = h;
+      setTowerData({ stack: [{ id: -1, word: "", height: h, color: '#1e293b', isPlatform: true }] });
+    }
+  }, [containerHeight, showStart]);
+
+  useEffect(() => {
+    if (showStart || isGameOver || isOutOfHearts) return;
+    let active = true;
+    const tick = () => {
+      if (!active) return;
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - lastUpdateRef.current) / 1000);
+      lastUpdateRef.current = now;
+      platformYRef.current -= sinkRateRef.current * dt;
+      const topOfTower = platformYRef.current + towerHeightRef.current;
+      const targetCameraY = Math.max(0, topOfTower - containerHeight * 0.6);
+      cameraYRef.current += (targetCameraY - cameraYRef.current) * (1 - Math.exp(-4 * dt));
+      if (topOfTower - cameraYRef.current <= DANGER_LINE_PX) {
+        setIsGameOver(true);
+        return;
+      }
+      if (towerContainerRef.current) {
+        towerContainerRef.current.style.transform = `translate3d(0, ${-(platformYRef.current - cameraYRef.current)}px, 0)`;
+      }
+      sinkRateRef.current += 0.3 * dt;
+      requestAnimationFrame(tick);
+    };
+    lastUpdateRef.current = performance.now();
+    const animId = requestAnimationFrame(tick);
+    return () => { active = false; cancelAnimationFrame(animId); };
+  }, [showStart, isGameOver, isOutOfHearts, containerHeight]);
+
+  const handleChoice = (opt: any) => {
+    if (isGameOver || showStart) return;
+    if (opt.name === question.parable.name) {
+      setScore(s => s + 20);
+      setStreak(s => s + 1);
+      const h = containerHeight * 0.20;
+      towerHeightRef.current += h;
+      setTowerData(prev => ({
+        stack: [...prev.stack, { id: nextIdRef.current++, word: opt.name, height: h, color: '#8b5cf6' }]
+      }));
+      setQuestion(generateParableQuestion());
+      lastTapTimeRef.current = Date.now();
+    } else {
+      setStreak(0);
+      onMistake();
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden flex flex-col">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500/50 z-20" style={{ bottom: DANGER_LINE_PX }} />
+      </div>
+
+      <div ref={towerContainerRef} className="absolute left-0 right-0 bottom-0 flex flex-col-reverse items-center transition-transform duration-75 ease-out will-change-transform">
+        {towerData.stack.map((block) => (
+          <TowerBlock key={block.id} {...block} containerHeight={containerHeight} />
+        ))}
+      </div>
+
+      <div className="relative z-30 p-6 flex flex-col h-full">
+        <div className="flex justify-between items-center mb-4">
+          <button onClick={onExit} className="p-2 bg-white/10 rounded-xl text-white"><ArrowLeft /></button>
+          <div className="text-white font-black text-2xl">SCORE: {score}</div>
+          <div className="w-10" />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {showStart ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="w-24 h-24 bg-violet-500 rounded-3xl flex items-center justify-center text-white mb-6 shadow-2xl"><Sparkles size={48} /></div>
+              <h2 className="text-4xl font-black text-white mb-4 italic tracking-tighter">PARABLE TOWER</h2>
+              <p className="text-violet-200 mb-8 font-bold uppercase tracking-widest">Match parables to meanings!</p>
+              <button onClick={() => setShowStart(false)} className="px-12 py-4 bg-violet-500 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform">START MISSION</button>
+            </motion.div>
+          ) : isGameOver ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col items-center justify-center text-center">
+              <h2 className="text-6xl font-black text-white mb-4 italic tracking-tighter">TOWER FELL!</h2>
+              <p className="text-violet-200 mb-8 text-xl font-bold">Final Score: {score}</p>
+              <button onClick={() => onComplete(score)} className="px-12 py-4 bg-violet-500 text-white rounded-2xl font-black text-xl shadow-xl">COLLECT XP</button>
+            </motion.div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border-2 border-white/20 mb-8">
+                <p className="text-violet-200 text-xs font-black uppercase tracking-widest mb-2">What is the meaning of...</p>
+                <h3 className="text-2xl font-black text-white italic tracking-tight">{question.parable.name}</h3>
+              </div>
+              <div className="grid grid-cols-1 gap-3 mt-auto mb-8">
+                {question.options.map((opt, i) => (
+                  <button key={i} onClick={() => handleChoice(opt)} className="w-full py-5 bg-white rounded-2xl font-black text-slate-900 shadow-xl active:scale-95 transition-transform hover:bg-violet-50">
+                    {opt.meaning}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
 const MathTowerGame = ({ 
   onComplete, 
   onMistake, 
@@ -5863,15 +6786,16 @@ const MathTowerGame = ({
   const [lives, setLives] = useState(3);
   const [isPaused, setIsPaused] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
-  const [showStart, setShowStart] = useState(() => localStorage.getItem('math_tutorial_dismissed') !== 'true');
+  const [showStart, setShowStart] = useState(true);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [isRedAlert, setIsRedAlert] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [comboCount, setComboCount] = useState(0);
   const [isComboActive, setIsComboActive] = useState(false);
   const lastCorrectTimesRef = useRef<number[]>([]);
 
-  const [problem, setProblem] = useState(() => generateMathProblem(0));
+  const [problem, setProblem] = useState(() => generateMathProblem(0, 'medium'));
   const [towerData, setTowerData] = useState<{
     stack: {id: number, word: string, height: number, color: string, isPlatform?: boolean}[]
   }>({ 
@@ -5913,7 +6837,7 @@ const MathTowerGame = ({
 
   useEffect(() => {
     if (containerHeight > 0) {
-      const newHeight = containerHeight * 0.15;
+      const newHeight = containerHeight * 0.20;
       if (showStart) {
         towerHeightRef.current = newHeight;
         platformYRef.current = DANGER_LINE_PX;
@@ -5979,7 +6903,6 @@ const MathTowerGame = ({
         }
       }
 
-      if (sinkRateRef.current < 15) sinkRateRef.current = 15;
       sinkRateRef.current += 0.5 * dt; 
 
       requestAnimationFrame(tick);
@@ -6094,10 +7017,7 @@ const MathTowerGame = ({
       setConsecutiveCorrect(prev => prev + 1);
 
       // Speed = Height
-      const maxHeight = containerHeight * 0.30; 
-      const minHeight = containerHeight * 0.16; 
-      const t = Math.max(0, Math.min(1, (timeDelta - 200) / 3800));
-      const height = maxHeight - (maxHeight - minHeight) * t;
+      const height = containerHeight * 0.20; 
       
       towerHeightRef.current += height;
       
@@ -6113,7 +7033,7 @@ const MathTowerGame = ({
         ]
       }));
 
-      setProblem(generateMathProblem(score + points));
+      setProblem(generateMathProblem(score + points, difficulty));
     } else {
       playIncorrectSound();
       setStreak(0);
@@ -6133,6 +7053,11 @@ const MathTowerGame = ({
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
+    
+    // Set sink rate based on difficulty
+    sinkRateRef.current = difficulty === 'extreme' ? 25 : difficulty === 'master' ? 20 : difficulty === 'advanced' ? 15 : difficulty === 'hard' ? 12 : difficulty === 'medium' ? 8 : 5;
+
+    setProblem(generateMathProblem(0, difficulty));
     lastTapTimeRef.current = Date.now();
     setShowStart(false);
     if (dontShowAgain) {
@@ -6154,7 +7079,28 @@ const MathTowerGame = ({
           <h2 className="text-5xl font-black mb-2 tracking-tighter italic">MATH TOWER</h2>
           <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-8">Mental Math Marathon</p>
           
-          <div className="space-y-4 mb-8 text-left">
+          {/* Difficulty Selector */}
+          <div className="mb-8">
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-3">Select Difficulty</p>
+            <div className="flex gap-2">
+              {(['easy', 'medium', 'hard', 'advanced', 'master', 'extreme'] as Difficulty[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDifficulty(d)}
+                  className={cn(
+                    "flex-1 py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all border-2",
+                    difficulty === d 
+                      ? "bg-emerald-500 border-emerald-400 text-white shadow-lg" 
+                      : "bg-slate-900 border-slate-800 text-slate-500 hover:border-emerald-500/50"
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4 mb-8 text-left bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
             <div className="flex gap-4">
               <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-emerald-400 font-bold">1</div>
               <p className="text-slate-300 text-sm leading-relaxed">
@@ -6171,6 +7117,12 @@ const MathTowerGame = ({
               <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-yellow-400 font-bold">3</div>
               <p className="text-slate-300 text-sm leading-relaxed">
                 <span className="text-white font-bold">Combo Fire.</span> Get 5 correct in 10 seconds for <span className="text-yellow-400 font-bold">DOUBLE SCORE</span> and golden blocks.
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-rose-400 font-bold">4</div>
+              <p className="text-slate-300 text-sm leading-relaxed">
+                <span className="text-white font-bold">Stay Above the Line.</span> The tower is sinking. If the <span className="text-rose-400 font-bold underline text-[10px]">TOP</span> of your stack falls below the red laser, you collapse.
               </p>
             </div>
           </div>
@@ -6475,8 +7427,9 @@ export default function App() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showMasteredVerses, setShowMasteredVerses] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'bible_hero_tower' | 'bible_reader'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys'>('dashboard');
   const [boggleDifficulty, setBoggleDifficulty] = useState<Difficulty>('easy');
+  const [referenceTowerDifficulty, setReferenceTowerDifficulty] = useState<ReferenceTowerDifficulty>('easy');
   const [showReward, setShowReward] = useState(false);
   const [earnedXP, setEarnedXP] = useState(0);
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -6682,7 +7635,7 @@ export default function App() {
     setView('dashboard');
   };
 
-  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'bible_hero_tower' || view === 'bible_reader' || view === 'bible_jeopardy';
+  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers';
 
   if (!progress || !isDbReady) {
     return (
@@ -6794,17 +7747,24 @@ export default function App() {
                 </div>
               </motion.div>
 
-              {/* Star Tower Action Button */}
+              {/* Tower Games Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={handleStartStarTower}
+                onClick={() => {
+                  if (progress && progress.hearts <= 0) {
+                    setOutOfHearts(true);
+                    return;
+                  }
+                  setMistakesInSession(0);
+                  setView('tower_games');
+                }}
                 className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
               >
-                <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                  <Rocket size={28} className="text-white" />
+                <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Tower size={28} className="text-white" />
                 </div>
-                PLAY STAR TOWER
+                TOWER GAMES
               </motion.button>
 
               {/* Math Tower Action Button */}
@@ -6818,18 +7778,6 @@ export default function App() {
                   <Calculator size={28} className="text-white" />
                 </div>
                 PLAY MATH TOWER
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setView('bible_hero_tower')}
-                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
-              >
-                <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                  <Shield size={28} className="text-white" />
-                </div>
-                PLAY HERO TOWER
               </motion.button>
 
               {/* Verse Boggle Difficulty Selector */}
@@ -6876,6 +7824,19 @@ export default function App() {
                 PLAY BIBLE JEOPARDY
               </motion.button>
 
+              {/* Missionary Journeys Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('missionary_journeys')}
+                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Compass size={28} className="text-white" />
+                </div>
+                MISSIONARY JOURNEYS
+              </motion.button>
+
               {/* Bible Reader Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -6887,6 +7848,19 @@ export default function App() {
                   <BookOpen size={28} className="text-white" />
                 </div>
                 READ THE BIBLE
+              </motion.button>
+
+              {/* Bible Wits & Wagers Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('wits_and_wagers')}
+                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-[#d4af37] rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Coins size={28} className="text-white" />
+                </div>
+                WITS & WAGERS
               </motion.button>
 
               {/* Question Bank Action Button */}
@@ -7001,29 +7975,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {view === 'game' && (
-            <motion.div 
-              key="game"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-full flex flex-col bg-slate-950"
-            >
-              <EndlessBlitzGame 
-                allVerses={filteredGameVerses} 
-                onComplete={handleGameComplete} 
-                onMistake={handleMistake} 
-                onExit={() => setView('dashboard')}
-                volume={volume}
-                setVolume={setVolume}
-                isMusicEnabled={isMusicEnabled}
-                setIsMusicEnabled={setIsMusicEnabled}
-                musicStatus={musicStatus}
-                setMusicStatus={setMusicStatus}
-                setIsQuestionBankOpen={setIsQuestionBankOpen}
-              />
-            </motion.div>
-          )}
+
 
           {view === 'math_tower' && (
             <motion.div 
@@ -7049,15 +8001,15 @@ export default function App() {
             </motion.div>
           )}
 
-          {view === 'bible_hero_tower' && (
+          {view === 'tower_games' && (
             <motion.div 
-              key="bible_hero_tower"
+              key="tower_games"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="h-full flex flex-col bg-slate-950"
             >
-              <BibleHeroTowerGame 
+              <BibleTriviaTowerGame 
                 onComplete={handleGameComplete} 
                 onMistake={handleMistake} 
                 onExit={() => setView('dashboard')}
@@ -7071,6 +8023,33 @@ export default function App() {
                 setIsQuestionBankOpen={setIsQuestionBankOpen}
                 downloadProgress={downloadProgress}
               />
+            </motion.div>
+          )}
+
+          {view === 'missionary_journeys' && (
+            <motion.div 
+              key="missionary_journeys"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex flex-col bg-slate-950"
+            >
+              <MissionaryJourneysGame 
+                onComplete={handleGameComplete} 
+                onExit={() => setView('dashboard')}
+              />
+            </motion.div>
+          )}
+
+          {view === 'wits_and_wagers' && (
+            <motion.div 
+              key="wits_and_wagers"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex flex-col bg-[#FDFCF0]"
+            >
+              <BibleWitsAndWagersGame />
             </motion.div>
           )}
 
@@ -7337,7 +8316,7 @@ export default function App() {
             </motion.div>
           </motion.div>
         )}
-        {outOfHearts && view !== 'bible_hero_tower' && (
+        {outOfHearts && view !== 'tower_games' && (
           <motion.div 
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}

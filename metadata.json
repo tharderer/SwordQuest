@@ -1,5 +1,5 @@
 {
   "name": "Bible Verse App",
-  "description": "A Bible verse application that downloads and stores the full KJV Bible locally for offline use.",
+  "description": "A Bible verse application that downloads and stores the full KJV Bible locally for offline use, featuring multiple game modes including Missionary Journeys and Bible Wits & Wagers.",
   "requestFramePermissions": []
 }

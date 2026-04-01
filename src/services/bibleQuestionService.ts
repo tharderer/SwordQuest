@@ -1,23 +1,16 @@
-
-import { BIBLE_SECTIONS } from '../lib/bibleSections';
-
-const DB_NAME = 'BibleHeroTowerDB';
-const DB_VERSION = 2;
-const QUESTIONS_STORE = 'questions';
-const PROGRESS_STORE = 'progress';
+import { openDB, IDBPDatabase } from 'idb';
+import { GoogleGenAI, Type } from "@google/genai";
 
 export interface BibleQuestion {
   id?: number;
   text: string;
-  correctAnswer: string;
-  options: string[];
-  era: string;
-  reference?: string;
-  lastSeen: number;
+  answer: number;
   book: string;
   chapter: number;
   verse?: number;
-  sectionId: string;
+  used: boolean | number;
+  lastSeen?: number;
+  sectionId?: string;
   consecutiveCorrect?: number;
 }
 
@@ -28,241 +21,254 @@ export interface SectionProgress {
 }
 
 export interface BibleProgress {
-  id: string;
   sections: Record<string, SectionProgress>;
   lastSectionIndex?: number;
   lastQuestionInCurrentSection?: number;
-  lastQuestionId?: number;
 }
 
-export const initBibleQuestionDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('BibleHeroTowerDB open timed out (10s). This can happen if another tab is blocking the database.'));
-    }, 10000);
+const DB_NAME = 'BibleWitsAndWagers';
+const STORE_NAME = 'questions';
+const META_STORE = 'metadata';
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+let dbPromise: Promise<IDBPDatabase<any>>;
 
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      const transaction = (event.target as IDBOpenDBRequest).transaction;
-      
-      if (!db.objectStoreNames.contains(QUESTIONS_STORE)) {
-        const questionStore = db.createObjectStore(QUESTIONS_STORE, { keyPath: 'id', autoIncrement: true });
-        questionStore.createIndex('lastSeen', 'lastSeen', { unique: false });
-        questionStore.createIndex('sectionId', 'sectionId', { unique: false });
-        questionStore.createIndex('book_chapter', ['book', 'chapter'], { unique: false });
-      } else if (transaction) {
-        // If store exists, ensure indices exist
-        const questionStore = transaction.objectStore(QUESTIONS_STORE);
-        if (!questionStore.indexNames.contains('lastSeen')) {
-          questionStore.createIndex('lastSeen', 'lastSeen', { unique: false });
+function getDB() {
+  if (!dbPromise) {
+    dbPromise = openDB(DB_NAME, 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+          store.createIndex('by-chapter', ['book', 'chapter']);
+          store.createIndex('by-used', 'used');
+          store.createIndex('by-section', 'sectionId');
+          store.createIndex('by-lastSeen', 'lastSeen');
         }
-        if (!questionStore.indexNames.contains('sectionId')) {
-          questionStore.createIndex('sectionId', 'sectionId', { unique: false });
+        if (!db.objectStoreNames.contains(META_STORE)) {
+          db.createObjectStore(META_STORE);
         }
-        if (!questionStore.indexNames.contains('book_chapter')) {
-          questionStore.createIndex('book_chapter', ['book', 'chapter'], { unique: false });
-        }
-      }
+      },
+    });
+  }
+  return dbPromise;
+}
 
-      if (!db.objectStoreNames.contains(PROGRESS_STORE)) {
-        db.createObjectStore(PROGRESS_STORE, { keyPath: 'id' });
-      }
-    };
-
-    request.onsuccess = () => {
-      clearTimeout(timeout);
-      resolve(request.result);
-    };
-    request.onerror = () => {
-      clearTimeout(timeout);
-      reject(request.error);
-    };
-    request.onblocked = () => {
-      console.warn('BibleHeroTowerDB open blocked by another tab');
-    };
-  });
-};
-
-export const saveQuestions = async (questions: BibleQuestion[]): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readwrite');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    
-    // Check for duplicates before adding
-    const getAllRequest = store.getAll();
-    getAllRequest.onsuccess = () => {
-      const existing = getAllRequest.result as BibleQuestion[];
-      questions.forEach(q => {
-        const isDuplicate = existing.some(e => e.text === q.text && e.correctAnswer === q.correctAnswer);
-        if (!isDuplicate) {
-          // Initialize consecutiveCorrect if not present
-          if (q.consecutiveCorrect === undefined) q.consecutiveCorrect = 0;
-          store.add(q);
-        }
-      });
-    };
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
-
-export const getQuestionsSortedByLastSeen = async (): Promise<BibleQuestion[]> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readonly');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    const index = store.index('lastSeen');
-    const request = index.getAll();
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const getQuestionsBySection = async (sectionId: string): Promise<BibleQuestion[]> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readonly');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    const index = store.index('sectionId');
-    const request = index.getAll(sectionId);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const updateQuestionLastSeen = async (id: number, correct: boolean = true): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readwrite');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    const getRequest = store.get(id);
-
-    getRequest.onsuccess = () => {
-      const question = getRequest.result as BibleQuestion;
-      if (question) {
-        question.lastSeen = Date.now();
-        if (correct) {
-          question.consecutiveCorrect = (question.consecutiveCorrect || 0) + 1;
-        } else {
-          question.consecutiveCorrect = 0;
-        }
-        store.put(question);
-      }
-    };
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
-
-export const getQuestionById = async (id: number): Promise<BibleQuestion | null> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readonly');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const getBibleProgress = async (): Promise<BibleProgress> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(PROGRESS_STORE, 'readonly');
-    const store = transaction.objectStore(PROGRESS_STORE);
-    const request = store.get('current');
-
-    request.onsuccess = () => {
-      resolve(request.result || { id: 'current', sections: {} });
-    };
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const updateBibleProgress = async (
-  sections: Record<string, SectionProgress>,
-  lastSectionIndex?: number,
-  lastQuestionInCurrentSection?: number,
-  lastQuestionId?: number
-): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(PROGRESS_STORE, 'readwrite');
-    const store = transaction.objectStore(PROGRESS_STORE);
-    store.put({ id: 'current', sections, lastSectionIndex, lastQuestionInCurrentSection, lastQuestionId });
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
-
-export const deleteQuestion = async (id: number): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readwrite');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    store.delete(id);
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
-
-export const deleteQuestions = async (ids: number[]): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readwrite');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    ids.forEach(id => store.delete(id));
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
-
-export const deleteAllQuestions = async (): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(QUESTIONS_STORE, 'readwrite');
-    const store = transaction.objectStore(QUESTIONS_STORE);
-    store.clear();
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
-
-export const resetBibleProgress = async (): Promise<void> => {
-  const db = await initBibleQuestionDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(PROGRESS_STORE, 'readwrite');
-    const store = transaction.objectStore(PROGRESS_STORE);
-    
-    const sections: Record<string, SectionProgress> = {};
-    BIBLE_SECTIONS.forEach(section => {
-      sections[section.id] = {
-        currentBook: section.startBook,
-        currentChapter: section.startChapter,
-        currentVerse: section.startVerse
+export const bibleQuestionService = {
+  async saveQuestions(questions: BibleQuestion[]) {
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    for (const q of questions) {
+      const question = {
+        ...q,
+        used: q.used ? 1 : 0,
+        lastSeen: q.lastSeen || 0
       };
-    });
+      await tx.store.add(question);
+    }
+    await tx.done;
+  },
+
+  async getNextUnusedQuestions(count: number): Promise<BibleQuestion[]> {
+    const db = await getDB();
+    const questions = await db.getAllFromIndex(STORE_NAME, 'by-used', 0); 
+    return questions.slice(0, count);
+  },
+
+  async markAsUsed(ids: number[]) {
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    for (const id of ids) {
+      const q = await tx.store.get(id);
+      if (q) {
+        q.used = 1;
+        q.lastSeen = Date.now();
+        await tx.store.put(q);
+      }
+    }
+    await tx.done;
+  },
+
+  async getLastGeneratedChapter(): Promise<{ book: string; chapter: number }> {
+    const db = await getDB();
+    const last = await db.get(META_STORE, 'lastChapter');
+    return last || { book: 'Genesis', chapter: 0 };
+  },
+
+  async setLastGeneratedChapter(book: string, chapter: number) {
+    const db = await getDB();
+    await db.put(META_STORE, { book, chapter }, 'lastChapter');
+  },
+
+  async getCurrentGameChapter(): Promise<{ book: string; chapter: number }> {
+    const db = await getDB();
+    const current = await db.get(META_STORE, 'currentGameChapter');
+    return current || { book: 'Genesis', chapter: 1 };
+  },
+
+  async setCurrentGameChapter(book: string, chapter: number) {
+    const db = await getDB();
+    await db.put(META_STORE, { book, chapter }, 'currentGameChapter');
+  },
+
+  async generateQuestions(apiKey: string) {
+    const last = await this.getLastGeneratedChapter();
+    const nextChapter = last.chapter + 1;
+    const book = last.book; 
     
-    store.put({ 
-      id: 'current', 
-      sections, 
-      lastSectionIndex: 0, 
-      lastQuestionInCurrentSection: 0 
+    const ai = new GoogleGenAI({ apiKey });
+    
+    const prompt = `You are a Biblical scholar and trivia master. Generate exactly 15 of the ABSOLUTE HARDEST numerical trivia questions possible from the Bible book of ${book}, Chapter ${nextChapter}. 
+    
+    CRITICAL REQUIREMENTS:
+    1. DIFFICULTY: The questions must be extremely obscure. They should be so difficult that even experts would likely not know the exact number without looking it up, yet they must be "guessable" (e.g., counts of people, objects, measurements, or specific actions).
+    2. NUMERICAL ONLY: Every answer MUST be a single integer.
+    3. TYPES OF QUESTIONS:
+       - Obscure measurements or counts of objects/people/actions mentioned in the text.
+       - Specific counts of genealogical links or generations mentioned in the chapter.
+       - Numerical details about sacrifices, building dimensions, or tribal counts.
+       - Verse numbers for specific events within the chapter.
+       - NO WORD COUNTS, NO PUNCTUATION COUNTS, NO CHARACTER COUNTS. Avoid "boring" linguistic metrics. Focus on the CONTENT and NARRATIVE details of the chapter.
+    4. FORMAT: Return ONLY a JSON array of objects with "text" and "answer" properties.
+    
+    Example Question: "How many generations are listed from Adam to Noah in this chapter?"
+    Example Question: "What is the total number of verses in ${book} chapter ${nextChapter}?"
+    
+    Make them challenging enough that a winning 'Wits & Wagers' guess would be a true feat of estimation.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              text: { type: Type.STRING },
+              answer: { type: Type.NUMBER }
+            },
+            required: ["text", "answer"]
+          }
+        }
+      }
     });
 
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
+    const text = response.text;
+    if (!text) throw new Error("No response from AI");
+
+    const generated = JSON.parse(text);
+    const questions: BibleQuestion[] = generated.map((q: any) => ({
+      ...q,
+      book,
+      chapter: nextChapter,
+      used: 0,
+      lastSeen: 0
+    }));
+
+    await this.saveQuestions(questions);
+    await this.setLastGeneratedChapter(book, nextChapter);
+    
+    return questions;
+  },
+
+  async getQuestionsForChapter(book: string, chapter: number): Promise<BibleQuestion[]> {
+    const db = await getDB();
+    return db.getAllFromIndex(STORE_NAME, 'by-chapter', [book, chapter]);
+  },
+
+  async getQuestionCount() {
+    const db = await getDB();
+    return db.count(STORE_NAME);
+  },
+
+  // Compatibility methods for App.tsx
+  async initBibleQuestionDB() {
+    await getDB();
+  },
+
+  async getQuestionsSortedByLastSeen(): Promise<BibleQuestion[]> {
+    const db = await getDB();
+    return db.getAllFromIndex(STORE_NAME, 'by-lastSeen');
+  },
+
+  async getQuestionsBySection(sectionId: string): Promise<BibleQuestion[]> {
+    const db = await getDB();
+    return db.getAllFromIndex(STORE_NAME, 'by-section', sectionId);
+  },
+
+  async updateQuestionLastSeen(id: number, isCorrect?: boolean) {
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const q = await tx.store.get(id);
+    if (q) {
+      q.lastSeen = Date.now();
+      if (isCorrect !== undefined) {
+        q.consecutiveCorrect = isCorrect ? (q.consecutiveCorrect || 0) + 1 : 0;
+      }
+      await tx.store.put(q);
+    }
+    await tx.done;
+  },
+
+  async getBibleProgress(): Promise<BibleProgress> {
+    const db = await getDB();
+    const sections = await db.get(META_STORE, 'sectionsProgress');
+    const lastSectionIndex = await db.get(META_STORE, 'lastSectionIndex');
+    const lastQuestionInCurrentSection = await db.get(META_STORE, 'lastQuestionInCurrentSection');
+    return { 
+      sections: sections || {},
+      lastSectionIndex: lastSectionIndex || 0,
+      lastQuestionInCurrentSection: lastQuestionInCurrentSection || 0
+    };
+  },
+
+  async updateBibleProgress(sections: Record<string, SectionProgress>, lastSectionIndex?: number, lastQuestionInCurrentSection?: number) {
+    const db = await getDB();
+    await db.put(META_STORE, sections, 'sectionsProgress');
+    if (lastSectionIndex !== undefined) {
+      await db.put(META_STORE, lastSectionIndex, 'lastSectionIndex');
+    }
+    if (lastQuestionInCurrentSection !== undefined) {
+      await db.put(META_STORE, lastQuestionInCurrentSection, 'lastQuestionInCurrentSection');
+    }
+  },
+
+  async resetBibleProgress() {
+    const db = await getDB();
+    await db.delete(META_STORE, 'sectionsProgress');
+    await db.delete(META_STORE, 'lastChapter');
+    await db.delete(META_STORE, 'currentGameChapter');
+  },
+
+  async deleteQuestion(id: number) {
+    const db = await getDB();
+    await db.delete(STORE_NAME, id);
+  },
+
+  async deleteQuestions(ids: number[]) {
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    for (const id of ids) {
+      await tx.store.delete(id);
+    }
+    await tx.done;
+  },
+
+  async deleteAllQuestions() {
+    const db = await getDB();
+    await db.clear(STORE_NAME);
+  }
 };
+
+// Export individual functions for App.tsx compatibility
+export const initBibleQuestionDB = bibleQuestionService.initBibleQuestionDB;
+export const getQuestionsSortedByLastSeen = bibleQuestionService.getQuestionsSortedByLastSeen;
+export const getQuestionsBySection = bibleQuestionService.getQuestionsBySection;
+export const updateQuestionLastSeen = bibleQuestionService.updateQuestionLastSeen;
+export const getBibleProgress = bibleQuestionService.getBibleProgress;
+export const updateBibleProgress = bibleQuestionService.updateBibleProgress;
+export const resetBibleProgress = bibleQuestionService.resetBibleProgress;
+export const saveQuestions = bibleQuestionService.saveQuestions;
+export const deleteQuestion = bibleQuestionService.deleteQuestion;
+export const deleteQuestions = bibleQuestionService.deleteQuestions;
+export const deleteAllQuestions = bibleQuestionService.deleteAllQuestions;

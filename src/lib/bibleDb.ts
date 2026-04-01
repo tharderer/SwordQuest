@@ -221,6 +221,18 @@ export async function getBooks(): Promise<string[]> {
   }
 }
 
+export async function getBibleVerses(): Promise<Verse[]> {
+  try {
+    const db = await initBibleDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    return await store.getAll();
+  } catch (error) {
+    console.warn('getBibleVerses falling back to local library:', error);
+    return KJV_LIBRARY;
+  }
+}
+
 export async function getChapters(book: string): Promise<number[]> {
   try {
     const db = await initBibleDB();
