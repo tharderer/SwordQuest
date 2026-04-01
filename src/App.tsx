@@ -63,7 +63,8 @@ import {
   ArrowRight,
   Layout,
   Compass,
-  Coins
+  Coins,
+  RefreshCw
 } from 'lucide-react';
 import { 
   initBibleQuestionDB, 
@@ -73,10 +74,13 @@ import {
   getBibleProgress, 
   updateBibleProgress, 
   resetBibleProgress,
+  resetWitsAndWagersBank,
   saveQuestions, 
   deleteQuestion,
   deleteQuestions,
   deleteAllQuestions,
+  JEOPARDY_STORE,
+  WITS_STORE,
   BibleQuestion,
   BibleProgress,
   SectionProgress
@@ -584,7 +588,7 @@ const Background = memo(({ masteredKeys, progress }: { masteredKeys: string[], p
          prev.masteredKeys.every((v, i) => v === next.masteredKeys[i]);
 });
 
-const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+const QuestionBankOverlay = ({ isOpen, onClose, storeName = JEOPARDY_STORE }: { isOpen: boolean, onClose: () => void, storeName?: string }) => {
   const [questions, setQuestions] = useState<BibleQuestion[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -592,18 +596,19 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   const [generationMessage, setGenerationMessage] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showResetBankConfirm, setShowResetBankConfirm] = useState(false);
 
   const loadQuestions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const q = await getQuestionsSortedByLastSeen();
-      setQuestions(q);
+      const q = await getQuestionsSortedByLastSeen(storeName);
+      setQuestions(q || []);
     } catch (error) {
       console.error("Failed to load questions:", error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [storeName]);
 
   useEffect(() => {
     if (isOpen) {
@@ -612,14 +617,20 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   }, [isOpen, loadQuestions]);
 
   const handleGenerateMore = async () => {
+    if (storeName === WITS_STORE) {
+      setGenerationMessage("Generate in Wits & Wagers Lobby");
+      setTimeout(() => setGenerationMessage(null), 3000);
+      return;
+    }
     setIsGenerating(true);
     setGenerationMessage("Starting generation...");
     try {
       const currentProgress = await getBibleProgress();
       const sectionsProgress = { ...(currentProgress.sections || {}) };
-      let anyNew = false;
       let totalNew = 0;
-      
+      let anyNew = false;
+
+      // Find first section that needs questions
       for (const section of BIBLE_SECTIONS) {
         const sectionStored = await getQuestionsBySection(section.id);
         const unseenCount = sectionStored.filter(q => q.lastSeen === 0).length;
@@ -637,14 +648,16 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
               await generateBibleQuestionsBatch(section.id, prog.currentBook, prog.currentChapter, prog.currentVerse);
             
             if (newQuestions.length > 0) {
-              await saveQuestions(newQuestions);
+              await saveQuestions(newQuestions, JEOPARDY_STORE);
               sectionsProgress[section.id] = { 
                 currentBook: nextBook, 
                 currentChapter: nextChapter, 
                 currentVerse: nextVerse 
               };
+              totalNew = newQuestions.length;
               anyNew = true;
-              totalNew += newQuestions.length;
+              // Break after one section to keep it fast
+              break;
             }
           } catch (e) {
             console.error(`Failed to generate for section ${section.id}:`, e);
@@ -671,18 +684,18 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   };
 
   const handleDeleteSingle = async (id: number) => {
-    await deleteQuestion(id);
+    await deleteQuestion(id, storeName);
     loadQuestions();
   };
 
   const handleDeleteSelected = async () => {
-    await deleteQuestions(Array.from(selectedIds));
+    await deleteQuestions(Array.from(selectedIds), storeName);
     setSelectedIds(new Set());
     loadQuestions();
   };
 
   const handleDeleteAll = async () => {
-    await deleteAllQuestions();
+    await deleteAllQuestions(storeName);
     setShowClearConfirm(false);
     loadQuestions();
   };
@@ -690,7 +703,17 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   const handleResetProgress = async () => {
     await resetBibleProgress();
     setShowResetConfirm(false);
-    // Optionally alert the user or just close the confirm
+  };
+
+  const handleResetBank = async () => {
+    if (storeName === WITS_STORE) {
+      await resetWitsAndWagersBank();
+    } else {
+      await deleteAllQuestions(JEOPARDY_STORE);
+      await resetBibleProgress();
+    }
+    setShowResetBankConfirm(false);
+    loadQuestions();
   };
 
   const toggleSelect = (id: number) => {
@@ -704,10 +727,11 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   };
 
   const selectAll = () => {
-    if (selectedIds.size === questions.length) {
+    const qList = questions || [];
+    if (selectedIds.size === qList.length && qList.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(questions.map(q => q.id!)));
+      setSelectedIds(new Set(qList.map(q => q.id!)));
     }
   };
 
@@ -728,8 +752,10 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
           >
             <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
               <div>
-                <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">Question Bank</h2>
-                <p className="text-xs text-white/40 font-bold uppercase tracking-widest">{questions.length} Questions Stored</p>
+                <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">
+                  {storeName === JEOPARDY_STORE ? "Jeopardy Bank" : "Wits & Wagers Bank"}
+                </h2>
+                <p className="text-xs text-white/40 font-bold uppercase tracking-widest">{(questions || []).length} Questions Stored</p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/50 hover:text-white transition-colors">
                 <X className="w-6 h-6" />
@@ -742,7 +768,7 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                   onClick={selectAll}
                   className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/70 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-white/5"
                 >
-                  {selectedIds.size === questions.length ? "Deselect All" : "Select All"}
+                  {(selectedIds.size === (questions || []).length && (questions || []).length > 0) ? "Deselect All" : "Select All"}
                 </button>
                 {selectedIds.size > 0 && (
                   <button 
@@ -752,26 +778,36 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                     <Trash2 size={12} /> Delete ({selectedIds.size})
                   </button>
                 )}
+                {storeName === JEOPARDY_STORE && (
+                  <button 
+                    onClick={handleGenerateMore}
+                    disabled={isGenerating}
+                    className={cn(
+                      "px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-orange-500/20 flex items-center gap-1 min-w-[140px] justify-center",
+                      isGenerating && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {isGenerating ? (
+                      <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    {generationMessage || (isGenerating ? "Generating..." : "Generate More")}
+                  </button>
+                )}
+                {storeName === JEOPARDY_STORE && (
+                  <button 
+                    onClick={() => setShowResetConfirm(true)}
+                    className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-blue-500/20 flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} /> Reset Progress
+                  </button>
+                )}
                 <button 
-                  onClick={handleGenerateMore}
-                  disabled={isGenerating}
-                  className={cn(
-                    "px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-orange-500/20 flex items-center gap-1 min-w-[140px] justify-center",
-                    isGenerating && "opacity-50 cursor-not-allowed"
-                  )}
+                  onClick={() => setShowResetBankConfirm(true)}
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-amber-500/20 flex items-center gap-1"
                 >
-                  {isGenerating ? (
-                    <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Sparkles size={12} />
-                  )}
-                  {generationMessage || (isGenerating ? "Generating..." : "Generate More")}
-                </button>
-                <button 
-                  onClick={() => setShowResetConfirm(true)}
-                  className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-blue-500/20 flex items-center gap-1"
-                >
-                  <RotateCcw size={12} /> Reset Progress
+                  <RefreshCw size={12} /> Reset Bank
                 </button>
               </div>
               <button 
@@ -787,13 +823,13 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                 <div className="h-full flex items-center justify-center">
                   <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
                 </div>
-              ) : questions.length === 0 ? (
+              ) : (questions || []).length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8">
                   <Database size={48} className="text-white/10 mb-4" />
                   <p className="text-white/30 font-bold uppercase tracking-widest text-sm">No questions stored yet</p>
                 </div>
               ) : (
-                questions.map((q) => (
+                (questions || []).map((q) => (
                   <div 
                     key={q.id} 
                     className={cn(
@@ -821,7 +857,7 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                       </div>
                       <p className="text-white font-medium text-sm leading-tight mb-2">{q.text}</p>
                       <div className="flex flex-wrap gap-1">
-                        {q.options.map((opt, i) => (
+                        {q.options?.map((opt, i) => (
                           <span 
                             key={i} 
                             className={cn(
@@ -832,6 +868,11 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                             {opt}
                           </span>
                         ))}
+                        {!q.options && (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-400">
+                            Answer: {q.answer}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button 
@@ -915,6 +956,37 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
                 </div>
               </motion.div>
             )}
+
+            {showResetBankConfirm && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[120] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6"
+              >
+                <div className="bg-slate-900 border border-white/10 p-8 rounded-[2rem] max-w-xs w-full text-center shadow-2xl">
+                  <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 text-amber-500">
+                    <RefreshCw size={32} />
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase italic mb-2">Reset Bank?</h3>
+                  <p className="text-white/50 text-sm mb-8 leading-tight">This will clear all questions and reset the generation pointer to Genesis 1.</p>
+                  <div className="flex flex-col gap-3">
+                    <button 
+                      onClick={handleResetBank}
+                      className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-amber-600/20 active:scale-95 transition-transform"
+                    >
+                      YES, RESET BANK
+                    </button>
+                    <button 
+                      onClick={() => setShowResetBankConfirm(false)}
+                      className="w-full py-3 text-white/40 font-bold uppercase tracking-widest text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         </motion.div>
       )}
@@ -922,7 +994,7 @@ const QuestionBankOverlay = ({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   );
 };
 
-const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabled, setIsMusicEnabled, musicStatus, onOpenBank, onRepair, downloadProgress }: any) => {
+const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabled, setIsMusicEnabled, musicStatus, onOpenBank, onOpenWitsBank, onRepair, downloadProgress }: any) => {
   return (
     <>
       <AnimatePresence>
@@ -990,19 +1062,35 @@ const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabl
                   </button>
                 </div>
 
-                <button 
-                  onClick={() => {
-                    onClose();
-                    onOpenBank();
-                  }}
-                  className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Database className="w-5 h-5 text-orange-400" />
-                    <span className="text-white font-bold uppercase tracking-widest text-xs">Question Bank</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white transition-colors" />
-                </button>
+                <div className="grid grid-cols-1 gap-3">
+                  <button 
+                    onClick={() => {
+                      onClose();
+                      onOpenBank();
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-orange-400" />
+                      <span className="text-white font-bold uppercase tracking-widest text-xs">Jeopardy Bank</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white transition-colors" />
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      onClose();
+                      onOpenWitsBank();
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-[#d4af37]" />
+                      <span className="text-white font-bold uppercase tracking-widest text-xs">Wits & Wagers Bank</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white transition-colors" />
+                  </button>
+                </div>
 
                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                   <div className="flex items-center justify-between">
@@ -2251,6 +2339,7 @@ const BibleTriviaTowerGame = ({
   musicStatus,
   setMusicStatus,
   setIsQuestionBankOpen,
+  setBankStore,
   downloadProgress
 }: { 
   onComplete: (xp: number) => void, 
@@ -2264,6 +2353,7 @@ const BibleTriviaTowerGame = ({
   musicStatus: string,
   setMusicStatus: (v: string) => void,
   setIsQuestionBankOpen: (v: boolean) => void,
+  setBankStore: (store: string) => void,
   downloadProgress: number | null
 }) => {
   const [score, setScore] = useState(0);
@@ -3116,6 +3206,7 @@ const BibleTriviaTowerGame = ({
         musicStatus={musicStatus}
         setMusicStatus={setMusicStatus}
         setIsQuestionBankOpen={setIsQuestionBankOpen}
+        setBankStore={setBankStore}
       />
     );
   }
@@ -3171,7 +3262,16 @@ const BibleTriviaTowerGame = ({
         isMusicEnabled={isMusicEnabled}
         setIsMusicEnabled={setIsMusicEnabled}
         musicStatus={musicStatus}
-        onOpenBank={() => setIsQuestionBankOpen(true)}
+        onOpenBank={() => {
+          setBankStore(JEOPARDY_STORE);
+          setIsQuestionBankOpen(true);
+          setIsSettingsOpen(false);
+        }}
+        onOpenWitsBank={() => {
+          setBankStore(WITS_STORE);
+          setIsQuestionBankOpen(true);
+          setIsSettingsOpen(false);
+        }}
       />
 
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
@@ -4903,7 +5003,8 @@ const EndlessBlitzGame = ({
   setIsMusicEnabled,
   musicStatus,
   setMusicStatus,
-  setIsQuestionBankOpen
+  setIsQuestionBankOpen,
+  setBankStore
 }: { 
   allVerses: Verse[], 
   onComplete: (xp: number) => void, 
@@ -4915,7 +5016,8 @@ const EndlessBlitzGame = ({
   setIsMusicEnabled: (v: boolean) => void,
   musicStatus: string,
   setMusicStatus: (v: string) => void,
-  setIsQuestionBankOpen: (v: boolean) => void
+  setIsQuestionBankOpen: (v: boolean) => void,
+  setBankStore: (store: string) => void
 }) => {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [gameMode, setGameMode] = useState<'classic' | 'reference'>('classic');
@@ -5986,7 +6088,16 @@ const EndlessBlitzGame = ({
         isMusicEnabled={isMusicEnabled}
         setIsMusicEnabled={setIsMusicEnabled}
         musicStatus={musicStatus}
-        onOpenBank={() => setIsQuestionBankOpen(true)}
+        onOpenBank={() => {
+          setBankStore(JEOPARDY_STORE);
+          setIsQuestionBankOpen(true);
+          setIsSettingsOpen(false);
+        }}
+        onOpenWitsBank={() => {
+          setBankStore(WITS_STORE);
+          setIsQuestionBankOpen(true);
+          setIsSettingsOpen(false);
+        }}
       />
 
       {/* The Tower Area */}
@@ -6766,7 +6877,8 @@ const MathTowerGame = ({
   setIsMusicEnabled,
   musicStatus,
   setMusicStatus,
-  setIsQuestionBankOpen
+  setIsQuestionBankOpen,
+  setBankStore
 }: { 
   onComplete: (xp: number) => void, 
   onMistake: () => void, 
@@ -6778,7 +6890,8 @@ const MathTowerGame = ({
   setIsMusicEnabled: (v: boolean) => void,
   musicStatus: string,
   setMusicStatus: (v: string) => void,
-  setIsQuestionBankOpen: (v: boolean) => void
+  setIsQuestionBankOpen: (v: boolean) => void,
+  setBankStore: (store: string) => void
 }) => {
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -7203,7 +7316,16 @@ const MathTowerGame = ({
         isMusicEnabled={isMusicEnabled}
         setIsMusicEnabled={setIsMusicEnabled}
         musicStatus={musicStatus}
-        onOpenBank={() => setIsQuestionBankOpen(true)}
+        onOpenBank={() => {
+          setBankStore(JEOPARDY_STORE);
+          setIsQuestionBankOpen(true);
+          setIsSettingsOpen(false);
+        }}
+        onOpenWitsBank={() => {
+          setBankStore(WITS_STORE);
+          setIsQuestionBankOpen(true);
+          setIsSettingsOpen(false);
+        }}
       />
 
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
@@ -7441,6 +7563,8 @@ export default function App() {
   const [selectedGameSetId, setSelectedGameSetId] = useState<string | null>(null);
   const [isStarTowerSelectionOpen, setIsStarTowerSelectionOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isBankOpen, setIsBankOpen] = useState(false);
+  const [bankStore, setBankStore] = useState(JEOPARDY_STORE);
   const [volume, setVolume] = useState(0.5);
   const [isMusicEnabled, setIsMusicEnabled] = useState(true);
   const [musicStatus, setMusicStatus] = useState<string>("Stopped");
@@ -7997,6 +8121,7 @@ export default function App() {
                 musicStatus={musicStatus}
                 setMusicStatus={setMusicStatus}
                 setIsQuestionBankOpen={setIsQuestionBankOpen}
+                setBankStore={setBankStore}
               />
             </motion.div>
           )}
@@ -8021,6 +8146,7 @@ export default function App() {
                 musicStatus={musicStatus}
                 setMusicStatus={setMusicStatus}
                 setIsQuestionBankOpen={setIsQuestionBankOpen}
+                setBankStore={setBankStore}
                 downloadProgress={downloadProgress}
               />
             </motion.div>
@@ -8207,7 +8333,13 @@ export default function App() {
       <AnimatePresence>
         {showReward && <RewardModal xp={earnedXP} onNext={closeReward} />}
         {showCustomForm && <CustomVerseForm onAdd={handleAddCustom} onCancel={() => setShowCustomForm(false)} />}
-        {isQuestionBankOpen && <QuestionBankOverlay isOpen={isQuestionBankOpen} onClose={() => setIsQuestionBankOpen(false)} />}
+        {isQuestionBankOpen && (
+          <QuestionBankOverlay 
+            isOpen={isQuestionBankOpen} 
+            onClose={() => setIsQuestionBankOpen(false)} 
+            storeName={bankStore}
+          />
+        )}
         {isVerseSetOpen && (
           <VerseSetOverlay 
             isOpen={isVerseSetOpen} 
@@ -8232,7 +8364,16 @@ export default function App() {
             isMusicEnabled={isMusicEnabled}
             setIsMusicEnabled={setIsMusicEnabled}
             musicStatus={musicStatus}
-            onOpenBank={() => setIsQuestionBankOpen(true)}
+            onOpenBank={() => {
+              setBankStore(JEOPARDY_STORE);
+              setIsQuestionBankOpen(true);
+              setIsSettingsOpen(false);
+            }}
+            onOpenWitsBank={() => {
+              setBankStore(WITS_STORE);
+              setIsQuestionBankOpen(true);
+              setIsSettingsOpen(false);
+            }}
             downloadProgress={downloadProgress}
             onRepair={async () => {
               try {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Coins, User, Bot, Trophy, ArrowRight, RotateCcw, HelpCircle, Sparkles, Database, Play } from 'lucide-react';
+import { Coins, User, Bot, Trophy, ArrowRight, RotateCcw, HelpCircle, Sparkles, Database, Play, AlertCircle, Trash2 } from 'lucide-react';
 import { bibleQuestionService, BibleQuestion } from '../services/bibleQuestionService';
+import { getVerseByRef } from '../lib/bibleDb';
 
 interface Question {
   text: string;
@@ -83,43 +84,21 @@ export const BibleWitsAndWagersGame: React.FC = () => {
   const [roundResult, setRoundResult] = useState<{ winnings: number; bonus: boolean; message: string; winners?: string[] } | null>(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("Consulting the scrolls...");
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [dbQuestionCount, setDbQuestionCount] = useState(0);
-  const [lastChapter, setLastChapter] = useState({ book: 'Genesis', chapter: 0 });
-  const [currentGameChapter, setCurrentGameChapter] = useState({ book: 'Genesis', chapter: 1 });
+  const [unseenQuestionCount, setUnseenQuestionCount] = useState(0);
+  const [verificationVerse, setVerificationVerse] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
       const count = await bibleQuestionService.getQuestionCount();
+      const unseen = await bibleQuestionService.getUnseenQuestionCount();
       setDbQuestionCount(count);
-      const last = await bibleQuestionService.getLastGeneratedChapter();
-      setLastChapter(last);
-      const current = await bibleQuestionService.getCurrentGameChapter();
-      setCurrentGameChapter(current);
+      setUnseenQuestionCount(unseen);
     };
     init();
   }, []);
-
-  useEffect(() => {
-    if (!isGenerating) return;
-    const messages = [
-      "Consulting the scrolls...",
-      "Counting the generations...",
-      "Measuring the temple dimensions...",
-      "Verifying the tribal counts...",
-      "Translating the ancient texts...",
-      "Gathering the elders...",
-      "Searching the archives...",
-      "Scribing the questions..."
-    ];
-    let i = 0;
-    const interval = setInterval(() => {
-      i = (i + 1) % messages.length;
-      setLoadingMessage(messages[i]);
-    }, 1500);
-    return () => clearInterval(interval);
-  }, [isGenerating]);
 
   const currentQuestion = questions[currentQuestionIndex] || { text: "Loading...", answer: 0 };
 
@@ -127,63 +106,63 @@ export const BibleWitsAndWagersGame: React.FC = () => {
   const totalUserChips = userScore + 2;
   const userChipsPlaced = (Object.values(userBets) as number[]).reduce((a, b) => a + b, 0);
 
-  const handleGenerate = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    setGenerationProgress({ current: 0, total: 15 });
-    try {
-      await bibleQuestionService.generateQuestions(process.env.GEMINI_API_KEY!, (current, total) => {
-        setGenerationProgress({ current, total });
-      });
-      const count = await bibleQuestionService.getQuestionCount();
-      setDbQuestionCount(count);
-      const last = await bibleQuestionService.getLastGeneratedChapter();
-      setLastChapter(last);
-    } catch (error) {
-      console.error("Failed to generate questions:", error);
-    } finally {
-      setIsGenerating(false);
-      setGenerationProgress({ current: 0, total: 0 });
-    }
-  };
-
   const startGame = async () => {
-    const current = await bibleQuestionService.getCurrentGameChapter();
-    let gameQuestions = await bibleQuestionService.getQuestionsForChapter(current.book, current.chapter);
+    setGenerationError(null);
+    let gameQuestions = await bibleQuestionService.getWitsQuestionsForGame(7);
     
-    // If not enough questions for this specific chapter, generate them
-    if (gameQuestions.length < 7) {
+    // If we have enough for a game but the bank is getting low on UNSEEN questions, generate in background
+    const unseenCount = await bibleQuestionService.getUnseenQuestionCount();
+    const shouldGenerateInBackground = unseenCount < 21; // Keep at least 3 games worth of unseen questions
+
+    if (shouldGenerateInBackground) {
+      const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+      if (apiKey) {
+        // Trigger background generation without awaiting
+        bibleQuestionService.generateQuestions(apiKey).then(async () => {
+          const newCount = await bibleQuestionService.getQuestionCount();
+          const newUnseen = await bibleQuestionService.getUnseenQuestionCount();
+          setDbQuestionCount(newCount);
+          setUnseenQuestionCount(newUnseen);
+        }).catch(err => console.error("Background generation failed:", err));
+      }
+    }
+
+    // If not enough UNSEEN questions for the current game, generate them (blocking)
+    if (unseenCount < 7) {
       setIsGenerating(true);
-      setGenerationProgress({ current: 0, total: 15 });
+      setGenerationProgress({ current: 0, total: 14 });
       try {
-        // We need to set the last generated chapter to current.chapter - 1 
-        // so generateQuestions picks up the right one if it's not yet generated
-        const lastGen = await bibleQuestionService.getLastGeneratedChapter();
-        if (lastGen.chapter < current.chapter) {
-          await bibleQuestionService.setLastGeneratedChapter(current.book, current.chapter - 1);
-        }
-        await bibleQuestionService.generateQuestions(process.env.GEMINI_API_KEY!, (current, total) => {
+        const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+        if (!apiKey) throw new Error("API Key missing");
+
+        await bibleQuestionService.generateQuestions(apiKey, (current, total) => {
           setGenerationProgress({ current, total });
         });
-        gameQuestions = await bibleQuestionService.getQuestionsForChapter(current.book, current.chapter);
         
-        // Refresh stats
+        gameQuestions = await bibleQuestionService.getWitsQuestionsForGame(7);
         const count = await bibleQuestionService.getQuestionCount();
+        const unseen = await bibleQuestionService.getUnseenQuestionCount();
         setDbQuestionCount(count);
-        const last = await bibleQuestionService.getLastGeneratedChapter();
-        setLastChapter(last);
-      } catch (error) {
+        setUnseenQuestionCount(unseen);
+      } catch (error: any) {
         console.error("Failed to auto-generate questions:", error);
+        setGenerationError("Auto-generation failed. Using default questions.");
         const fallback = DEFAULT_QUESTIONS.map(q => ({ ...q, book: 'Genesis', chapter: 0, used: false })) as BibleQuestion[];
-        gameQuestions = fallback.slice(0, 7);
+        gameQuestions = fallback;
       } finally {
         setIsGenerating(false);
         setGenerationProgress({ current: 0, total: 0 });
       }
     }
 
+    if (!gameQuestions || gameQuestions.length === 0) {
+      const fallback = DEFAULT_QUESTIONS.map(q => ({ ...q, book: 'Genesis', chapter: 0, used: false })) as BibleQuestion[];
+      gameQuestions = fallback;
+    }
+
     setQuestions(gameQuestions.slice(0, 7));
     setPhase('QUESTION');
+    setVerificationVerse(null);
     setRound(1);
     setCurrentQuestionIndex(0);
     setScores(scores.map(s => ({ ...s, score: 0 })));
@@ -207,18 +186,11 @@ export const BibleWitsAndWagersGame: React.FC = () => {
 
   const startNewRound = useCallback(async () => {
     if (round >= 7) {
-      // Mark questions as used in DB
-      const ids = questions.map(q => q.id).filter((id): id is number => id !== undefined);
-      await bibleQuestionService.markAsUsed(ids);
-      
-      // Increment current game chapter
-      const current = await bibleQuestionService.getCurrentGameChapter();
-      await bibleQuestionService.setCurrentGameChapter(current.book, current.chapter + 1);
-      
       setPhase('GAME_OVER');
       return;
     }
     setPhase('QUESTION');
+    setVerificationVerse(null);
     setUserGuess('');
     setUniqueGuesses([]);
     setBets([]);
@@ -228,6 +200,48 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     setRound(prev => prev + 1);
     setCurrentQuestionIndex((prev) => (prev + 1) % questions.length);
   }, [round, questions]);
+
+  const handleDeleteQuestion = async () => {
+    if (!currentQuestion.id) return;
+    
+    try {
+      await bibleQuestionService.deleteQuestion(currentQuestion.id);
+      // Update counts after deletion
+      const count = await bibleQuestionService.getQuestionCount();
+      const unseen = await bibleQuestionService.getUnseenQuestionCount();
+      setDbQuestionCount(count);
+      setUnseenQuestionCount(unseen);
+      
+      // Fetch a replacement question, excluding all questions currently in the game
+      const currentIds = questions.map(q => q.id).filter((id): id is number => id !== undefined);
+      const replacement = await bibleQuestionService.getWitsQuestionsForGame(1, currentIds);
+      if (replacement.length > 0) {
+        const newQuestions = [...questions];
+        newQuestions[currentQuestionIndex] = replacement[0];
+        setQuestions(newQuestions);
+        setUserGuess('');
+        setTimeLeft(30);
+      } else {
+        // If no replacement available, try to generate
+        const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+        if (apiKey) {
+          setIsGenerating(true);
+          await bibleQuestionService.generateQuestions(apiKey);
+          const fresh = await bibleQuestionService.getWitsQuestionsForGame(1, currentIds);
+          if (fresh.length > 0) {
+            const newQuestions = [...questions];
+            newQuestions[currentQuestionIndex] = fresh[0];
+            setQuestions(newQuestions);
+            setUserGuess('');
+            setTimeLeft(30);
+          }
+          setIsGenerating(false);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete/replace question:", err);
+    }
+  };
 
   const handleGuessSubmit = () => {
     let val = parseInt(userGuess);
@@ -350,8 +364,28 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     return mapping;
   }, [uniqueGuesses]);
 
-  const handleReveal = () => {
+  const handleReveal = async () => {
     setPhase('REVEAL');
+    
+    // Mark as used immediately so it's not picked again if user leaves
+    if (currentQuestion.id) {
+      await bibleQuestionService.markAsUsed([currentQuestion.id]);
+      const unseen = await bibleQuestionService.getUnseenQuestionCount();
+      setUnseenQuestionCount(unseen);
+    }
+    
+    // Fetch verification verse
+    if (currentQuestion?.book && currentQuestion?.chapter && currentQuestion?.verse) {
+      try {
+        const verse = await getVerseByRef(currentQuestion.book, currentQuestion.chapter, currentQuestion.verse);
+        if (verse) {
+          setVerificationVerse(verse.text);
+        }
+      } catch (err) {
+        console.error("Failed to fetch verification verse:", err);
+      }
+    }
+
     const oldUserScore = userScore;
     const answer = currentQuestion.answer;
     const mapping = getMatMapping();
@@ -498,65 +532,63 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                 <p className="text-sm font-bold opacity-60 uppercase tracking-[0.2em]">The Ultimate Biblical Trivia Challenge</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-md">
-                <div className="bg-white/40 p-6 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-2">
-                  <Database className="w-6 h-6 text-[#d4af37]" />
-                  <span className="text-xs font-bold uppercase opacity-50">Question Bank</span>
-                  <span className="text-2xl font-black">{dbQuestionCount}</span>
-                  <span className="text-[10px] opacity-40">Stored in IndexedDB</span>
+              <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+                <div className="bg-white/40 p-4 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-1">
+                  <Database className="w-5 h-5 text-[#d4af37]" />
+                  <span className="text-[10px] font-bold uppercase opacity-50">Total Bank</span>
+                  <span className="text-xl font-black">{dbQuestionCount}</span>
                 </div>
-                <div className="bg-white/40 p-6 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-2">
-                  <Sparkles className="w-6 h-6 text-[#d4af37]" />
-                  <span className="text-xs font-bold uppercase opacity-50">Next Game</span>
-                  <span className="text-2xl font-black">{currentGameChapter.book} {currentGameChapter.chapter}</span>
-                  <span className="text-[10px] opacity-40">Sequential Chapter Mode</span>
+                <div className="bg-white/40 p-4 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-1">
+                  <Sparkles className="w-5 h-5 text-[#d4af37]" />
+                  <span className="text-[10px] font-bold uppercase opacity-50">Unseen</span>
+                  <span className="text-xl font-black text-[#d4af37]">{unseenQuestionCount}</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-4 w-full max-w-xs">
                 <button
                   onClick={startGame}
-                  className="group relative w-full py-5 bg-[#d4af37] text-white rounded-2xl font-black text-xl shadow-2xl hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-3"
-                >
-                  <Play className="w-6 h-6 fill-current" />
-                  START GAME
-                </button>
-
-                <button
-                  onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="w-full py-4 bg-white border-2 border-[#d4af37] text-[#d4af37] rounded-2xl font-bold text-sm hover:bg-[#d4af37]/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="group relative w-full py-5 bg-[#d4af37] text-white rounded-2xl font-black text-xl shadow-2xl hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-80"
                 >
                   {isGenerating ? (
                     <div className="flex flex-col items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[10px] font-black animate-pulse uppercase tracking-widest">
-                        {generationProgress.total > 0 
-                          ? `[${generationProgress.current}/${generationProgress.total}] ${loadingMessage}` 
-                          : loadingMessage}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                        <span className="text-lg uppercase tracking-widest">Generating...</span>
+                      </div>
                       {generationProgress.total > 0 && (
-                        <div className="w-32 h-1 bg-white/20 rounded-full overflow-hidden">
+                        <div className="w-48 h-1.5 bg-white/20 rounded-full overflow-hidden">
                           <motion.div 
-                            className="h-full bg-[#d4af37]"
+                            className="h-full bg-white"
                             initial={{ width: 0 }}
                             animate={{ width: `${(generationProgress.current / generationProgress.total) * 100}%` }}
                           />
                         </div>
                       )}
+                      <span className="text-[10px] font-bold opacity-80 uppercase tracking-tighter">
+                        {generationProgress.current}/{generationProgress.total} Questions Found
+                      </span>
                     </div>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" />
-                      GENERATE HARD QUESTIONS
+                      <Play className="w-6 h-6 fill-current" />
+                      START GAME
                     </>
                   )}
                 </button>
               </div>
 
+              {generationError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs font-bold flex items-center gap-2 animate-shake">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{generationError}</span>
+                </div>
+              )}
+
               <p className="max-w-xs text-[10px] leading-relaxed opacity-40 uppercase font-bold tracking-widest">
                 Questions are generated by AI to be extremely difficult. 
-                Progress is saved chapter-by-chapter starting from Genesis 1.
+                Searching across all sections of the Bible.
               </p>
             </motion.div>
           )}
@@ -574,6 +606,13 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                   {timeLeft}
                 </div>
                 <HelpCircle className="mx-auto mb-4 text-[#d4af37] w-12 h-12" />
+                <button 
+                  onClick={handleDeleteQuestion}
+                  className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                  title="Delete bad question"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
                 <h2 className="text-2xl font-bold italic leading-tight">
                   "{currentQuestion.text}"
                 </h2>
@@ -773,6 +812,14 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                 >
                   <p className="text-sm font-bold uppercase tracking-widest opacity-60">The Correct Answer is:</p>
                   <p className="text-5xl font-black text-[#d4af37]">{currentQuestion.answer}</p>
+                  
+                  {verificationVerse && (
+                    <div className="p-4 bg-[#fdfcf0] border-l-4 border-[#d4af37] text-left italic text-sm rounded-r-lg shadow-inner">
+                      <p className="mb-2 text-[#2c1e11]">"{verificationVerse}"</p>
+                      <p className="text-[10px] font-bold not-italic opacity-60 uppercase tracking-widest">— {currentQuestion.book} {currentQuestion.chapter}:{currentQuestion.verse}</p>
+                    </div>
+                  )}
+
                   <p className="font-bold text-lg">{roundResult?.message}</p>
                   {roundResult?.winners && roundResult.winners.length > 0 && (
                     <div className="space-y-1">
@@ -854,10 +901,6 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                   onClick={async () => {
                     const count = await bibleQuestionService.getQuestionCount();
                     setDbQuestionCount(count);
-                    const last = await bibleQuestionService.getLastGeneratedChapter();
-                    setLastChapter(last);
-                    const current = await bibleQuestionService.getCurrentGameChapter();
-                    setCurrentGameChapter(current);
                     setPhase('LOBBY');
                   }}
                   className="w-full py-4 bg-white border-2 border-[#d4af37] text-[#d4af37] rounded-2xl font-bold text-sm hover:bg-[#d4af37]/5 transition-all"

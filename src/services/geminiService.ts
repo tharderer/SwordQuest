@@ -6,9 +6,9 @@ import { BIBLE_SECTIONS } from "../lib/bibleSections";
 let aiInstance: GoogleGenAI | null = null;
 const getAI = () => {
   if (!aiInstance) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('VITE_GEMINI_API_KEY environment variable is missing. Please set it in your Vercel project settings.');
+      throw new Error('GEMINI_API_KEY environment variable is missing.');
     }
     aiInstance = new GoogleGenAI({ apiKey });
   }
@@ -22,72 +22,24 @@ export const generateBibleQuestionsBatch = async (
   book: string, 
   chapter: number, 
   verse: number,
-  retries = 5
+  count = 10,
+  retries = 2
 ): Promise<{ questions: BibleQuestion[], nextBook: string, nextChapter: number, nextVerse: number }> => {
   const section = BIBLE_SECTIONS.find(s => s.id === sectionId);
   
-  // Create a summary of Bible Heroes for context
-  const heroContext = BIBLE_HEROES.slice(0, 30).map(h => `${h.name} (${h.era}): ${h.deeds[0]}`).join('\n');
-
   let lastError;
   for (let i = 0; i < retries; i++) {
     try {
-      console.log(`Generating Bible questions for section "${section?.name}" starting from ${book} ${chapter}:${verse}... (Attempt ${i + 1}/${retries})`);
+      console.log(`Generating ${count} Bible questions for section "${section?.name}" starting from ${book} ${chapter}:${verse}... (Attempt ${i + 1}/${retries})`);
       const ai = getAI();
-      const model = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Generate a batch of EXACTLY 10 Bible questions for the theme: "${section?.name}".
-        
-        CRITICAL STARTING POINT:
-        You MUST start generating questions from ${book} chapter ${chapter}, verse ${verse}. 
-        Go VERSE BY VERSE. Try to create a question for every verse if possible.
-        
-        CONTENT REQUIREMENTS:
-        - Theme: ${section?.description}
-        - Mix of Bible Hero deeds/actions AND general Bible trivia found in these verses.
-        - EVERYTHING must be strictly from the verses starting at ${book} ${chapter}:${verse}.
-        
-        STRICT CHARACTER LIMITS (ABSOLUTE MAXIMUM):
-        - Question text: MAX 70 characters. DO NOT EXCEED 70.
-        - Correct answer: MAX 25 characters. DO NOT EXCEED 25.
-        - Distractors: EXACTLY 3 distractors, MAX 25 characters each. DO NOT EXCEED 25.
-        
-        If a question or answer is too long, shorten it or choose a different verse.
-        
-        REFERENCE HEROES (Style Guide):
-        ${heroContext}
-        
-        CRITICAL INSTRUCTIONS:
-        - Use the King James Version (KJV).
-        - EVERY question MUST have a precise Bible reference in the "reference" field (e.g., "John 3:16").
-        - For each question, provide EXACTLY 3 era-appropriate distractors.
-        - There MUST be exactly 4 total options (1 correct + 3 distractors) for every question.
-        - Use ONLY one of these exact eras: Patriarchs, Judges, Kings, Prophets, Exile, Apostles, Early Church.
-        - NO COMMENTARY: Do not include any notes, explanations, or parenthetical commentary in the question text, answers, or distractors.
-        - RETURN ONLY THE JSON OBJECT. NO PREAMBLE. NO POSTAMBLE.
-        
-        Return the data in JSON format with the following structure:
-        {
-          "questions": [
-            {
-              "text": "Question (max 70 chars)?",
-              "correctAnswer": "Answer (max 25 chars)",
-              "distractors": ["D1", "D2", "D3"],
-              "era": "One of the exact eras listed above",
-              "reference": "The Bible verse reference",
-              "book": "The Bible book name",
-              "chapter": 1,
-              "verse": 1
-            }
-          ],
-          "nextBook": "The next book to start from",
-          "nextChapter": 1,
-          "nextVerse": 1
-        }`,
+        contents: `JSON only. List ${count} obscure numerical facts from ${book} ${chapter}:${verse} onwards.
+        Each fact must be a number mentioned in the text. No counts.
+        Format: {"questions": [{"text": "Question?", "correctAnswer": "123", "distractors": ["1","2","3"], "era": "...", "reference": "...", "book": "...", "chapter": 1, "verse": 1}], "nextBook": "...", "nextChapter": 1, "nextVerse": 1}`,
         config: {
-          systemInstruction: "You are a precise data generator. You MUST NOT include any conversational text, commentary, or explanations. Your output MUST be valid JSON only.",
-          responseMimeType: "application/json",
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -102,22 +54,25 @@ export const generateBibleQuestionsBatch = async (
                     era: { type: Type.STRING },
                     reference: { type: Type.STRING },
                     book: { type: Type.STRING },
-                    chapter: { type: Type.INTEGER },
-                    verse: { type: Type.INTEGER }
+                    chapter: { type: Type.NUMBER },
+                    verse: { type: Type.NUMBER }
                   },
-                  required: ["text", "correctAnswer", "distractors", "era", "book", "chapter", "verse", "reference"]
+                  required: ["text", "correctAnswer", "distractors", "era", "reference", "book", "chapter", "verse"]
                 }
               },
               nextBook: { type: Type.STRING },
-              nextChapter: { type: Type.INTEGER },
-              nextVerse: { type: Type.INTEGER }
+              nextChapter: { type: Type.NUMBER },
+              nextVerse: { type: Type.NUMBER }
             },
             required: ["questions", "nextBook", "nextChapter", "nextVerse"]
           }
         }
       });
 
-      const data = JSON.parse(model.text || '{}');
+      const text = response.text;
+      if (!text) throw new Error("Empty response from AI");
+
+      const data = JSON.parse(text.replace(/```json\n?|```/g, '').trim());
       
       if (!data.questions || !Array.isArray(data.questions)) {
         throw new Error("Invalid response format from Gemini: missing questions array");

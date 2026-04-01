@@ -1,10 +1,15 @@
 import { openDB, IDBPDatabase } from 'idb';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { BIBLE_SECTIONS } from '../lib/bibleSections';
 
 export interface BibleQuestion {
   id?: number;
   text: string;
   answer: number;
+  correctAnswer?: string; // For compatibility with multiple choice
+  options?: string[]; // For compatibility with multiple choice
+  era?: string;
+  reference?: string;
   book: string;
   chapter: number;
   verse?: number;
@@ -27,25 +32,37 @@ export interface BibleProgress {
 }
 
 const DB_NAME = 'BibleWitsAndWagers';
-const STORE_NAME = 'questions';
+export const JEOPARDY_STORE = 'questions_jeopardy';
+export const WITS_STORE = 'questions_wits';
 const META_STORE = 'metadata';
 
 let dbPromise: Promise<IDBPDatabase<any>>;
 
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-          store.createIndex('by-chapter', ['book', 'chapter']);
-          store.createIndex('by-used', 'used');
-          store.createIndex('by-section', 'sectionId');
-          store.createIndex('by-lastSeen', 'lastSeen');
+    dbPromise = openDB(DB_NAME, 2, {
+      upgrade(db, oldVersion, newVersion, transaction) {
+        if (!db.objectStoreNames.contains(JEOPARDY_STORE)) {
+          db.createObjectStore(JEOPARDY_STORE, { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains(WITS_STORE)) {
+          db.createObjectStore(WITS_STORE, { keyPath: 'id', autoIncrement: true });
         }
         if (!db.objectStoreNames.contains(META_STORE)) {
           db.createObjectStore(META_STORE);
         }
+
+        // Ensure indices exist for both stores using the versionchange transaction
+        const jStore = transaction.objectStore(JEOPARDY_STORE);
+        if (!jStore.indexNames.contains('by-chapter')) jStore.createIndex('by-chapter', ['book', 'chapter']);
+        if (!jStore.indexNames.contains('by-used')) jStore.createIndex('by-used', 'used');
+        if (!jStore.indexNames.contains('by-section')) jStore.createIndex('by-section', 'sectionId');
+        if (!jStore.indexNames.contains('by-lastSeen')) jStore.createIndex('by-lastSeen', 'lastSeen');
+
+        const wStore = transaction.objectStore(WITS_STORE);
+        if (!wStore.indexNames.contains('by-chapter')) wStore.createIndex('by-chapter', ['book', 'chapter']);
+        if (!wStore.indexNames.contains('by-used')) wStore.createIndex('by-used', 'used');
+        if (!wStore.indexNames.contains('by-lastSeen')) wStore.createIndex('by-lastSeen', 'lastSeen');
       },
     });
   }
@@ -53,9 +70,9 @@ function getDB() {
 }
 
 export const bibleQuestionService = {
-  async saveQuestions(questions: BibleQuestion[]) {
+  async saveQuestions(questions: BibleQuestion[], storeName: string = JEOPARDY_STORE) {
     const db = await getDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(storeName, 'readwrite');
     for (const q of questions) {
       const question = {
         ...q,
@@ -67,15 +84,62 @@ export const bibleQuestionService = {
     await tx.done;
   },
 
-  async getNextUnusedQuestions(count: number): Promise<BibleQuestion[]> {
+  async getWitsSectionsProgress(): Promise<Record<string, SectionProgress>> {
     const db = await getDB();
-    const questions = await db.getAllFromIndex(STORE_NAME, 'by-used', 0); 
-    return questions.slice(0, count);
+    const progress = await db.get(META_STORE, 'witsSectionsProgress');
+    return progress || {};
   },
 
-  async markAsUsed(ids: number[]) {
+  async updateWitsSectionsProgress(progress: Record<string, SectionProgress>) {
     const db = await getDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    await db.put(META_STORE, progress, 'witsSectionsProgress');
+  },
+
+  async getWitsQuestionsForGame(count: number = 7, excludeIds: number[] = []): Promise<BibleQuestion[]> {
+    const db = await getDB();
+    let allQuestions = await db.getAll(WITS_STORE);
+    
+    if (excludeIds.length > 0) {
+      allQuestions = allQuestions.filter(q => q.id && !excludeIds.includes(q.id));
+    }
+    
+    if (!allQuestions || allQuestions.length === 0) return [];
+
+    // Sort: Unseen first (used === 0), then by lastSeen (oldest first)
+    const sorted = allQuestions.sort((a, b) => {
+      const aUsed = (a.used === true || a.used === 1) ? 1 : 0;
+      const bUsed = (b.used === true || b.used === 1) ? 1 : 0;
+      
+      if (aUsed !== bUsed) return aUsed - bUsed;
+      return (a.lastSeen || 0) - (b.lastSeen || 0);
+    });
+
+    // Take all unseen questions
+    const unseen = sorted.filter(q => {
+      const isUsed = (q.used === true || q.used === 1);
+      return !isUsed;
+    });
+    
+    let selected: BibleQuestion[] = [];
+    if (unseen.length >= count) {
+      // If we have enough unseen, pick randomly from THEM only
+      selected = unseen.sort(() => Math.random() - 0.5).slice(0, count);
+    } else {
+      // Take all unseen, then fill the rest with the oldest used ones
+      selected = [...unseen];
+      const used = sorted.filter(q => (q.used === true || q.used === 1));
+      const needed = count - unseen.length;
+      // Take a pool of oldest used and pick randomly to avoid same repeat order
+      const extra = used.slice(0, Math.max(needed, 20)).sort(() => Math.random() - 0.5).slice(0, needed);
+      selected = [...selected, ...extra];
+    }
+    
+    return selected;
+  },
+
+  async markAsUsed(ids: number[], storeName: string = WITS_STORE) {
+    const db = await getDB();
+    const tx = db.transaction(storeName, 'readwrite');
     for (const id of ids) {
       const q = await tx.store.get(id);
       if (q) {
@@ -87,109 +151,136 @@ export const bibleQuestionService = {
     await tx.done;
   },
 
-  async getLastGeneratedChapter(): Promise<{ book: string; chapter: number }> {
+  async deleteQuestion(id: number, storeName: string = WITS_STORE) {
     const db = await getDB();
-    const last = await db.get(META_STORE, 'lastChapter');
-    return last || { book: 'Genesis', chapter: 0 };
-  },
-
-  async setLastGeneratedChapter(book: string, chapter: number) {
-    const db = await getDB();
-    await db.put(META_STORE, { book, chapter }, 'lastChapter');
-  },
-
-  async getCurrentGameChapter(): Promise<{ book: string; chapter: number }> {
-    const db = await getDB();
-    const current = await db.get(META_STORE, 'currentGameChapter');
-    return current || { book: 'Genesis', chapter: 1 };
-  },
-
-  async setCurrentGameChapter(book: string, chapter: number) {
-    const db = await getDB();
-    await db.put(META_STORE, { book, chapter }, 'currentGameChapter');
+    const tx = db.transaction(storeName, 'readwrite');
+    await tx.store.delete(id);
+    await tx.done;
   },
 
   async generateQuestions(apiKey: string, onProgress?: (count: number, total: number) => void) {
-    const last = await this.getLastGeneratedChapter();
-    const nextChapter = last.chapter + 1;
-    const book = last.book; 
-    
-    const ai = new GoogleGenAI({ apiKey });
-    const totalToGenerate = 15;
-    const generatedQuestions: BibleQuestion[] = [];
-
-    for (let i = 0; i < totalToGenerate; i++) {
-      const prompt = `You are a Biblical scholar and trivia master. Generate exactly ONE of the ABSOLUTE HARDEST numerical trivia questions possible from the Bible book of ${book}, Chapter ${nextChapter}. 
-      
-      CRITICAL REQUIREMENTS:
-      1. DIFFICULTY: The question must be extremely obscure. It should be so difficult that even experts would likely not know the exact number without looking it up, yet it must be "guessable" (e.g., counts of people, objects, measurements, or specific actions).
-      2. NUMERICAL ONLY: The answer MUST be a single integer.
-      3. TYPES OF QUESTIONS:
-         - Obscure measurements or counts of objects/people/actions mentioned in the text.
-         - Specific counts of genealogical links or generations mentioned in the chapter.
-         - Numerical details about sacrifices, building dimensions, or tribal counts.
-         - Verse numbers for specific events within the chapter.
-         - NO WORD COUNTS, NO PUNCTUATION COUNTS, NO CHARACTER COUNTS. Avoid "boring" linguistic metrics. Focus on the CONTENT and NARRATIVE details of the chapter.
-      4. FORMAT: Return ONLY a JSON object with "text" and "answer" properties.
-      
-      Example Question: "How many generations are listed from Adam to Noah in this chapter?"
-      Example Question: "What is the total number of verses in ${book} chapter ${nextChapter}?"
-      
-      Make it challenging enough that a winning 'Wits & Wagers' guess would be a true feat of estimation.
-      Ensure this question is unique and not one of these already generated: ${generatedQuestions.map(q => q.text).join(' | ')}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              text: { type: Type.STRING },
-              answer: { type: Type.NUMBER }
-            },
-            required: ["text", "answer"]
-          }
-        }
-      });
-
-      const text = response.text;
-      if (text) {
-        try {
-          const q = JSON.parse(text);
-          generatedQuestions.push({
-            ...q,
-            book,
-            chapter: nextChapter,
-            used: 0,
-            lastSeen: 0
-          });
-          if (onProgress) {
-            onProgress(generatedQuestions.length, totalToGenerate);
-          }
-        } catch (e) {
-          console.error("Failed to parse question JSON", e);
-        }
-      }
+    if (!apiKey) {
+      throw new Error("Gemini API Key is missing. Please check your environment variables.");
     }
 
-    if (generatedQuestions.length === 0) throw new Error("No questions generated");
-
-    await this.saveQuestions(generatedQuestions);
-    await this.setLastGeneratedChapter(book, nextChapter);
+    const ai = new GoogleGenAI({ apiKey });
+    const witsProgress = await this.getWitsSectionsProgress();
+    const allGeneratedQuestions: BibleQuestion[] = [];
     
-    return generatedQuestions;
+    // Use the first 7 sections as requested
+    const targetSections = BIBLE_SECTIONS.slice(0, 7);
+    const totalToGenerate = targetSections.length * 2; // 2 per section to keep bank ahead
+
+    for (let i = 0; i < targetSections.length; i++) {
+      const section = targetSections[i];
+      const prog = witsProgress[section.id] || { 
+        currentBook: section.startBook, 
+        currentChapter: section.startChapter, 
+        currentVerse: section.startVerse 
+      };
+
+      if (onProgress) onProgress(allGeneratedQuestions.length, totalToGenerate);
+
+      const prompt = `JSON only. List 2 obscure numerical facts from ${prog.currentBook} ${prog.currentChapter}:${prog.currentVerse} onwards in the ${section.name} section of the Bible. 
+      Extract specific numbers mentioned in the text (ages, years, cubits, shekels, etc.). 
+      Each fact must be a number mentioned in the narrative.
+      Format: {
+        "questions": [{"text": "Question?", "answer": 123, "book": "...", "chapter": 1, "verse": 1}],
+        "nextBook": "...", "nextChapter": 1, "nextVerse": 1
+      }`;
+
+      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      let batchSuccess = false;
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: prompt,
+            config: {
+              thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  questions: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        text: { type: Type.STRING },
+                        answer: { type: Type.NUMBER },
+                        book: { type: Type.STRING },
+                        chapter: { type: Type.NUMBER },
+                        verse: { type: Type.NUMBER }
+                      },
+                      required: ["text", "answer", "book", "chapter", "verse"]
+                    }
+                  },
+                  nextBook: { type: Type.STRING },
+                  nextChapter: { type: Type.NUMBER },
+                  nextVerse: { type: Type.NUMBER }
+                },
+                required: ["questions", "nextBook", "nextChapter", "nextVerse"]
+              }
+            }
+          });
+
+          const text = response.text;
+          if (!text) throw new Error("Empty response from AI");
+
+          const data = JSON.parse(text.replace(/```json\n?|```/g, '').trim());
+          
+          if (!data.questions || !Array.isArray(data.questions)) {
+            throw new Error("Invalid response format");
+          }
+
+          const batchQuestions: BibleQuestion[] = data.questions.map((q: any) => ({
+            ...q,
+            used: 0,
+            lastSeen: 0,
+            sectionId: section.id
+          }));
+
+          allGeneratedQuestions.push(...batchQuestions);
+          
+          // Update progress for this section
+          witsProgress[section.id] = {
+            currentBook: data.nextBook,
+            currentChapter: data.nextChapter,
+            currentVerse: data.nextVerse
+          };
+
+          batchSuccess = true;
+          break;
+        } catch (e: any) {
+          if (attempt < 1) await delay(1000);
+        }
+      }
+      
+      if (onProgress) onProgress(allGeneratedQuestions.length, totalToGenerate);
+    }
+
+    await this.saveQuestions(allGeneratedQuestions, WITS_STORE);
+    await this.updateWitsSectionsProgress(witsProgress);
+    
+    return allGeneratedQuestions;
   },
 
   async getQuestionsForChapter(book: string, chapter: number): Promise<BibleQuestion[]> {
     const db = await getDB();
-    return db.getAllFromIndex(STORE_NAME, 'by-chapter', [book, chapter]);
+    return db.getAllFromIndex(WITS_STORE, 'by-chapter', [book, chapter]);
   },
 
-  async getQuestionCount() {
+  async getQuestionCount(storeName: string = WITS_STORE) {
     const db = await getDB();
-    return db.count(STORE_NAME);
+    return db.count(storeName);
+  },
+
+  async getUnseenQuestionCount(storeName: string = WITS_STORE) {
+    const db = await getDB();
+    const count = await db.countFromIndex(storeName, 'by-used', 0);
+    return count;
   },
 
   // Compatibility methods for App.tsx
@@ -197,19 +288,21 @@ export const bibleQuestionService = {
     await getDB();
   },
 
-  async getQuestionsSortedByLastSeen(): Promise<BibleQuestion[]> {
+  async getQuestionsSortedByLastSeen(storeName: string = JEOPARDY_STORE): Promise<BibleQuestion[]> {
     const db = await getDB();
-    return db.getAllFromIndex(STORE_NAME, 'by-lastSeen');
+    const questions = await db.getAllFromIndex(storeName, 'by-lastSeen');
+    return Array.isArray(questions) ? questions : [];
   },
 
   async getQuestionsBySection(sectionId: string): Promise<BibleQuestion[]> {
     const db = await getDB();
-    return db.getAllFromIndex(STORE_NAME, 'by-section', sectionId);
+    const questions = await db.getAllFromIndex(JEOPARDY_STORE, 'by-section', sectionId);
+    return Array.isArray(questions) ? questions : [];
   },
 
-  async updateQuestionLastSeen(id: number, isCorrect?: boolean) {
+  async updateQuestionLastSeen(id: number, isCorrect?: boolean, storeName: string = JEOPARDY_STORE) {
     const db = await getDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(storeName, 'readwrite');
     const q = await tx.store.get(id);
     if (q) {
       q.lastSeen = Date.now();
@@ -251,23 +344,26 @@ export const bibleQuestionService = {
     await db.delete(META_STORE, 'currentGameChapter');
   },
 
-  async deleteQuestion(id: number) {
+  async resetWitsAndWagersBank() {
     const db = await getDB();
-    await db.delete(STORE_NAME, id);
+    const tx = db.transaction([WITS_STORE, META_STORE], 'readwrite');
+    await tx.objectStore(WITS_STORE).clear();
+    await tx.objectStore(META_STORE).delete('witsSectionsProgress');
+    await tx.done;
   },
 
-  async deleteQuestions(ids: number[]) {
+  async deleteQuestions(ids: number[], storeName: string = JEOPARDY_STORE) {
     const db = await getDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(storeName, 'readwrite');
     for (const id of ids) {
       await tx.store.delete(id);
     }
     await tx.done;
   },
 
-  async deleteAllQuestions() {
+  async deleteAllQuestions(storeName: string = JEOPARDY_STORE) {
     const db = await getDB();
-    await db.clear(STORE_NAME);
+    await db.clear(storeName);
   }
 };
 
@@ -279,6 +375,8 @@ export const updateQuestionLastSeen = bibleQuestionService.updateQuestionLastSee
 export const getBibleProgress = bibleQuestionService.getBibleProgress;
 export const updateBibleProgress = bibleQuestionService.updateBibleProgress;
 export const resetBibleProgress = bibleQuestionService.resetBibleProgress;
+export const resetWitsAndWagersBank = bibleQuestionService.resetWitsAndWagersBank;
+export const getWitsQuestionsForGame = bibleQuestionService.getWitsQuestionsForGame;
 export const saveQuestions = bibleQuestionService.saveQuestions;
 export const deleteQuestion = bibleQuestionService.deleteQuestion;
 export const deleteQuestions = bibleQuestionService.deleteQuestions;
