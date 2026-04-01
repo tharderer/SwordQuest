@@ -109,39 +109,41 @@ export const bibleQuestionService = {
     await db.put(META_STORE, { book, chapter }, 'currentGameChapter');
   },
 
-  async generateQuestions(apiKey: string) {
+  async generateQuestions(apiKey: string, onProgress?: (count: number, total: number) => void) {
     const last = await this.getLastGeneratedChapter();
     const nextChapter = last.chapter + 1;
     const book = last.book; 
     
     const ai = new GoogleGenAI({ apiKey });
-    
-    const prompt = `You are a Biblical scholar and trivia master. Generate exactly 15 of the ABSOLUTE HARDEST numerical trivia questions possible from the Bible book of ${book}, Chapter ${nextChapter}. 
-    
-    CRITICAL REQUIREMENTS:
-    1. DIFFICULTY: The questions must be extremely obscure. They should be so difficult that even experts would likely not know the exact number without looking it up, yet they must be "guessable" (e.g., counts of people, objects, measurements, or specific actions).
-    2. NUMERICAL ONLY: Every answer MUST be a single integer.
-    3. TYPES OF QUESTIONS:
-       - Obscure measurements or counts of objects/people/actions mentioned in the text.
-       - Specific counts of genealogical links or generations mentioned in the chapter.
-       - Numerical details about sacrifices, building dimensions, or tribal counts.
-       - Verse numbers for specific events within the chapter.
-       - NO WORD COUNTS, NO PUNCTUATION COUNTS, NO CHARACTER COUNTS. Avoid "boring" linguistic metrics. Focus on the CONTENT and NARRATIVE details of the chapter.
-    4. FORMAT: Return ONLY a JSON array of objects with "text" and "answer" properties.
-    
-    Example Question: "How many generations are listed from Adam to Noah in this chapter?"
-    Example Question: "What is the total number of verses in ${book} chapter ${nextChapter}?"
-    
-    Make them challenging enough that a winning 'Wits & Wagers' guess would be a true feat of estimation.`;
+    const totalToGenerate = 15;
+    const generatedQuestions: BibleQuestion[] = [];
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
+    for (let i = 0; i < totalToGenerate; i++) {
+      const prompt = `You are a Biblical scholar and trivia master. Generate exactly ONE of the ABSOLUTE HARDEST numerical trivia questions possible from the Bible book of ${book}, Chapter ${nextChapter}. 
+      
+      CRITICAL REQUIREMENTS:
+      1. DIFFICULTY: The question must be extremely obscure. It should be so difficult that even experts would likely not know the exact number without looking it up, yet it must be "guessable" (e.g., counts of people, objects, measurements, or specific actions).
+      2. NUMERICAL ONLY: The answer MUST be a single integer.
+      3. TYPES OF QUESTIONS:
+         - Obscure measurements or counts of objects/people/actions mentioned in the text.
+         - Specific counts of genealogical links or generations mentioned in the chapter.
+         - Numerical details about sacrifices, building dimensions, or tribal counts.
+         - Verse numbers for specific events within the chapter.
+         - NO WORD COUNTS, NO PUNCTUATION COUNTS, NO CHARACTER COUNTS. Avoid "boring" linguistic metrics. Focus on the CONTENT and NARRATIVE details of the chapter.
+      4. FORMAT: Return ONLY a JSON object with "text" and "answer" properties.
+      
+      Example Question: "How many generations are listed from Adam to Noah in this chapter?"
+      Example Question: "What is the total number of verses in ${book} chapter ${nextChapter}?"
+      
+      Make it challenging enough that a winning 'Wits & Wagers' guess would be a true feat of estimation.
+      Ensure this question is unique and not one of these already generated: ${generatedQuestions.map(q => q.text).join(' | ')}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
             type: Type.OBJECT,
             properties: {
               text: { type: Type.STRING },
@@ -150,25 +152,34 @@ export const bibleQuestionService = {
             required: ["text", "answer"]
           }
         }
+      });
+
+      const text = response.text;
+      if (text) {
+        try {
+          const q = JSON.parse(text);
+          generatedQuestions.push({
+            ...q,
+            book,
+            chapter: nextChapter,
+            used: 0,
+            lastSeen: 0
+          });
+          if (onProgress) {
+            onProgress(generatedQuestions.length, totalToGenerate);
+          }
+        } catch (e) {
+          console.error("Failed to parse question JSON", e);
+        }
       }
-    });
+    }
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (generatedQuestions.length === 0) throw new Error("No questions generated");
 
-    const generated = JSON.parse(text);
-    const questions: BibleQuestion[] = generated.map((q: any) => ({
-      ...q,
-      book,
-      chapter: nextChapter,
-      used: 0,
-      lastSeen: 0
-    }));
-
-    await this.saveQuestions(questions);
+    await this.saveQuestions(generatedQuestions);
     await this.setLastGeneratedChapter(book, nextChapter);
     
-    return questions;
+    return generatedQuestions;
   },
 
   async getQuestionsForChapter(book: string, chapter: number): Promise<BibleQuestion[]> {

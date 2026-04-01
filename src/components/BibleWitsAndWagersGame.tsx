@@ -83,6 +83,8 @@ export const BibleWitsAndWagersGame: React.FC = () => {
   const [roundResult, setRoundResult] = useState<{ winnings: number; bonus: boolean; message: string; winners?: string[] } | null>(null);
   const [timeLeft, setTimeLeft] = useState(30);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Consulting the scrolls...");
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [dbQuestionCount, setDbQuestionCount] = useState(0);
   const [lastChapter, setLastChapter] = useState({ book: 'Genesis', chapter: 0 });
   const [currentGameChapter, setCurrentGameChapter] = useState({ book: 'Genesis', chapter: 1 });
@@ -99,6 +101,26 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     init();
   }, []);
 
+  useEffect(() => {
+    if (!isGenerating) return;
+    const messages = [
+      "Consulting the scrolls...",
+      "Counting the generations...",
+      "Measuring the temple dimensions...",
+      "Verifying the tribal counts...",
+      "Translating the ancient texts...",
+      "Gathering the elders...",
+      "Searching the archives...",
+      "Scribing the questions..."
+    ];
+    let i = 0;
+    const interval = setInterval(() => {
+      i = (i + 1) % messages.length;
+      setLoadingMessage(messages[i]);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [isGenerating]);
+
   const currentQuestion = questions[currentQuestionIndex] || { text: "Loading...", answer: 0 };
 
   const userScore = scores.find(s => s.isUser)?.score || 0;
@@ -108,8 +130,11 @@ export const BibleWitsAndWagersGame: React.FC = () => {
   const handleGenerate = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
+    setGenerationProgress({ current: 0, total: 15 });
     try {
-      await bibleQuestionService.generateQuestions(process.env.GEMINI_API_KEY!);
+      await bibleQuestionService.generateQuestions(process.env.GEMINI_API_KEY!, (current, total) => {
+        setGenerationProgress({ current, total });
+      });
       const count = await bibleQuestionService.getQuestionCount();
       setDbQuestionCount(count);
       const last = await bibleQuestionService.getLastGeneratedChapter();
@@ -118,6 +143,7 @@ export const BibleWitsAndWagersGame: React.FC = () => {
       console.error("Failed to generate questions:", error);
     } finally {
       setIsGenerating(false);
+      setGenerationProgress({ current: 0, total: 0 });
     }
   };
 
@@ -128,6 +154,7 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     // If not enough questions for this specific chapter, generate them
     if (gameQuestions.length < 7) {
       setIsGenerating(true);
+      setGenerationProgress({ current: 0, total: 15 });
       try {
         // We need to set the last generated chapter to current.chapter - 1 
         // so generateQuestions picks up the right one if it's not yet generated
@@ -135,7 +162,9 @@ export const BibleWitsAndWagersGame: React.FC = () => {
         if (lastGen.chapter < current.chapter) {
           await bibleQuestionService.setLastGeneratedChapter(current.book, current.chapter - 1);
         }
-        await bibleQuestionService.generateQuestions(process.env.GEMINI_API_KEY!);
+        await bibleQuestionService.generateQuestions(process.env.GEMINI_API_KEY!, (current, total) => {
+          setGenerationProgress({ current, total });
+        });
         gameQuestions = await bibleQuestionService.getQuestionsForChapter(current.book, current.chapter);
         
         // Refresh stats
@@ -149,6 +178,7 @@ export const BibleWitsAndWagersGame: React.FC = () => {
         gameQuestions = fallback.slice(0, 7);
       } finally {
         setIsGenerating(false);
+        setGenerationProgress({ current: 0, total: 0 });
       }
     }
 
@@ -498,11 +528,29 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                   className="w-full py-4 bg-white border-2 border-[#d4af37] text-[#d4af37] rounded-2xl font-bold text-sm hover:bg-[#d4af37]/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isGenerating ? (
-                    <div className="w-4 h-4 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-[#d4af37] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] font-black animate-pulse uppercase tracking-widest">
+                        {generationProgress.total > 0 
+                          ? `[${generationProgress.current}/${generationProgress.total}] ${loadingMessage}` 
+                          : loadingMessage}
+                      </span>
+                      {generationProgress.total > 0 && (
+                        <div className="w-32 h-1 bg-white/20 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-[#d4af37]"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(generationProgress.current / generationProgress.total) * 100}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <Sparkles className="w-4 h-4" />
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      GENERATE HARD QUESTIONS
+                    </>
                   )}
-                  {isGenerating ? 'GENERATING...' : 'GENERATE HARD QUESTIONS'}
                 </button>
               </div>
 
