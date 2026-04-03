@@ -45,6 +45,56 @@ interface SavedSession {
   timestamp: number;
 }
 
+const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
+  return (
+    <div
+      style={{ 
+        position: 'absolute',
+        left: `${word.x}%`, 
+        top: `${word.y}%`,
+        transform: 'translate3d(-50%, -50%, 0)',
+        pointerEvents: 'none',
+        willChange: 'transform'
+      }}
+    >
+      <div className={cn(
+        "px-8 py-6 rounded-[2rem] font-black text-3xl shadow-xl whitespace-nowrap border-4 transition-transform",
+        "bg-slate-800 text-white border-white/30 opacity-100 shadow-white/5"
+      )}>
+        {word.text}
+      </div>
+    </div>
+  );
+});
+
+const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, streak: number }) => {
+  return (
+    <div
+      style={{ 
+        position: 'absolute',
+        left: `${pos.x}%`, 
+        top: `${pos.y}%`,
+        transform: 'translate3d(-50%, -50%, 0)',
+        pointerEvents: 'none',
+        zIndex: 30,
+        willChange: 'transform'
+      }}
+    >
+      <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-slate-950 rounded-full" />
+        <div className="absolute top-1/4 right-1/4 w-2 h-2 bg-slate-950 rounded-full" />
+        <div className="absolute bottom-1.5 w-6 h-3 bg-slate-950 rounded-full" />
+      </div>
+      
+      {streak >= 5 && (
+        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+          {streak} STREAK!
+        </div>
+      )}
+    </div>
+  );
+});
+
 const CHOMPER_LEVELS: ChomperLevel[] = [
   { id: 1, reference: "John 3:16", title: "God's Love" },
   { id: 2, reference: "Psalm 23:1", title: "The Good Shepherd" },
@@ -164,7 +214,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     if (savedScores) setHighScores(JSON.parse(savedScores));
     
     const savedMaxLoops = localStorage.getItem('verse_chomper_max_loops');
-    if (savedMaxLoops) setMaxLoops(JSON.parse(savedMaxLoops));
+    if (savedMaxLoops) {
+      const parsed = JSON.parse(savedMaxLoops);
+      setMaxLoops(parsed);
+      // Default startLoops to the highest reached for each level
+      setStartLoops(parsed);
+    }
     
     const savedProgress = localStorage.getItem('verse_chomper_progress');
     if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
@@ -283,6 +338,9 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     setMaxLoops(updatedMaxLoops);
     localStorage.setItem('verse_chomper_max_loops', JSON.stringify(updatedMaxLoops));
 
+    // Update startLoops to the highest reached
+    setStartLoops(prev => ({ ...prev, [levelId]: Math.max(prev[levelId] || 1, currentLoop) }));
+
     if (levelId === unlockedLevels && currentLoop >= 10 && levelId < CHOMPER_LEVELS.length) {
       const nextLevel = levelId + 1;
       setUnlockedLevels(nextLevel);
@@ -302,7 +360,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     localStorage.setItem('verse_chomper_max_loops', JSON.stringify(updatedMaxLoops));
 
     const updatedStartLoops = { ...startLoops };
-    delete updatedStartLoops[levelId];
+    updatedStartLoops[levelId] = 1;
     setStartLoops(updatedStartLoops);
   };
 
@@ -661,7 +719,31 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                         )}>
                           {level.id}
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        
+                        {!isLocked && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Reset all progress for ${level.title} to Loop 1?`)) {
+                                resetLevelProgress(level.id);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 hover:bg-rose-500/30 rounded-lg text-rose-500 transition-all border border-rose-500/20 z-20"
+                            title="Reset Level Progress"
+                          >
+                            <RotateCcw size={12} />
+                            <span className="text-[8px] font-black uppercase tracking-widest">Reset</span>
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="mb-12">
+                        <h3 className="font-black text-lg leading-tight mb-1">{level.title}</h3>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest max-w-[70%]">{level.reference}</p>
+                      </div>
+
+                      <div className="flex justify-between items-end mt-auto">
+                        <div className="flex flex-col gap-1">
                           {highScore > 0 && (
                             <div className="flex items-center gap-1 text-amber-400 font-black text-xs">
                               <Trophy size={12} />
@@ -687,12 +769,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                           )}
                         </div>
                       </div>
-                      <h3 className="font-black text-lg leading-tight mb-1">{level.title}</h3>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{level.reference}</p>
                     </motion.button>
 
                     {!isLocked && maxLoop > 1 && (
-                      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-sm p-1.5 rounded-xl border border-white/10 z-10">
+                      <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-slate-950/80 backdrop-blur-sm p-1.5 rounded-xl border border-white/10 z-10">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -725,19 +805,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                     )}
 
                     {!isLocked && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Reset all progress for ${level.title} to Loop 1?`)) {
-                            resetLevelProgress(level.id);
-                          }
-                        }}
-                        className="absolute top-4 left-4 flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 hover:bg-rose-500/30 rounded-lg text-rose-500 transition-all border border-rose-500/20 z-10"
-                        title="Reset Level Progress"
-                      >
-                        <RotateCcw size={12} />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Reset</span>
-                      </button>
+                      <div className="hidden" />
                     )}
                   </div>
                 );
@@ -888,52 +956,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           </div>
 
           {/* Falling Words */}
-          {fallingWords.map(w => {
-            return (
-              <div
-                key={w.id}
-                style={{ 
-                  position: 'absolute',
-                  left: `${w.x}%`, 
-                  top: `${w.y}%`,
-                  transform: 'translate3d(-50%, -50%, 0)',
-                  pointerEvents: 'none'
-                }}
-              >
-                <div className={cn(
-                  "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
-                  "bg-slate-800 text-white border-white/30 opacity-100 shadow-white/5"
-                )}>
-                  {w.text}
-                </div>
-              </div>
-            );
-          })}
+          {fallingWords.map(w => (
+            <FallingWordItem key={w.id} word={w} />
+          ))}
 
           {/* Avatar (Chomper) */}
-          <div
-            style={{ 
-              position: 'absolute',
-              left: `${avatarPos.x}%`, 
-              top: `${avatarPos.y}%`,
-              transform: 'translate3d(-50%, -50%, 0)',
-              pointerEvents: 'none',
-              zIndex: 30
-            }}
-          >
-            <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
-              <div className="absolute top-1/4 left-1/4 w-3 h-3 bg-slate-950 rounded-full" />
-              <div className="absolute top-1/4 right-1/4 w-3 h-3 bg-slate-950 rounded-full" />
-              <div className="absolute bottom-2 w-8 h-4 bg-slate-950 rounded-full" />
-            </div>
-            
-            {/* Streak Indicator */}
-            {streak >= 5 && (
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
-                {streak} STREAK!
-              </div>
-            )}
-          </div>
+          <Avatar pos={avatarPos} streak={streak} />
 
           {/* Speed Up Notification */}
           <AnimatePresence>
