@@ -357,7 +357,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       x: Math.random() * 80 + 10, // 10% to 90%
       y: -10,
       // Base speed increases with loop count
-      speed: (0.6 + (loopCountRef.current * 0.2)) * (Math.random() * 0.4 + 0.8),
+      speed: (0.3 + (loopCountRef.current * 0.15)) * (Math.random() * 0.4 + 0.8),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
@@ -430,7 +430,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     lastTimeRef.current = time;
 
     // Spawn logic - faster as loops progress
-    const spawnRate = Math.max(300, 1000 - (loopCountRef.current * 100));
+    const spawnRate = Math.max(150, 800 - (loopCountRef.current * 150));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
       if (Math.random() < 0.1) spawnEnemy();
@@ -459,8 +459,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           const dy = avatarPosRef.current.y - e.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0) {
-            nvx = (dx / dist) * 0.015; // Reduced from 0.03
-            nvy = (dy / dist) * 0.015; // Reduced from 0.03
+            nvx = (dx / dist) * 0.008; // Reduced from 0.015
+            nvy = (dy / dist) * 0.008; // Reduced from 0.015
           }
         } else if (e.type === 'BAR') {
           if (nx < 20 || nx > 80) nvx *= -1;
