@@ -455,7 +455,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     lastTimeRef.current = time;
 
     // Spawn logic - faster as loops progress, but more gradual
-    const spawnRate = Math.max(1, 1300 - (loopCountRef.current * 150));
+    const spawnRate = Math.max(1, 650 - (loopCountRef.current * 50));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
       lastSpawnTime.current = time;
@@ -565,7 +565,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+    <div className="flex flex-col h-screen bg-slate-950 text-white font-sans overflow-hidden relative select-none">
       {/* Header (Lobby/Level Select Only) */}
       {gameState === 'LEVEL_SELECT' && (
         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
