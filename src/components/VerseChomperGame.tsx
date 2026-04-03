@@ -379,6 +379,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           if (w.isCorrect && w.wordIndex === nextWordIndexRef.current) {
             livesLost++;
             streakReset = true;
+            // Reset spawn ref so the missed word is the next "correct" one to drop
+            nextWordToSpawnRef.current = nextWordIndexRef.current;
           }
           return false;
         }
