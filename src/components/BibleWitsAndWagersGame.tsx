@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Coins, User, Bot, Trophy, ArrowRight, RotateCcw, HelpCircle, Sparkles, Database, Play, AlertCircle, Trash2 } from 'lucide-react';
+import { Coins, User, Bot, Trophy, ArrowRight, RotateCcw, HelpCircle, Sparkles, Database, Play, AlertCircle, Trash2, Timer } from 'lucide-react';
 import { bibleQuestionService, BibleQuestion } from '../services/bibleQuestionService';
 import { getVerseByRef } from '../lib/bibleDb';
 
@@ -47,6 +47,22 @@ interface Bet {
   playerName: string;
   spotIndex: number;
   isUser: boolean;
+  amount?: number;
+}
+
+interface RoundHistory {
+  round: number;
+  question: string;
+  answer: number;
+  winningGuess: number;
+  winningSpotIndex: number;
+  bets: {
+    playerName: string;
+    amount: number;
+    spotIndex: number;
+    isWinning: boolean;
+    guessValue: number | string;
+  }[];
 }
 
 interface PlayerScore {
@@ -89,6 +105,7 @@ export const BibleWitsAndWagersGame: React.FC = () => {
   const [dbQuestionCount, setDbQuestionCount] = useState(0);
   const [unseenQuestionCount, setUnseenQuestionCount] = useState(0);
   const [verificationVerse, setVerificationVerse] = useState<string | null>(null);
+  const [gameHistory, setGameHistory] = useState<RoundHistory[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -110,48 +127,42 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     setGenerationError(null);
     let gameQuestions = await bibleQuestionService.getWitsQuestionsForGame(7);
     
-    // If we have enough for a game but the bank is getting low on UNSEEN questions, generate in background
     const unseenCount = await bibleQuestionService.getUnseenQuestionCount();
-    const shouldGenerateInBackground = unseenCount < 21; // Keep at least 3 games worth of unseen questions
-
-    if (shouldGenerateInBackground) {
+    
+    // Only trigger generation if we are below the threshold (21 unseen questions)
+    if (unseenCount < 21) {
       const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
       if (apiKey) {
-        // Trigger background generation without awaiting
-        bibleQuestionService.generateQuestions(apiKey).then(async () => {
-          const newCount = await bibleQuestionService.getQuestionCount();
-          const newUnseen = await bibleQuestionService.getUnseenQuestionCount();
-          setDbQuestionCount(newCount);
-          setUnseenQuestionCount(newUnseen);
-        }).catch(err => console.error("Background generation failed:", err));
-      }
-    }
-
-    // If not enough UNSEEN questions for the current game, generate them (blocking)
-    if (unseenCount < 7) {
-      setIsGenerating(true);
-      setGenerationProgress({ current: 0, total: 14 });
-      try {
-        const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-        if (!apiKey) throw new Error("API Key missing");
-
-        await bibleQuestionService.generateQuestions(apiKey, (current, total) => {
-          setGenerationProgress({ current, total });
-        });
-        
-        gameQuestions = await bibleQuestionService.getWitsQuestionsForGame(7);
-        const count = await bibleQuestionService.getQuestionCount();
-        const unseen = await bibleQuestionService.getUnseenQuestionCount();
-        setDbQuestionCount(count);
-        setUnseenQuestionCount(unseen);
-      } catch (error: any) {
-        console.error("Failed to auto-generate questions:", error);
-        setGenerationError("Auto-generation failed. Using default questions.");
-        const fallback = DEFAULT_QUESTIONS.map(q => ({ ...q, book: 'Genesis', chapter: 0, used: false })) as BibleQuestion[];
-        gameQuestions = fallback;
-      } finally {
-        setIsGenerating(false);
-        setGenerationProgress({ current: 0, total: 0 });
+        if (unseenCount < 7) {
+          // Blocking generation: we don't even have enough for one full game
+          setIsGenerating(true);
+          setGenerationProgress({ current: 0, total: 14 });
+          try {
+            await bibleQuestionService.generateQuestions(apiKey, (current, total) => {
+              setGenerationProgress({ current, total });
+            });
+            // Re-fetch questions after generation is complete
+            gameQuestions = await bibleQuestionService.getWitsQuestionsForGame(7);
+            const count = await bibleQuestionService.getQuestionCount();
+            const unseen = await bibleQuestionService.getUnseenQuestionCount();
+            setDbQuestionCount(count);
+            setUnseenQuestionCount(unseen);
+          } catch (error: any) {
+            console.error("Failed to generate questions:", error);
+            setGenerationError("Generation failed. Using fallback questions.");
+          } finally {
+            setIsGenerating(false);
+            setGenerationProgress({ current: 0, total: 0 });
+          }
+        } else {
+          // Background generation: we have enough for this game, but want to stay ahead
+          bibleQuestionService.generateQuestions(apiKey).then(async () => {
+            const newCount = await bibleQuestionService.getQuestionCount();
+            const newUnseen = await bibleQuestionService.getUnseenQuestionCount();
+            setDbQuestionCount(newCount);
+            setUnseenQuestionCount(newUnseen);
+          }).catch(err => console.error("Background generation failed:", err));
+        }
       }
     }
 
@@ -161,11 +172,22 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     }
 
     setQuestions(gameQuestions.slice(0, 7));
+    
+    // Mark all selected questions as used immediately to prevent duplicates in next game
+    const selectedIds = gameQuestions.slice(0, 7).map(q => q.id).filter((id): id is number => id !== undefined);
+    if (selectedIds.length > 0) {
+      await bibleQuestionService.markAsUsed(selectedIds);
+      const unseen = await bibleQuestionService.getUnseenQuestionCount();
+      setUnseenQuestionCount(unseen);
+    }
+
     setPhase('QUESTION');
     setVerificationVerse(null);
     setRound(1);
     setCurrentQuestionIndex(0);
     setScores(scores.map(s => ({ ...s, score: 0 })));
+    setGameHistory([]);
+    setTimeLeft(30);
   };
 
   useEffect(() => {
@@ -216,10 +238,23 @@ export const BibleWitsAndWagersGame: React.FC = () => {
       const currentIds = questions.map(q => q.id).filter((id): id is number => id !== undefined);
       const replacement = await bibleQuestionService.getWitsQuestionsForGame(1, currentIds);
       if (replacement.length > 0) {
+        // Mark replacement as used
+        if (replacement[0].id) {
+          await bibleQuestionService.markAsUsed([replacement[0].id]);
+        }
+        
         const newQuestions = [...questions];
         newQuestions[currentQuestionIndex] = replacement[0];
         setQuestions(newQuestions);
+        
+        // Reset round state
+        setPhase('QUESTION');
+        setVerificationVerse(null);
         setUserGuess('');
+        setUniqueGuesses([]);
+        setBets([]);
+        setWinningSpotIndex(null);
+        setRoundResult(null);
         setTimeLeft(30);
       } else {
         // If no replacement available, try to generate
@@ -229,10 +264,23 @@ export const BibleWitsAndWagersGame: React.FC = () => {
           await bibleQuestionService.generateQuestions(apiKey);
           const fresh = await bibleQuestionService.getWitsQuestionsForGame(1, currentIds);
           if (fresh.length > 0) {
+            // Mark fresh as used
+            if (fresh[0].id) {
+              await bibleQuestionService.markAsUsed([fresh[0].id]);
+            }
+            
             const newQuestions = [...questions];
             newQuestions[currentQuestionIndex] = fresh[0];
             setQuestions(newQuestions);
+            
+            // Reset round state
+            setPhase('QUESTION');
+            setVerificationVerse(null);
             setUserGuess('');
+            setUniqueGuesses([]);
+            setBets([]);
+            setWinningSpotIndex(null);
+            setRoundResult(null);
             setTimeLeft(30);
           }
           setIsGenerating(false);
@@ -299,7 +347,8 @@ export const BibleWitsAndWagersGame: React.FC = () => {
         botBets.push({
           playerName: name,
           spotIndex: validSpots[Math.floor(Math.random() * validSpots.length)],
-          isUser: false
+          isUser: false,
+          amount: 1
         });
       }
     });
@@ -367,13 +416,6 @@ export const BibleWitsAndWagersGame: React.FC = () => {
   const handleReveal = async () => {
     setPhase('REVEAL');
     
-    // Mark as used immediately so it's not picked again if user leaves
-    if (currentQuestion.id) {
-      await bibleQuestionService.markAsUsed([currentQuestion.id]);
-      const unseen = await bibleQuestionService.getUnseenQuestionCount();
-      setUnseenQuestionCount(unseen);
-    }
-    
     // Fetch verification verse
     if (currentQuestion?.book && currentQuestion?.chapter && currentQuestion?.verse) {
       try {
@@ -411,6 +453,53 @@ export const BibleWitsAndWagersGame: React.FC = () => {
 
     setWinningSpotIndex(finalWinningSpotIndex);
 
+    // Record history
+    const currentRoundHistory: RoundHistory = {
+      round,
+      question: currentQuestion.text,
+      answer: currentQuestion.answer,
+      winningGuess: winningGuessIdx !== -1 ? uniqueGuesses[winningGuessIdx].value : -1,
+      winningSpotIndex: finalWinningSpotIndex,
+      bets: []
+    };
+
+    // Add user bets to history
+    Object.entries(userBets).forEach(([spotIdx, amount]) => {
+      const amt = amount as number;
+      if (amt > 0) {
+        const spot = parseInt(spotIdx);
+        currentRoundHistory.bets.push({
+          playerName: "You",
+          amount: amt,
+          spotIndex: spot,
+          isWinning: spot === finalWinningSpotIndex,
+          guessValue: spot === 0 ? "Too High" : (mapping[spot]?.value || "---")
+        });
+      }
+    });
+
+    // Add bot bets to history
+    const botBetsBySpot: Record<number, Record<string, number>> = {};
+    bets.forEach(b => {
+      if (!botBetsBySpot[b.spotIndex]) botBetsBySpot[b.spotIndex] = {};
+      botBetsBySpot[b.spotIndex][b.playerName] = (botBetsBySpot[b.spotIndex][b.playerName] || 0) + 1;
+    });
+
+    Object.entries(botBetsBySpot).forEach(([spotIdx, players]) => {
+      const spot = parseInt(spotIdx);
+      Object.entries(players).forEach(([playerName, amount]) => {
+        currentRoundHistory.bets.push({
+          playerName,
+          amount,
+          spotIndex: spot,
+          isWinning: spot === finalWinningSpotIndex,
+          guessValue: spot === 0 ? "Too High" : (mapping[spot]?.value || "---")
+        });
+      });
+    });
+
+    setGameHistory(prev => [...prev, currentRoundHistory]);
+
     // Calculate payouts and bonuses
     const newScores = scores.map(s => ({ ...s }));
     
@@ -433,7 +522,7 @@ export const BibleWitsAndWagersGame: React.FC = () => {
     // 2. Payouts for User
     const userPlayer = newScores.find(s => s.isUser)!;
     const userTotalChipsBet = userChipsPlaced;
-    const userWinningChipsCount = userBets[finalWinningSpotIndex] || 0;
+    const userWinningChipsCount = (userBets[finalWinningSpotIndex] as number) || 0;
     const odds = MAT_LAYOUT[finalWinningSpotIndex].odds;
     const userWinnings = userWinningChipsCount * odds;
 
@@ -601,10 +690,17 @@ export const BibleWitsAndWagersGame: React.FC = () => {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-6 text-center"
             >
-              <div className="bg-white/40 p-8 rounded-2xl border-2 border-dashed border-[#d4af37] relative">
-                <div className={`absolute top-4 right-4 w-12 h-12 rounded-full border-4 flex items-center justify-center font-bold ${timeLeft <= 5 ? 'border-red-500 text-red-500 animate-pulse' : 'border-[#d4af37] text-[#d4af37]'}`}>
-                  {timeLeft}
+              <div className="flex justify-center mb-2">
+                <div className={`
+                  flex items-center gap-3 px-6 py-3 rounded-full border-4 bg-white shadow-xl
+                  ${timeLeft <= 5 ? 'border-red-500 text-red-500 animate-pulse' : 'border-[#d4af37] text-[#d4af37]'}
+                `}>
+                  <Timer className="w-8 h-8" />
+                  <span className="text-4xl font-black tabular-nums">{timeLeft}</span>
                 </div>
+              </div>
+
+              <div className="bg-white/40 p-8 rounded-2xl border-2 border-dashed border-[#d4af37] relative">
                 <HelpCircle className="mx-auto mb-4 text-[#d4af37] w-12 h-12" />
                 <button 
                   onClick={handleDeleteQuestion}
@@ -664,7 +760,18 @@ export const BibleWitsAndWagersGame: React.FC = () => {
               animate={{ opacity: 1 }}
               className="space-y-6"
             >
-              <div className="text-center mb-4">
+              <div className="text-center mb-4 relative">
+                {phase === 'BETTING' && (
+                  <div className="flex justify-center mb-6">
+                    <div className={`
+                      flex items-center gap-3 px-6 py-3 rounded-full border-4 bg-white shadow-xl
+                      ${timeLeft <= 10 ? 'border-red-500 text-red-500 animate-pulse' : 'border-[#d4af37] text-[#d4af37]'}
+                    `}>
+                      <Timer className="w-8 h-8" />
+                      <span className="text-4xl font-black tabular-nums">{timeLeft}</span>
+                    </div>
+                  </div>
+                )}
                 <h2 className="text-xl font-bold uppercase tracking-widest">
                   {phase === 'BETTING' ? "Place Your Bets!" : "The Reveal"}
                 </h2>
@@ -808,10 +915,25 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white p-6 rounded-2xl border-4 border-[#d4af37] text-center space-y-4"
+                  className="bg-white p-6 rounded-2xl border-4 border-[#d4af37] text-center space-y-4 relative"
                 >
-                  <p className="text-sm font-bold uppercase tracking-widest opacity-60">The Correct Answer is:</p>
-                  <p className="text-5xl font-black text-[#d4af37]">{currentQuestion.answer}</p>
+                  <button 
+                    onClick={handleDeleteQuestion}
+                    className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                    title="Delete bad question"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">The Question Was:</p>
+                    <p className="text-sm font-medium italic leading-tight text-[#2c1e11]">"{currentQuestion.text}"</p>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">The Correct Answer is:</p>
+                    <p className="text-5xl font-black text-[#d4af37]">{currentQuestion.answer}</p>
+                  </div>
                   
                   {verificationVerse && (
                     <div className="p-4 bg-[#fdfcf0] border-l-4 border-[#d4af37] text-left italic text-sm rounded-r-lg shadow-inner">
@@ -858,7 +980,7 @@ export const BibleWitsAndWagersGame: React.FC = () => {
               key="gameover"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-8"
+              className="text-center space-y-8 pb-12"
             >
               <div className="bg-white/40 p-8 rounded-3xl border-4 border-[#d4af37] shadow-xl">
                 <Trophy className="w-20 h-20 text-[#d4af37] mx-auto mb-4" />
@@ -885,6 +1007,56 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                       </div>
                     </div>
                     <span className="font-black text-2xl">{s.score} pts</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Game Review Section */}
+              <div className="bg-white/60 p-6 rounded-3xl border-2 border-[#d4af37]/30 text-left space-y-6">
+                <h3 className="text-xl font-black uppercase tracking-widest text-center border-b border-[#d4af37]/20 pb-4">Game Review</h3>
+                {gameHistory.map((h, i) => (
+                  <div key={i} className="space-y-3 border-b border-[#d4af37]/10 pb-6 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-[#d4af37] text-white text-[10px] font-black px-2 py-0.5 rounded">ROUND {h.round}</span>
+                      <span className="text-xs font-bold opacity-60 uppercase tracking-widest">Question</span>
+                    </div>
+                    <p className="text-sm italic font-medium leading-tight">"{h.question}"</p>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase opacity-40">Correct Answer</p>
+                        <p className="text-2xl font-black text-[#d4af37]">{h.answer}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold uppercase opacity-40">Winning Guess</p>
+                        <p className="text-lg font-black">{h.winningGuess === -1 ? "All Too High" : h.winningGuess}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold uppercase opacity-40">Bets Placed</p>
+                      <div className="grid grid-cols-1 gap-1">
+                        {h.bets.length === 0 ? (
+                          <p className="text-[10px] italic opacity-50">No bets placed this round.</p>
+                        ) : (
+                          h.bets.map((bet, bi) => {
+                            const p = scores.find(s => s.name === bet.playerName);
+                            return (
+                              <div key={bi} className={`flex items-center justify-between p-2 rounded-lg text-[10px] ${bet.isWinning ? 'bg-green-50 border border-green-200' : 'bg-white/40 border border-black/5'}`}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p?.color }} />
+                                  <span className="font-bold">{bet.playerName}</span>
+                                  <span className="opacity-50">bet</span>
+                                  <span className="font-black">{bet.amount} chips</span>
+                                  <span className="opacity-50">on</span>
+                                  <span className="font-bold">{bet.guessValue}</span>
+                                </div>
+                                {bet.isWinning && <span className="text-green-600 font-black uppercase tracking-tighter">Winner!</span>}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -34,9 +34,10 @@ export const generateBibleQuestionsBatch = async (
       const ai = getAI();
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `JSON only. List ${count} obscure numerical facts from ${book} ${chapter}:${verse} onwards.
-        Each fact must be a number mentioned in the text. No counts.
-        Format: {"questions": [{"text": "Question?", "correctAnswer": "123", "distractors": ["1","2","3"], "era": "...", "reference": "...", "book": "...", "chapter": 1, "verse": 1}], "nextBook": "...", "nextChapter": 1, "nextVerse": 1}`,
+        contents: `JSON only. List ${count} interesting Bible trivia questions starting from ${book} ${chapter}:${verse} onwards in the ${section?.name || 'Bible'}.
+        IMPORTANT: Start as close to the beginning of the requested range as possible. Do not skip the early chapters (like Genesis 1-10) if they are within the range.
+        Questions should cover people, places, events, miracles, or quotes mentioned in the text.
+        Format: {"questions": [{"text": "Question?", "correctAnswer": "Correct Answer", "distractors": ["Wrong 1","Wrong 2","Wrong 3"], "era": "Era Name", "reference": "Book 1:1", "book": "Book", "chapter": 1, "verse": 1}], "nextBook": "...", "nextChapter": 1, "nextVerse": 1}`,
         config: {
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           responseMimeType: "application/json",

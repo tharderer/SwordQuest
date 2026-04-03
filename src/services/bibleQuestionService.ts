@@ -69,6 +69,8 @@ function getDB() {
   return dbPromise;
 }
 
+let isGeneratingGlobal = false;
+
 export const bibleQuestionService = {
   async saveQuestions(questions: BibleQuestion[], storeName: string = JEOPARDY_STORE) {
     const db = await getDB();
@@ -159,112 +161,123 @@ export const bibleQuestionService = {
   },
 
   async generateQuestions(apiKey: string, onProgress?: (count: number, total: number) => void) {
-    if (!apiKey) {
-      throw new Error("Gemini API Key is missing. Please check your environment variables.");
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-    const witsProgress = await this.getWitsSectionsProgress();
-    const allGeneratedQuestions: BibleQuestion[] = [];
+    if (isGeneratingGlobal) return [];
+    isGeneratingGlobal = true;
     
-    // Use the first 7 sections as requested
-    const targetSections = BIBLE_SECTIONS.slice(0, 7);
-    const totalToGenerate = targetSections.length * 2; // 2 per section to keep bank ahead
-
-    for (let i = 0; i < targetSections.length; i++) {
-      const section = targetSections[i];
-      const prog = witsProgress[section.id] || { 
-        currentBook: section.startBook, 
-        currentChapter: section.startChapter, 
-        currentVerse: section.startVerse 
-      };
-
-      if (onProgress) onProgress(allGeneratedQuestions.length, totalToGenerate);
-
-      const prompt = `JSON only. List 2 obscure numerical facts from ${prog.currentBook} ${prog.currentChapter}:${prog.currentVerse} onwards in the ${section.name} section of the Bible. 
-      Extract specific numbers mentioned in the text (ages, years, cubits, shekels, etc.). 
-      Each fact must be a number mentioned in the narrative.
-      Format: {
-        "questions": [{"text": "Question?", "answer": 123, "book": "...", "chapter": 1, "verse": 1}],
-        "nextBook": "...", "nextChapter": 1, "nextVerse": 1
-      }`;
-
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-      let batchSuccess = false;
-
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: prompt,
-            config: {
-              thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  questions: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        text: { type: Type.STRING },
-                        answer: { type: Type.NUMBER },
-                        book: { type: Type.STRING },
-                        chapter: { type: Type.NUMBER },
-                        verse: { type: Type.NUMBER }
-                      },
-                      required: ["text", "answer", "book", "chapter", "verse"]
-                    }
-                  },
-                  nextBook: { type: Type.STRING },
-                  nextChapter: { type: Type.NUMBER },
-                  nextVerse: { type: Type.NUMBER }
-                },
-                required: ["questions", "nextBook", "nextChapter", "nextVerse"]
-              }
-            }
-          });
-
-          const text = response.text;
-          if (!text) throw new Error("Empty response from AI");
-
-          const data = JSON.parse(text.replace(/```json\n?|```/g, '').trim());
-          
-          if (!data.questions || !Array.isArray(data.questions)) {
-            throw new Error("Invalid response format");
-          }
-
-          const batchQuestions: BibleQuestion[] = data.questions.map((q: any) => ({
-            ...q,
-            used: 0,
-            lastSeen: 0,
-            sectionId: section.id
-          }));
-
-          allGeneratedQuestions.push(...batchQuestions);
-          
-          // Update progress for this section
-          witsProgress[section.id] = {
-            currentBook: data.nextBook,
-            currentChapter: data.nextChapter,
-            currentVerse: data.nextVerse
-          };
-
-          batchSuccess = true;
-          break;
-        } catch (e: any) {
-          if (attempt < 1) await delay(1000);
-        }
+    try {
+      if (!apiKey) {
+        throw new Error("Gemini API Key is missing. Please check your environment variables.");
       }
-      
-      if (onProgress) onProgress(allGeneratedQuestions.length, totalToGenerate);
-    }
 
-    await this.saveQuestions(allGeneratedQuestions, WITS_STORE);
-    await this.updateWitsSectionsProgress(witsProgress);
-    
-    return allGeneratedQuestions;
+      const ai = new GoogleGenAI({ apiKey });
+      const witsProgress = await this.getWitsSectionsProgress();
+      const allGeneratedQuestions: BibleQuestion[] = [];
+      
+      // Use the first 7 sections as requested
+      const targetSections = BIBLE_SECTIONS.slice(0, 7);
+      const totalToGenerate = targetSections.length * 2; // 2 per section to keep bank ahead
+
+      for (let i = 0; i < targetSections.length; i++) {
+        const section = targetSections[i];
+        const prog = witsProgress[section.id] || { 
+          currentBook: section.startBook, 
+          currentChapter: section.startChapter, 
+          currentVerse: section.startVerse 
+        };
+
+        if (onProgress) onProgress(allGeneratedQuestions.length, totalToGenerate);
+
+        const prompt = `JSON only. List 2 obscure numerical facts starting from ${prog.currentBook} ${prog.currentChapter}:${prog.currentVerse} onwards in the ${section.name} section of the Bible. 
+        IMPORTANT: Start as close to the beginning of the requested range as possible. Do not skip the early chapters (like Genesis 1-10) if they are within the range.
+        Extract specific numbers mentioned in the text (ages, years, cubits, shekels, etc.). 
+        Each fact must be a number mentioned in the narrative.
+        Format: {
+          "questions": [{"text": "Question?", "answer": 123, "book": "...", "chapter": 1, "verse": 1}],
+          "nextBook": "The next book to start from", 
+          "nextChapter": 1, 
+          "nextVerse": 1
+        }
+        The "nextBook", "nextChapter", and "nextVerse" should be the verse immediately following the last fact you provided, so the next search can pick up exactly where you left off without repetition.`;
+
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        let batchSuccess = false;
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const response = await ai.models.generateContent({
+              model: "gemini-3-flash-preview",
+              contents: prompt,
+              config: {
+                thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    questions: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          text: { type: Type.STRING },
+                          answer: { type: Type.NUMBER },
+                          book: { type: Type.STRING },
+                          chapter: { type: Type.NUMBER },
+                          verse: { type: Type.NUMBER }
+                        },
+                        required: ["text", "answer", "book", "chapter", "verse"]
+                      }
+                    },
+                    nextBook: { type: Type.STRING },
+                    nextChapter: { type: Type.NUMBER },
+                    nextVerse: { type: Type.NUMBER }
+                  },
+                  required: ["questions", "nextBook", "nextChapter", "nextVerse"]
+                }
+              }
+            });
+
+            const text = response.text;
+            if (!text) throw new Error("Empty response from AI");
+
+            const data = JSON.parse(text.replace(/```json\n?|```/g, '').trim());
+            
+            if (!data.questions || !Array.isArray(data.questions)) {
+              throw new Error("Invalid response format");
+            }
+
+            const batchQuestions: BibleQuestion[] = data.questions.map((q: any) => ({
+              ...q,
+              used: 0,
+              lastSeen: 0,
+              sectionId: section.id
+            }));
+
+            allGeneratedQuestions.push(...batchQuestions);
+            
+            // Update progress for this section
+            witsProgress[section.id] = {
+              currentBook: data.nextBook,
+              currentChapter: data.nextChapter,
+              currentVerse: data.nextVerse
+            };
+
+            batchSuccess = true;
+            break;
+          } catch (e: any) {
+            if (attempt < 1) await delay(1000);
+          }
+        }
+        
+        if (onProgress) onProgress(allGeneratedQuestions.length, totalToGenerate);
+      }
+
+      await this.saveQuestions(allGeneratedQuestions, WITS_STORE);
+      await this.updateWitsSectionsProgress(witsProgress);
+      
+      return allGeneratedQuestions;
+    } finally {
+      isGeneratingGlobal = false;
+    }
   },
 
   async getQuestionsForChapter(book: string, chapter: number): Promise<BibleQuestion[]> {
@@ -342,6 +355,8 @@ export const bibleQuestionService = {
     await db.delete(META_STORE, 'sectionsProgress');
     await db.delete(META_STORE, 'lastChapter');
     await db.delete(META_STORE, 'currentGameChapter');
+    await db.delete(META_STORE, 'lastSectionIndex');
+    await db.delete(META_STORE, 'lastQuestionInCurrentSection');
   },
 
   async resetWitsAndWagersBank() {
@@ -373,6 +388,7 @@ export const getQuestionsSortedByLastSeen = bibleQuestionService.getQuestionsSor
 export const getQuestionsBySection = bibleQuestionService.getQuestionsBySection;
 export const updateQuestionLastSeen = bibleQuestionService.updateQuestionLastSeen;
 export const getBibleProgress = bibleQuestionService.getBibleProgress;
+export const getWitsSectionsProgress = bibleQuestionService.getWitsSectionsProgress;
 export const updateBibleProgress = bibleQuestionService.updateBibleProgress;
 export const resetBibleProgress = bibleQuestionService.resetBibleProgress;
 export const resetWitsAndWagersBank = bibleQuestionService.resetWitsAndWagersBank;
