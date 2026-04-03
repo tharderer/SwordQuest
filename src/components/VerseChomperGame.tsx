@@ -371,7 +371,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
     setEnemies(prev => {
       // Limit number of enemies
-      if (prev.length >= Math.min(3, loop - 1)) return prev;
+      const maxEnemies = loop === 3 ? 1 : Math.min(3, loop - 1);
+      if (prev.length >= maxEnemies) return prev;
 
       const id = Date.now() + Math.random();
       let newEnemy: Enemy;
@@ -458,8 +459,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           const dy = avatarPosRef.current.y - e.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0) {
-            nvx = (dx / dist) * 0.03; // Reduced from 0.05
-            nvy = (dy / dist) * 0.03; // Reduced from 0.05
+            nvx = (dx / dist) * 0.015; // Reduced from 0.03
+            nvy = (dy / dist) * 0.015; // Reduced from 0.03
           }
         } else if (e.type === 'BAR') {
           if (nx < 20 || nx > 80) nvx *= -1;
