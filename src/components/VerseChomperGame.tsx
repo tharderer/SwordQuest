@@ -801,7 +801,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       if (scoreGained > 0) setScore(s => s + scoreGained);
       
       if (circleBackBonus) {
-        setLives(l => Math.min(5, l + 1));
+        setLives(l => l + 1);
         setShowCircleBack(true);
         setTimeout(() => setShowCircleBack(false), 1500);
       }
@@ -810,7 +810,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       if (streakIncrement > 0) {
         setStreak(prevStreak => {
           const newStreak = prevStreak + streakIncrement;
-          if (newStreak % 10 === 0) setLives(l => Math.min(5, l + 1));
+          if (newStreak % 10 === 0) setLives(l => l + 1);
           return newStreak;
         });
       }
@@ -1107,14 +1107,21 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                 >
                   {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
                 </button>
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Heart 
-                      key={i} 
-                      size={20} 
-                      className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} 
-                    />
-                  ))}
+                <div className="flex items-center gap-1">
+                  {lives <= 5 ? (
+                    [...Array(5)].map((_, i) => (
+                      <Heart 
+                        key={i} 
+                        size={20} 
+                        className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} 
+                      />
+                    ))
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Heart size={20} className="text-rose-500 fill-rose-500" />
+                      <span className="text-xl font-black text-rose-500">x{lives}</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-right">
