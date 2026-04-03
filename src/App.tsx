@@ -7722,6 +7722,7 @@ export default function App() {
   const [outOfHearts, setOutOfHearts] = useState(false);
   const [mistakesInSession, setMistakesInSession] = useState(0);
   const [isDbReady, setIsDbReady] = useState(false);
+  const [isSeeded, setIsSeeded] = useState<boolean | null>(null);
   const [isQuestionBankOpen, setIsQuestionBankOpen] = useState(false);
   const [isVerseSetOpen, setIsVerseSetOpen] = useState(false);
   const [selectedGameSetId, setSelectedGameSetId] = useState<string | null>(null);
@@ -7758,6 +7759,7 @@ export default function App() {
         console.log("Starting Bible DB check...");
         await initBibleDB();
         const seeded = await isBibleSeeded();
+        setIsSeeded(seeded);
         console.log("Bible DB check complete. Seeded:", seeded);
         
         if (!seeded) {
@@ -7765,6 +7767,7 @@ export default function App() {
           setDownloadProgress(0);
           downloadFullKJV((progress) => {
             setDownloadProgress(progress);
+            if (progress === 100) setIsSeeded(true);
           }).catch(err => {
             console.error("Bible download failed:", err);
             setDownloadProgress(null);
@@ -7968,30 +7971,75 @@ export default function App() {
         </header>
       )}
 
-      {downloadProgress !== 100 && (
+      {/* Bible Initial Download Overlay */}
+      {isSeeded === false && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md w-full space-y-8"
+          >
+            <div className="space-y-2">
+              <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">
+                Bundling Bible Data
+              </h2>
+              <p className="text-slate-400 text-sm font-medium">
+                We're preparing the full KJV Bible for offline use. This only happens once.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="h-4 bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${downloadProgress || 0}%` }}
+                  transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                />
+              </div>
+              
+              <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                <span className="text-orange-500">
+                  {downloadProgress === null ? 'Connection Error' : 'Downloading...'}
+                </span>
+                <span className="text-white">
+                  {downloadProgress || 0}%
+                </span>
+              </div>
+
+              {downloadProgress === null && (
+                <button 
+                  onClick={async () => {
+                    setDownloadProgress(0);
+                    try {
+                      await downloadFullKJV((p) => setDownloadProgress(p));
+                      setIsSeeded(true);
+                    } catch (err) {
+                      console.error("Retry failed:", err);
+                      setDownloadProgress(null);
+                    }
+                  }}
+                  className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-orange-900/20"
+                >
+                  Retry Download
+                </button>
+              )}
+            </div>
+
+            <div className="pt-8 flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">
+                Please keep this tab open
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {downloadProgress !== 100 && downloadProgress !== null && isSeeded === true && (
         <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest z-50">
-          {downloadProgress === null ? (
-            <button 
-              onClick={async () => {
-                setDownloadProgress(0);
-                try {
-                  await downloadFullKJV((p) => setDownloadProgress(p));
-                } catch (err) {
-                  console.error("Retry failed:", err);
-                  setDownloadProgress(null);
-                }
-              }}
-              className="flex items-center gap-2 text-orange-400 hover:text-orange-300 transition-colors"
-            >
-              <AlertCircle size={12} />
-              Bible Download Failed. Tap to Retry.
-            </button>
-          ) : (
-            <>
-              <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              Downloading Bible: {downloadProgress}%
-            </>
-          )}
+          <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          Finalizing Bible: {downloadProgress}%
         </div>
       )}
 

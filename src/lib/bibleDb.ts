@@ -317,11 +317,11 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   console.log('Downloading Full KJV Bible...');
   
   const sources = [
+    '/kjv.txt',
     'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/kjv/kjv.txt',
     'https://raw.githubusercontent.com/OpenBibleInfo/Bible-Data/master/kjv.txt',
     'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json',
-    'https://raw.githubusercontent.com/getbible/v2/main/json/kjv.json',
-    '/kjv.txt'
+    'https://raw.githubusercontent.com/getbible/v2/main/json/kjv.json'
   ];
 
   let data = null;
@@ -375,7 +375,9 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   
   if (isTextFormat && typeof data === 'string') {
     const lines = data.split(/\r?\n/);
-    for (const line of lines) {
+    const totalLines = lines.length;
+    for (let i = 0; i < totalLines; i++) {
+      const line = lines[i];
       const trimmed = line.trim();
       if (!trimmed) continue;
       // Format: [LineNumber:] Book Chapter:Verse Text
@@ -390,6 +392,11 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
           verse: Number(match[3]),
           text: cleanVerseText(match[4])
         });
+      }
+      
+      // Update progress during parsing if it's a large file
+      if (i % 1000 === 0 && onProgress) {
+        onProgress(Math.round((i / totalLines) * 20)); // First 20% is parsing
       }
     }
   } else {
@@ -527,7 +534,8 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
     await tx.done;
     
     if (onProgress) {
-      onProgress(Math.round((i / verses.length) * 100));
+      // 20% to 100% is insertion
+      onProgress(20 + Math.round((i / verses.length) * 80));
     }
   }
   
