@@ -728,14 +728,15 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Reset all progress for ${level.title}?`)) {
+                          if (confirm(`Reset all progress for ${level.title} to Loop 1?`)) {
                             resetLevelProgress(level.id);
                           }
                         }}
-                        className="absolute top-4 left-4 w-8 h-8 bg-rose-500/20 hover:bg-rose-500/40 rounded-lg flex items-center justify-center text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                        className="absolute top-4 left-4 flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 hover:bg-rose-500/30 rounded-lg text-rose-500 transition-all border border-rose-500/20 z-10"
                         title="Reset Level Progress"
                       >
-                        <RotateCcw size={16} />
+                        <RotateCcw size={12} />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Reset</span>
                       </button>
                     )}
                   </div>
