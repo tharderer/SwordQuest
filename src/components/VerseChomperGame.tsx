@@ -65,6 +65,11 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
       </div>
     </div>
   );
+}, (prev, next) => {
+  // Only re-render if position or text changed significantly (approx every other frame at 60fps)
+  return prev.word.id === next.word.id && 
+         Math.abs(prev.word.y - next.word.y) < 0.5 && 
+         prev.word.x === next.word.x;
 });
 
 const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, streak: number }) => {
@@ -126,6 +131,86 @@ declare global {
     };
   }
 }
+
+const GameStage = React.memo(({ fallingWords, avatarPos, streak }: { fallingWords: FallingWord[], avatarPos: { x: number, y: number }, streak: number }) => {
+  return (
+    <>
+      {/* Falling Words */}
+      {fallingWords.map(w => (
+        <FallingWordItem key={w.id} word={w} />
+      ))}
+
+      {/* Avatar (Chomper) */}
+      <Avatar pos={avatarPos} streak={streak} />
+    </>
+  );
+});
+
+const VerseProgressBar = React.memo(({ words, nextWordIndex, loopCount }: { words: string[], nextWordIndex: number, loopCount: number }) => {
+  return (
+    <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
+      <div className="max-w-2xl mx-auto space-y-3">
+        <div className="flex flex-wrap justify-center gap-1.5 max-h-[120px] overflow-y-auto pb-2 custom-scrollbar">
+          {words.map((word, i) => {
+            const isCaught = i < nextWordIndex;
+            const isCurrent = i === nextWordIndex;
+            
+            let displayWord = word;
+            let opacityClass = "opacity-100";
+            let bgClass = "bg-slate-600";
+            
+            if (loopCount === 1) {
+              bgClass = isCaught ? "bg-amber-500 text-slate-950" : isCurrent ? "bg-white text-slate-950 animate-pulse" : "text-slate-600";
+            } else if (loopCount === 2) {
+              if (isCaught) {
+                bgClass = "bg-amber-500 text-slate-950";
+              } else if (isCurrent) {
+                displayWord = "_".repeat(word.length);
+                bgClass = "bg-white text-slate-950 animate-pulse";
+              } else {
+                opacityClass = "opacity-0";
+              }
+            } else if (loopCount === 3) {
+              if (isCaught) {
+                bgClass = "bg-amber-500 text-slate-950";
+              } else if (isCurrent) {
+                displayWord = word[0] + "_".repeat(word.length - 1);
+                bgClass = "bg-white text-slate-950 animate-pulse";
+              } else {
+                opacityClass = "opacity-0";
+              }
+            } else {
+              if (isCaught) {
+                bgClass = "bg-amber-500 text-slate-950";
+              } else {
+                opacityClass = "opacity-0";
+              }
+            }
+
+            return (
+              <span 
+                key={i}
+                className={cn(
+                  "text-xs font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded transition-all duration-500",
+                  bgClass,
+                  opacityClass
+                )}
+              >
+                {displayWord}
+              </span>
+            );
+          })}
+        </div>
+        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <motion.div 
+            animate={{ width: `${words.length > 0 ? (nextWordIndex / words.length) * 100 : 0}%` }}
+            className="h-full bg-amber-500"
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onExit }) => {
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'GAME_OVER' | 'VICTORY'>('LEVEL_SELECT');
@@ -497,7 +582,15 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     setFallingWords(prev => [...prev, newFallingWord]);
   }, []);
 
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
   const updateGame = useCallback((time: number) => {
+    if (!isMountedRef.current) return;
     if (gameStateRef.current !== 'PLAYING' || isPausedRef.current || showTutorialRef.current) {
       if (isPausedRef.current || showTutorialRef.current) {
         lastTimeRef.current = time; // Keep time updated but don't advance
@@ -520,7 +613,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     }
 
     setFallingWords(prev => {
-      if (prev.length === 0) return prev;
+      if (prev.length === 0 && distractorsRemainingRef.current > 0) return prev;
       
       let livesLost = 0;
       let scoreGained = 0;
@@ -528,37 +621,51 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       let streakReset = false;
       let streakIncrement = 0;
 
-      const next = prev.map(w => ({ ...w, y: w.y + (w.speed * (dt / 16)) })).filter(w => {
+      const next: FallingWord[] = [];
+      const currentNextWordIdx = nextWordIndexRef.current;
+      const currentAvatarPos = avatarPosRef.current;
+      const currentLoop = loopCountRef.current;
+
+      for (let i = 0; i < prev.length; i++) {
+        const w = prev[i];
+        const newY = w.y + (w.speed * (dt / 16));
+        
         // Check if correct word fell through
-        if (w.y > 105) {
-          if (w.isCorrect && w.wordIndex === nextWordIndexRef.current) {
+        if (newY > 105) {
+          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
             livesLost++;
             streakReset = true;
-            // Reset spawn ref so the missed word is the next "correct" one to drop
-            nextWordToSpawnRef.current = nextWordIndexRef.current;
+            nextWordToSpawnRef.current = currentNextWordIdx;
           }
-          return false;
+          continue;
         }
         
         // Collision detection
-        const dist = Math.sqrt(Math.pow(w.x - avatarPosRef.current.x, 2) + Math.pow(w.y - avatarPosRef.current.y, 2));
-        if (dist < 9) { // Slightly larger chomp radius for better feel
-          if (w.isCorrect && w.wordIndex === nextWordIndexRef.current) {
-            // Correct chomp!
+        const dx = w.x - currentAvatarPos.x;
+        const dy = newY - currentAvatarPos.y;
+        const distSq = dx * dx + dy * dy;
+        
+        if (distSq < 81) { // 9^2 = 81
+          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
             playChompSound(true);
-            scoreGained += (10 * loopCountRef.current);
+            scoreGained += (10 * currentLoop);
             nextWordAdvanced = true;
             streakIncrement++;
           } else {
-            // Wrong chomp!
             playChompSound(false);
             livesLost++;
             streakReset = true;
           }
-          return false;
+          continue;
         }
-        return true;
-      });
+
+        // Only create a new object if the position changed
+        if (newY !== w.y) {
+          next.push({ ...w, y: newY });
+        } else {
+          next.push(w);
+        }
+      }
 
       if (livesLost > 0) {
         setLives(l => {
@@ -701,12 +808,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                 
                 return (
                   <div key={level.id} className="relative group">
-                    <motion.button
+                    <motion.div
                       whileHover={!isLocked ? { scale: 1.02 } : {}}
                       whileTap={!isLocked ? { scale: 0.98 } : {}}
                       onClick={() => !isLocked && startLevel(idx)}
                       className={cn(
-                        "w-full p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden",
+                        "w-full p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden cursor-pointer",
                         isLocked 
                           ? "bg-slate-900/50 border-white/5 opacity-50 grayscale cursor-not-allowed" 
                           : "bg-slate-900 border-white/10 hover:border-amber-500/50"
@@ -804,7 +911,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                           )}
                         </div>
                       </div>
-                    </motion.button>
+                    </motion.div>
                   </div>
                 );
               })}
@@ -886,80 +993,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           </div>
 
           {/* Verse Progress Bar */}
-          <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
-            <div className="max-w-2xl mx-auto space-y-3">
-              <div className="flex flex-wrap justify-center gap-1.5 max-h-[120px] overflow-y-auto pb-2 custom-scrollbar">
-                {words.map((word, i) => {
-                  const isCaught = i < nextWordIndex;
-                  const isCurrent = i === nextWordIndex;
-                  
-                  // Loop 1: Show all words
-                  // Loop 2: Show caught words + current word as blank
-                  // Loop 3: Show initials
-                  // Loop 4+: Show only caught words, others hidden
-                  let displayWord = word;
-                  let opacityClass = "opacity-100";
-                  let bgClass = "bg-slate-600";
-                  
-                  if (loopCount === 1) {
-                    bgClass = isCaught ? "bg-amber-500 text-slate-950" : isCurrent ? "bg-white text-slate-950 animate-pulse" : "text-slate-600";
-                  } else if (loopCount === 2) {
-                    if (isCaught) {
-                      bgClass = "bg-amber-500 text-slate-950";
-                    } else if (isCurrent) {
-                      displayWord = "_".repeat(word.length);
-                      bgClass = "bg-white text-slate-950 animate-pulse";
-                    } else {
-                      opacityClass = "opacity-0";
-                    }
-                  } else if (loopCount === 3) {
-                    if (isCaught) {
-                      bgClass = "bg-amber-500 text-slate-950";
-                    } else if (isCurrent) {
-                      displayWord = word[0] + "_".repeat(word.length - 1);
-                      bgClass = "bg-white text-slate-950 animate-pulse";
-                    } else {
-                      opacityClass = "opacity-0";
-                    }
-                  } else {
-                    // Loop 4+: No bar (handled by opacity 0 for all non-caught)
-                    if (isCaught) {
-                      bgClass = "bg-amber-500 text-slate-950";
-                    } else {
-                      opacityClass = "opacity-0";
-                    }
-                  }
+          <VerseProgressBar words={words} nextWordIndex={nextWordIndex} loopCount={loopCount} />
 
-                  return (
-                    <span 
-                      key={i}
-                      className={cn(
-                        "text-xs font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded transition-all duration-500",
-                        bgClass,
-                        opacityClass
-                      )}
-                    >
-                      {displayWord}
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  animate={{ width: `${words.length > 0 ? (nextWordIndex / words.length) * 100 : 0}%` }}
-                  className="h-full bg-amber-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Falling Words */}
-          {fallingWords.map(w => (
-            <FallingWordItem key={w.id} word={w} />
-          ))}
-
-          {/* Avatar (Chomper) */}
-          <Avatar pos={avatarPos} streak={streak} />
+          {/* Game Stage (Falling Words & Avatar) */}
+          <GameStage fallingWords={fallingWords} avatarPos={avatarPos} streak={streak} />
 
           {/* Speed Up Notification */}
           <AnimatePresence>
