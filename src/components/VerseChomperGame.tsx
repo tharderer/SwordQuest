@@ -58,7 +58,7 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
       }}
     >
       <div className={cn(
-        "px-8 py-6 rounded-[2rem] font-black text-3xl shadow-xl whitespace-nowrap border-4 transition-transform",
+        "px-4 py-2 rounded-xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
         "bg-slate-800 text-white border-white/30 opacity-100 shadow-white/5"
       )}>
         {word.text}
@@ -720,26 +720,61 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                           {level.id}
                         </div>
                         
-                        {!isLocked && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Reset all progress for ${level.title} to Loop 1?`)) {
-                                resetLevelProgress(level.id);
-                              }
-                            }}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 hover:bg-rose-500/30 rounded-lg text-rose-500 transition-all border border-rose-500/20 z-20"
-                            title="Reset Level Progress"
-                          >
-                            <RotateCcw size={12} />
-                            <span className="text-[8px] font-black uppercase tracking-widest">Reset</span>
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {!isLocked && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Reset all progress for ${level.title} to Loop 1?`)) {
+                                  resetLevelProgress(level.id);
+                                }
+                              }}
+                              className="flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 hover:bg-rose-500/30 rounded-lg text-rose-500 transition-all border border-rose-500/20 z-20"
+                              title="Reset Level Progress"
+                            >
+                              <RotateCcw size={12} />
+                              <span className="text-[8px] font-black uppercase tracking-widest">Reset</span>
+                            </button>
+                          )}
+
+                          {!isLocked && maxLoop > 1 && (
+                            <div className="flex items-center gap-1 bg-slate-950/80 backdrop-blur-sm p-1 rounded-lg border border-white/10 z-20">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStartLoops(prev => ({
+                                    ...prev,
+                                    [level.id]: Math.max(1, (prev[level.id] || 1) - 1)
+                                  }));
+                                }}
+                                className="w-5 h-5 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black text-xs"
+                              >
+                                -
+                              </button>
+                              <div className="flex flex-col items-center min-w-[40px]">
+                                <span className="text-[6px] text-slate-500 font-black uppercase tracking-tighter">Start</span>
+                                <span className="text-[10px] font-black text-amber-400">{startLoops[level.id] || 1}</span>
+                              </div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStartLoops(prev => ({
+                                    ...prev,
+                                    [level.id]: Math.min(maxLoop, (prev[level.id] || 1) + 1)
+                                  }));
+                                }}
+                                className="w-5 h-5 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black text-xs"
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
-                      <div className="mb-12">
+                      <div className="mb-8">
                         <h3 className="font-black text-lg leading-tight mb-1">{level.title}</h3>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest max-w-[70%]">{level.reference}</p>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{level.reference}</p>
                       </div>
 
                       <div className="flex justify-between items-end mt-auto">
@@ -770,43 +805,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                         </div>
                       </div>
                     </motion.button>
-
-                    {!isLocked && maxLoop > 1 && (
-                      <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-slate-950/80 backdrop-blur-sm p-1.5 rounded-xl border border-white/10 z-10">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStartLoops(prev => ({
-                              ...prev,
-                              [level.id]: Math.max(1, (prev[level.id] || 1) - 1)
-                            }));
-                          }}
-                          className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black"
-                        >
-                          -
-                        </button>
-                        <div className="flex flex-col items-center min-w-[60px]">
-                          <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Start Loop</span>
-                          <span className="text-xs font-black text-amber-400">{startLoops[level.id] || 1}</span>
-                        </div>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStartLoops(prev => ({
-                              ...prev,
-                              [level.id]: Math.min(maxLoop, (prev[level.id] || 1) + 1)
-                            }));
-                          }}
-                          className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black"
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-
-                    {!isLocked && (
-                      <div className="hidden" />
-                    )}
                   </div>
                 );
               })}
