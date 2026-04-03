@@ -34,6 +34,17 @@ interface ChomperLevel {
   title: string;
 }
 
+interface SavedSession {
+  levelIdx: number;
+  score: number;
+  lives: number;
+  streak: number;
+  loopCount: number;
+  nextWordIndex: number;
+  startLoop: number;
+  timestamp: number;
+}
+
 const CHOMPER_LEVELS: ChomperLevel[] = [
   { id: 1, reference: "John 3:16", title: "God's Love" },
   { id: 2, reference: "Psalm 23:1", title: "The Good Shepherd" },
@@ -90,7 +101,26 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isJumbled, setIsJumbled] = useState(false);
   const [showSpeedUp, setShowSpeedUp] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
   const prevLoopCount = useRef(loopCount);
+  
+  const sessionRef = useRef<SavedSession | null>(null);
+
+  // Update session ref whenever state changes
+  useEffect(() => {
+    if (gameState === 'PLAYING') {
+      sessionRef.current = {
+        levelIdx: currentLevelIdx,
+        score: score,
+        lives: lives,
+        streak: streak,
+        loopCount: loopCount,
+        nextWordIndex: nextWordIndex,
+        startLoop: startLoop,
+        timestamp: Date.now()
+      };
+    }
+  }, [gameState, currentLevelIdx, score, lives, streak, loopCount, nextWordIndex, startLoop]);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -140,7 +170,28 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
     const skip = localStorage.getItem('verse_chomper_skip_tutorial');
     if (skip === 'true') setDontShowAgain(true);
+
+    const saved = localStorage.getItem('verse_chomper_saved_session');
+    if (saved) {
+      try {
+        setSavedSession(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse saved session", e);
+      }
+    }
   }, []);
+
+  // Periodically save session during gameplay
+  useEffect(() => {
+    if (gameState === 'PLAYING' && !isPaused) {
+      const saveInterval = setInterval(() => {
+        if (sessionRef.current) {
+          localStorage.setItem('verse_chomper_saved_session', JSON.stringify(sessionRef.current));
+        }
+      }, 5000); // Save every 5 seconds
+      return () => clearInterval(saveInterval);
+    }
+  }, [gameState, isPaused]);
 
   const playSound = useCallback((freq: number, type: OscillatorType, dur: number, vol: number = 0.2) => {
     if (isMuted) return;
@@ -238,7 +289,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     }
   };
 
-  const startLevel = async (idx: number) => {
+  const startLevel = async (idx: number, resumeSession?: SavedSession) => {
     const level = CHOMPER_LEVELS[idx];
     const parsed = parseReference(level.reference);
     
@@ -260,22 +311,38 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         }
         setVerseText(verse.text);
         setWords(cleanWords);
-        setNextWordIndex(0);
+        
+        if (resumeSession) {
+          setNextWordIndex(resumeSession.nextWordIndex);
+          setLives(resumeSession.lives);
+          setScore(resumeSession.score);
+          setStreak(resumeSession.streak);
+          setLoopCount(resumeSession.loopCount);
+          prevLoopCount.current = resumeSession.loopCount;
+          setStartLoop(resumeSession.startLoop);
+          nextWordToSpawnRef.current = resumeSession.nextWordIndex;
+        } else {
+          setNextWordIndex(0);
+          setLives(5);
+          setScore(0);
+          setStreak(0);
+          setLoopCount(startLoop);
+          prevLoopCount.current = startLoop;
+          nextWordToSpawnRef.current = 0;
+          // Clear any old saved session when starting fresh
+          localStorage.removeItem('verse_chomper_saved_session');
+          setSavedSession(null);
+        }
+
         setFallingWords([]);
-        setLives(5);
-        setScore(0);
-        setStreak(0);
-        setLoopCount(startLoop);
-        prevLoopCount.current = startLoop;
         setCurrentLevelIdx(idx);
         setIsPaused(false);
-        nextWordToSpawnRef.current = 0;
         distractorsRemainingRef.current = 0;
         lastTimeRef.current = 0;
         setAudioUrl(hymnUrls[Math.floor(Math.random() * hymnUrls.length)]);
         
         setGameState('PLAYING');
-        if (!dontShowAgain) {
+        if (!dontShowAgain && !resumeSession) {
           setShowTutorial(true);
         }
       } else {
@@ -368,7 +435,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     lastTimeRef.current = time;
 
     // Spawn logic - faster as loops progress, but more gradual
-    const spawnRate = Math.max(350, 1300 - (loopCountRef.current * 150));
+    const spawnRate = Math.max(1, 1300 - (loopCountRef.current * 150));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
       lastSpawnTime.current = time;
@@ -510,6 +577,43 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               <h1 className="text-4xl font-black tracking-tighter uppercase italic text-amber-400">Verse Chomper</h1>
               <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Catch the words in order. Don't miss a beat.</p>
             </div>
+
+            {savedSession && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-amber-500/10 border-2 border-amber-500/30 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <RotateCcw className="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg text-amber-400 leading-tight">Resume Last Game?</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                      {CHOMPER_LEVELS[savedSession.levelIdx].reference} • Loop {savedSession.loopCount} • Score {savedSession.score}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={() => {
+                      localStorage.removeItem('verse_chomper_saved_session');
+                      setSavedSession(null);
+                    }}
+                    className="flex-1 sm:flex-none px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-colors"
+                  >
+                    Discard
+                  </button>
+                  <button 
+                    onClick={() => startLevel(savedSession.levelIdx, savedSession)}
+                    className="flex-1 sm:flex-none px-6 py-3 bg-amber-500 text-slate-950 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-colors"
+                  >
+                    Resume
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {CHOMPER_LEVELS.map((level, idx) => {
@@ -878,12 +982,34 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                     <Pause size={40} className="text-slate-950" />
                   </div>
                   <h2 className="text-4xl font-black uppercase italic tracking-tighter">Game Paused</h2>
-                  <button
-                    onClick={() => setIsPaused(false)}
-                    className="px-8 py-4 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-2xl hover:bg-amber-400 transition-colors"
-                  >
-                    RESUME
-                  </button>
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => setIsPaused(false)}
+                      className="px-12 py-4 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-2xl hover:bg-amber-400 transition-colors"
+                    >
+                      RESUME
+                    </button>
+                    <button
+                      onClick={() => {
+                        const session: SavedSession = {
+                          levelIdx: currentLevelIdx,
+                          score: score,
+                          lives: lives,
+                          streak: streak,
+                          loopCount: loopCount,
+                          nextWordIndex: nextWordIndex,
+                          startLoop: startLoop,
+                          timestamp: Date.now()
+                        };
+                        localStorage.setItem('verse_chomper_saved_session', JSON.stringify(session));
+                        setSavedSession(session);
+                        setGameState('LEVEL_SELECT');
+                      }}
+                      className="px-12 py-4 bg-slate-900 text-white border border-white/10 rounded-2xl font-black text-sm hover:bg-slate-800 transition-colors"
+                    >
+                      SAVE & QUIT
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -924,6 +1050,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             <button
               onClick={() => {
                 saveProgress(CHOMPER_LEVELS[currentLevelIdx].id, score, loopCount);
+                localStorage.removeItem('verse_chomper_saved_session');
+                setSavedSession(null);
                 setGameState('LEVEL_SELECT');
               }}
               className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm border border-white/10 hover:bg-slate-800 transition-colors"
