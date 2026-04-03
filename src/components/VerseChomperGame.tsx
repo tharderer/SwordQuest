@@ -113,6 +113,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
   const gameStateRef = useRef(gameState);
   const isPausedRef = useRef(isPaused);
+  const showTutorialRef = useRef(showTutorial);
   const wordsRef = useRef(words);
   const nextWordIndexRef = useRef(nextWordIndex);
   const loopCountRef = useRef(loopCount);
@@ -121,6 +122,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   // Sync refs with state for the game loop
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { showTutorialRef.current = showTutorial; }, [showTutorial]);
   useEffect(() => { wordsRef.current = words; }, [words]);
   useEffect(() => { nextWordIndexRef.current = nextWordIndex; }, [nextWordIndex]);
   useEffect(() => { loopCountRef.current = loopCount; }, [loopCount]);
@@ -368,8 +370,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           type: 'STATIC',
           x: Math.random() * 80 + 10,
           y: Math.random() * 40 + 20,
-          vx: (Math.random() - 0.5) * 0.2,
-          vy: (Math.random() - 0.5) * 0.2,
+          vx: (Math.random() - 0.5) * 0.1,
+          vy: (Math.random() - 0.5) * 0.1,
           symbol: '#'
         };
       } else if (loop === 3) {
@@ -400,8 +402,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   }, []);
 
   const updateGame = useCallback((time: number) => {
-    if (gameStateRef.current !== 'PLAYING' || isPausedRef.current) {
-      if (isPausedRef.current) {
+    if (gameStateRef.current !== 'PLAYING' || isPausedRef.current || showTutorialRef.current) {
+      if (isPausedRef.current || showTutorialRef.current) {
         lastTimeRef.current = time; // Keep time updated but don't advance
         requestRef.current = requestAnimationFrame(updateGame);
       }
@@ -434,15 +436,18 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         let nvy = e.vy;
 
         if (e.type === 'STATIC') {
-          if (nx < 5 || nx > 95) nvx *= -1;
-          if (ny < 10 || ny > 60) nvy *= -1;
+          if (nx < 5) { nx = 5; nvx = Math.abs(nvx); }
+          else if (nx > 95) { nx = 95; nvx = -Math.abs(nvx); }
+          
+          if (ny < 10) { ny = 10; nvy = Math.abs(nvy); }
+          else if (ny > 60) { ny = 60; nvy = -Math.abs(nvy); }
         } else if (e.type === 'CHASER') {
           const dx = avatarPosRef.current.x - e.x;
           const dy = avatarPosRef.current.y - e.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist > 0) {
-            nvx = (dx / dist) * 0.05;
-            nvy = (dy / dist) * 0.05;
+            nvx = (dx / dist) * 0.03; // Reduced from 0.05
+            nvy = (dy / dist) * 0.03; // Reduced from 0.05
           }
         } else if (e.type === 'BAR') {
           if (nx < 20 || nx > 80) nvx *= -1;
@@ -540,7 +545,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       if (nextWordAdvanced) {
         setNextWordIndex(ni => {
           const nextIdx = (ni + 1) % wordsRef.current.length;
-          if (nextIdx === 0) setLoopCount(lc => lc + 1);
+          if (nextIdx === 0) {
+            setLoopCount(lc => lc + 1);
+            setEnemies([]); // Clear enemies on new loop
+          }
           return nextIdx;
         });
       }
