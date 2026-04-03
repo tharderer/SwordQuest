@@ -101,6 +101,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [showTutorial, setShowTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isJumbled, setIsJumbled] = useState(false);
+  const [showSpeedUp, setShowSpeedUp] = useState(false);
+  const prevLoopCount = useRef(loopCount);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -127,6 +129,15 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   useEffect(() => { nextWordIndexRef.current = nextWordIndex; }, [nextWordIndex]);
   useEffect(() => { loopCountRef.current = loopCount; }, [loopCount]);
   useEffect(() => { avatarPosRef.current = avatarPos; }, [avatarPos]);
+
+  useEffect(() => {
+    if (loopCount > prevLoopCount.current && gameState === 'PLAYING' && !showTutorial) {
+      setShowSpeedUp(true);
+      const timer = setTimeout(() => setShowSpeedUp(false), 1500);
+      return () => clearTimeout(timer);
+    }
+    prevLoopCount.current = loopCount;
+  }, [loopCount, gameState, showTutorial]);
 
   // Load progress
   useEffect(() => {
@@ -181,10 +192,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
   const playChompSound = useCallback((isCorrect: boolean) => {
     if (isCorrect) {
-      playSound(440, 'sine', 0.1, 0.2);
-      setTimeout(() => playSound(660, 'sine', 0.1, 0.15), 50);
+      playSound(440, 'sine', 0.1, 0.4);
+      setTimeout(() => playSound(660, 'sine', 0.1, 0.3), 50);
     } else {
-      playSound(220, 'triangle', 0.2, 0.3);
+      playSound(220, 'triangle', 0.2, 0.5);
     }
   }, [playSound]);
 
@@ -268,6 +279,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         setScore(0);
         setStreak(0);
         setLoopCount(startLoop);
+        prevLoopCount.current = startLoop;
         setCurrentLevelIdx(idx);
         setIsPaused(false);
         nextWordToSpawnRef.current = 0;
@@ -440,7 +452,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           else if (nx > 95) { nx = 95; nvx = -Math.abs(nvx); }
           
           if (ny < 10) { ny = 10; nvy = Math.abs(nvy); }
-          else if (ny > 60) { ny = 60; nvy = -Math.abs(nvy); }
+          else if (ny > 90) { ny = 90; nvy = -Math.abs(nvy); }
         } else if (e.type === 'CHASER') {
           const dx = avatarPosRef.current.x - e.x;
           const dy = avatarPosRef.current.y - e.y;
@@ -470,11 +482,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           return Math.max(0, nl);
         });
         playChompSound(false);
-        
-        if (hitEnemyType === 'STATIC') {
-          setIsJumbled(true);
-          setTimeout(() => setIsJumbled(false), 3000);
-        }
         
         return []; // Clear enemies on hit
       }
@@ -841,7 +848,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
           {/* Falling Words */}
           {fallingWords.map(w => {
-            const displayWord = isJumbled ? w.text.split('').sort(() => Math.random() - 0.5).join('') : w.text;
             return (
               <div
                 key={w.id}
@@ -855,9 +861,9 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               >
                 <div className={cn(
                   "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
-                  "bg-slate-900 text-white border-white/10 opacity-80"
+                  "bg-slate-800 text-white border-white/30 opacity-100 shadow-white/5"
                 )}>
-                  {displayWord}
+                  {w.text}
                 </div>
               </div>
             );
@@ -912,7 +918,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
           {/* Speed Up Notification */}
           <AnimatePresence>
-            {nextWordIndex === 0 && loopCount > 1 && (
+            {showSpeedUp && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
