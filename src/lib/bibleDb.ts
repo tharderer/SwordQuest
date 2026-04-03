@@ -16,20 +16,31 @@ export const BIBLE_BOOKS = [
 ];
 
 const BOOK_MAPPING: Record<string, string> = {
-  'Gen': 'Genesis', 'Ex': 'Exodus', 'Exo': 'Exodus', 'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
-  'Josh': 'Joshua', 'Judg': 'Judges', 'Ruth': 'Ruth', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
+  'gn': 'Genesis', 'ex': 'Exodus', 'lv': 'Leviticus', 'nm': 'Numbers', 'dt': 'Deuteronomy',
+  'js': 'Joshua', 'jg': 'Judges', 'rt': 'Ruth', '1s': '1 Samuel', '2s': '2 Samuel',
+  '1k': '1 Kings', '2k': '2 Kings', '1ch': '1 Chronicles', '2ch': '2 Chronicles',
+  'ez': 'Ezra', 'ne': 'Nehemiah', 'es': 'Esther', 'jb': 'Job', 'ps': 'Psalm', 'pr': 'Proverbs',
+  'ec': 'Ecclesiastes', 'sn': 'Song of Solomon', 'is': 'Isaiah', 'jr': 'Jeremiah', 'lm': 'Lamentations',
+  'ezk': 'Ezekiel', 'dn': 'Daniel', 'hs': 'Hosea', 'jl': 'Joel', 'am': 'Amos', 'ob': 'Obadiah',
+  'jn': 'Jonah', 'mi': 'Micah', 'na': 'Nahum', 'hk': 'Habakkuk', 'zp': 'Zephaniah', 'hg': 'Haggai',
+  'zc': 'Zechariah', 'ml': 'Malachi', 'mt': 'Matthew', 'mk': 'Mark', 'lk': 'Luke', 'jo': 'John',
+  'ac': 'Acts', 'rm': 'Romans', '1co': '1 Corinthians', '2co': '2 Corinthians', 'ga': 'Galatians',
+  'ep': 'Ephesians', 'ph': 'Philippians', 'cl': 'Colossians', '1th': '1 Thessalonians', '2th': '2 Thessalonians',
+  '1ti': '1 Timothy', '2ti': '2 Timothy', 'tt': 'Titus', 'pm': 'Philemon', 'hb': 'Hebrews', 'jm': 'James',
+  '1pe': '1 Peter', '2pe': '2 Peter', '1jo': '1 John', '2jo': '2 John', '3jo': '3 John', 'jd': 'Jude',
+  'rv': 'Revelation',
+  'Gen': 'Genesis', 'Exo': 'Exodus', 'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
+  'Josh': 'Joshua', 'Judg': 'Judges', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
   '1Kings': '1 Kings', '2Kings': '2 Kings', '1Chron': '1 Chronicles', '2Chron': '2 Chronicles',
-  'Ezra': 'Ezra', 'Neh': 'Nehemiah', 'Esth': 'Esther', 'Job': 'Job', 'Ps': 'Psalm', 'Psa': 'Psalm', 'Prov': 'Proverbs',
+  'Psa': 'Psalm', 'Prov': 'Proverbs',
   'Eccl': 'Ecclesiastes', 'Song': 'Song of Solomon', 'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations',
-  'Ezek': 'Ezekiel', 'Dan': 'Daniel', 'Hos': 'Hosea', 'Joel': 'Joel', 'Amos': 'Amos', 'Obad': 'Obadiah',
-  'Jonah': 'Jonah', 'Mic': 'Micah', 'Nah': 'Nahum', 'Hab': 'Habakkuk', 'Zeph': 'Zephaniah', 'Hag': 'Haggai',
-  'Zech': 'Zechariah', 'Mal': 'Malachi', 'Matt': 'Matthew', 'Mark': 'Mark', 'Luke': 'Luke', 'John': 'John',
-  'Acts': 'Acts', 'Rom': 'Romans', '1Cor': '1 Corinthians', '2Cor': '2 Corinthians', 'Gal': 'Galatians',
+  'Ezek': 'Ezekiel', 'Dan': 'Daniel', 'Hos': 'Hosea', 'Obad': 'Obadiah',
+  'Mic': 'Micah', 'Hab': 'Habakkuk', 'Zeph': 'Zephaniah', 'Hag': 'Haggai',
+  'Zech': 'Zechariah', 'Matt': 'Matthew', '1Cor': '1 Corinthians', '2Cor': '2 Corinthians',
   'Eph': 'Ephesians', 'Phil': 'Philippians', 'Col': 'Colossians', '1Thess': '1 Thessalonians', '2Thess': '2 Thessalonians',
-  '1Tim': '1 Timothy', '2Tim': '2 Timothy', 'Titus': 'Titus', 'Philem': 'Philemon', 'Heb': 'Hebrews', 'James': 'James',
-  '1Pet': '1 Peter', '2Pet': '2 Peter', '1John': '1 John', '2John': '2 John', '3John': '3 John', 'Jude': 'Jude',
-  'Rev': 'Revelation', '1 Sam': '1 Samuel', '2 Sam': '2 Samuel', '1 Kin': '1 Kings', '2 Kin': '2 Kings',
-  '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles', '1 Cor': '1 Corinthians', '2 Cor': '2 Corinthians',
+  '1Tim': '1 Timothy', '2Tim': '2 Timothy', 'Philem': 'Philemon', '1Pet': '1 Peter', '2Pet': '2 Peter',
+  '1John': '1 John', '2John': '2 John', '3John': '3 John', 'Rev': 'Revelation',
+  '1 Kin': '1 Kings', '2 Kin': '2 Kings', '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles',
   '1 Thess': '1 Thessalonians', '2 Thess': '2 Thessalonians', '1 Tim': '1 Timothy', '2 Tim': '2 Timothy',
   '1 Pet': '1 Peter', '2 Pet': '2 Peter', '1 Jo': '1 John', '2 Jo': '2 John', '3 Jo': '3 John'
 };
@@ -317,6 +328,7 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   console.log('Downloading Full KJV Bible...');
   
   const sources = [
+    '/kjv.json',
     '/kjv.txt',
     'https://raw.githubusercontent.com/scrollmapper/bible_databases/master/kjv/kjv.txt',
     'https://raw.githubusercontent.com/OpenBibleInfo/Bible-Data/master/kjv.txt',
@@ -328,9 +340,12 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
   let error = null;
   let isTextFormat = false;
 
+  if (onProgress) onProgress(5);
+  
   for (const url of sources) {
     try {
       console.log(`Attempting to fetch from: ${url}`);
+      if (onProgress) onProgress(10);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout per source
@@ -349,10 +364,18 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
           currentIsText = false;
         }
 
+        if (onProgress) onProgress(15);
+
         // Quick validation: does it look like a full Bible?
         // KJV is ~4.5MB text. If it's less than 2MB, it's likely truncated.
+        // But for JSON, it can be smaller (~2MB).
         if (typeof rawData === 'string' && rawData.length < 2000000 && url === '/kjv.txt') {
           console.warn(`Local source ${url} appears truncated (${rawData.length} bytes). Trying next...`);
+          continue;
+        }
+
+        if (url === '/kjv.json' && Array.isArray(rawData) && rawData.length < 60) {
+          console.warn(`Local source ${url} appears truncated (${rawData.length} books). Trying next...`);
           continue;
         }
 
@@ -404,11 +427,12 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
     // Case 1: Flat array of verses or object with result/verses array
     const flatList = Array.isArray(data) ? data : (data.result || data.verses);
     if (Array.isArray(flatList) && flatList.length > 0 && (flatList[0].text || flatList[0].t || flatList[0].v)) {
+      console.log('Parsing flat verse list format...');
       flatList.forEach((v: any) => {
         const text = String(v.text || v.t || v.v || '');
         if (text) {
           verses.push({
-            book: v.book || v.b || 'Unknown',
+            book: normalizeBookName(v.book || v.b || 'Unknown'),
             chapter: Number(v.chapter || v.c || 1),
             verse: Number(v.verse || v.v || v.n || 1),
             text: cleanVerseText(text)
@@ -418,6 +442,7 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
     } 
     // Case 2: Nested structure (Books -> Chapters -> Verses)
     else {
+      console.log('Parsing nested book/chapter/verse format...');
       let books = data.books || data.library || (Array.isArray(data) ? data : []);
       
       if (!Array.isArray(books) && typeof data === 'object') {
@@ -430,9 +455,20 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
 
       if (Array.isArray(books)) {
         books.forEach((book: any, bIdx: number) => {
-          const bookName = book.name || book.book || book.title || `Book ${bIdx + 1}`;
-          const chapters = book.chapters || book.chapter || [];
+          const rawBookName = book.name || book.book || book.title || book.abbrev || book.b || `Book ${bIdx + 1}`;
+          const bookName = normalizeBookName(String(rawBookName));
+          let chapters = book.chapters || book.chapter || book.c || [];
           
+          // If chapters is an object, convert to array
+          if (typeof chapters === 'object' && !Array.isArray(chapters) && chapters !== null) {
+            chapters = Object.entries(chapters)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([num, content]) => ({
+                num: Number(num),
+                ...(typeof content === 'object' ? content : { verses: content })
+              }));
+          }
+
           if (Array.isArray(chapters)) {
             chapters.forEach((chapter: any, cIdx: number) => {
               const chapterNum = chapter.num || chapter.number || (cIdx + 1);
@@ -453,10 +489,11 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
                 });
               } 
               // Case 2b: chapter is an object with a verses array
-              else if (chapter.verses && Array.isArray(chapter.verses)) {
-                chapter.verses.forEach((vData: any, vIdx: number) => {
-                  const text = typeof vData === 'string' ? vData : (vData.text || vData.verse || vData.v || '');
-                  const verseNum = vData.num || vData.number || vData.v || (vIdx + 1);
+              else if (chapter && typeof chapter === 'object' && (chapter.verses || chapter.v) && Array.isArray(chapter.verses || chapter.v)) {
+                const versesList = chapter.verses || chapter.v;
+                versesList.forEach((vData: any, vIdx: number) => {
+                  const text = typeof vData === 'string' ? vData : (vData.text || vData.verse || vData.v || vData.t || '');
+                  const verseNum = vData.num || vData.number || vData.v || vData.n || (vIdx + 1);
                   if (text) {
                     verses.push({
                       book: bookName,
@@ -471,7 +508,7 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
               else if (typeof chapter === 'object' && chapter !== null) {
                 Object.entries(chapter).forEach(([vNum, vText]: [string, any]) => {
                   if (vNum !== 'num' && vNum !== 'number') {
-                    const text = typeof vText === 'string' ? vText : (vText.text || vText.verse || vText.v || '');
+                    const text = typeof vText === 'string' ? vText : (vText.text || vText.verse || vText.v || vText.t || '');
                     if (text) {
                       verses.push({
                         book: bookName,
@@ -512,10 +549,11 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
 
   if (verses.length === 0) {
     console.error('Data structure received:', typeof data, Array.isArray(data) ? 'Array' : 'Object');
-    if (!Array.isArray(data)) console.log('Keys:', Object.keys(data).slice(0, 10));
+    if (data && !Array.isArray(data)) console.log('Keys:', Object.keys(data).slice(0, 10));
     throw new Error('Parsed 0 verses from Bible data. The JSON structure might be unsupported.');
   }
 
+  if (onProgress) onProgress(20);
   console.log(`Parsed ${verses.length} verses. Inserting into IndexedDB...`);
 
   // Clear existing data to avoid duplicates if we're re-downloading

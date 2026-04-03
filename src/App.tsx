@@ -7763,16 +7763,21 @@ export default function App() {
         console.log("Bible DB check complete. Seeded:", seeded);
         
         if (!seeded) {
-          // Start download in background
+          console.log("Bible not seeded, starting download...");
           setDownloadProgress(0);
           downloadFullKJV((progress) => {
+            console.log(`Download progress: ${progress}%`);
             setDownloadProgress(progress);
-            if (progress === 100) setIsSeeded(true);
+            if (progress === 100) {
+              console.log("Download complete, setting isSeeded to true");
+              setIsSeeded(true);
+            }
           }).catch(err => {
             console.error("Bible download failed:", err);
             setDownloadProgress(null);
           });
         } else {
+          console.log("Bible already seeded, skipping download");
           setDownloadProgress(100);
         }
 
