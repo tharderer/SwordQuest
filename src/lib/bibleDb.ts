@@ -29,6 +29,7 @@ const BOOK_MAPPING: Record<string, string> = {
   '1ti': '1 Timothy', '2ti': '2 Timothy', 'tt': 'Titus', 'pm': 'Philemon', 'hb': 'Hebrews', 'jm': 'James',
   '1pe': '1 Peter', '2pe': '2 Peter', '1jo': '1 John', '2jo': '2 John', '3jo': '3 John', 'jd': 'Jude',
   'rv': 'Revelation',
+  'Psalms': 'Psalm', 'Ps': 'Psalm',
   'Gen': 'Genesis', 'Exo': 'Exodus', 'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
   'Josh': 'Joshua', 'Judg': 'Judges', '1Sam': '1 Samuel', '2Sam': '2 Samuel',
   '1Kings': '1 Kings', '2Kings': '2 Kings', '1Chron': '1 Chronicles', '2Chron': '2 Chronicles',
@@ -47,10 +48,18 @@ const BOOK_MAPPING: Record<string, string> = {
 
 function normalizeBookName(name: string): string {
   const trimmed = name.trim();
+  
+  // Try direct match
   if (BOOK_MAPPING[trimmed]) return BOOK_MAPPING[trimmed];
   
+  // Try case-insensitive match in BOOK_MAPPING
+  const lowerTrimmed = trimmed.toLowerCase();
+  for (const key in BOOK_MAPPING) {
+    if (key.toLowerCase() === lowerTrimmed) return BOOK_MAPPING[key];
+  }
+  
   // Try to find a match in BIBLE_BOOKS
-  const match = BIBLE_BOOKS.find(b => b.toLowerCase() === trimmed.toLowerCase());
+  const match = BIBLE_BOOKS.find(b => b.toLowerCase() === lowerTrimmed);
   if (match) return match;
   
   return trimmed;
@@ -161,62 +170,125 @@ export async function searchBible(query: string): Promise<Verse[]> {
 }
 
 export async function getVerseByRef(book: string, chapter: number, verse: number): Promise<Verse | undefined> {
+  const normalizedBook = normalizeBookName(book);
   try {
     const db = await initBibleDB();
     const index = db.transaction(STORE_NAME).store.index('reference');
-    return await index.get([book, chapter, verse]);
+    let result = await index.get([normalizedBook, chapter, verse]);
+    
+    // Fallback for Psalm/Psalms mismatch in existing databases
+    if (!result) {
+      if (normalizedBook === 'Psalm') result = await index.get(['Psalms', chapter, verse]);
+      else if (normalizedBook === 'Psalms') result = await index.get(['Psalm', chapter, verse]);
+    }
+    
+    return result;
   } catch (error) {
     console.warn('GetVerseByRef falling back to local library:', error);
-    return KJV_LIBRARY.find(v => v.book === book && v.chapter === chapter && v.verse === verse);
+    const fallback = KJV_LIBRARY.find(v => v.book === normalizedBook && v.chapter === chapter && v.verse === verse);
+    if (!fallback && normalizedBook === 'Psalm') return KJV_LIBRARY.find(v => v.book === 'Psalms' && v.chapter === chapter && v.verse === verse);
+    return fallback;
   }
 }
 
 export async function getVersesByRange(book: string, chapter: number, startVerse: number, endVerse: number): Promise<Verse[]> {
+  const normalizedBook = normalizeBookName(book);
   try {
     const db = await initBibleDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const index = store.index('reference');
     
-    const range = IDBKeyRange.bound([book, chapter, startVerse], [book, chapter, endVerse]);
-    return await index.getAll(range);
+    const range = IDBKeyRange.bound([normalizedBook, chapter, startVerse], [normalizedBook, chapter, endVerse]);
+    let results = await index.getAll(range);
+    
+    // Fallback for Psalm/Psalms mismatch
+    if (results.length === 0) {
+      if (normalizedBook === 'Psalm') {
+        results = await index.getAll(IDBKeyRange.bound(['Psalms', chapter, startVerse], ['Psalms', chapter, endVerse]));
+      } else if (normalizedBook === 'Psalms') {
+        results = await index.getAll(IDBKeyRange.bound(['Psalm', chapter, startVerse], ['Psalm', chapter, endVerse]));
+      }
+    }
+    
+    return results;
   } catch (error) {
     console.warn('GetVersesByRange falling back to local library:', error);
-    return KJV_LIBRARY.filter(v => 
-      v.book === book && 
+    let results = KJV_LIBRARY.filter(v => 
+      v.book === normalizedBook && 
       v.chapter === chapter && 
       v.verse >= startVerse && 
       v.verse <= endVerse
     );
+    if (results.length === 0) {
+      const altBook = normalizedBook === 'Psalm' ? 'Psalms' : (normalizedBook === 'Psalms' ? 'Psalm' : null);
+      if (altBook) {
+        results = KJV_LIBRARY.filter(v => 
+          v.book === altBook && 
+          v.chapter === chapter && 
+          v.verse >= startVerse && 
+          v.verse <= endVerse
+        );
+      }
+    }
+    return results;
   }
 }
 
 export async function getVersesByChapter(book: string, chapter: number): Promise<Verse[]> {
+  const normalizedBook = normalizeBookName(book);
   try {
     const db = await initBibleDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const index = store.index('reference');
     
-    // The index is ['book', 'chapter', 'verse']
-    const range = IDBKeyRange.bound([book, chapter, 0], [book, chapter, 999]);
-    return await index.getAll(range);
+    const range = IDBKeyRange.bound([normalizedBook, chapter, 0], [normalizedBook, chapter, 999]);
+    let results = await index.getAll(range);
+    
+    if (results.length === 0) {
+      if (normalizedBook === 'Psalm') {
+        results = await index.getAll(IDBKeyRange.bound(['Psalms', chapter, 0], ['Psalms', chapter, 999]));
+      } else if (normalizedBook === 'Psalms') {
+        results = await index.getAll(IDBKeyRange.bound(['Psalm', chapter, 0], ['Psalm', chapter, 999]));
+      }
+    }
+    
+    return results;
   } catch (error) {
     console.warn('GetVersesByChapter falling back to local library:', error);
-    return KJV_LIBRARY.filter(v => v.book === book && v.chapter === chapter);
+    let results = KJV_LIBRARY.filter(v => v.book === normalizedBook && v.chapter === chapter);
+    if (results.length === 0) {
+      const altBook = normalizedBook === 'Psalm' ? 'Psalms' : (normalizedBook === 'Psalms' ? 'Psalm' : null);
+      if (altBook) results = KJV_LIBRARY.filter(v => v.book === altBook && v.chapter === chapter);
+    }
+    return results;
   }
 }
 
 export async function getVersesByBook(book: string): Promise<Verse[]> {
+  const normalizedBook = normalizeBookName(book);
   try {
     const db = await initBibleDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const index = store.index('book');
-    return await index.getAll(book);
+    let results = await index.getAll(normalizedBook);
+    
+    if (results.length === 0) {
+      if (normalizedBook === 'Psalm') results = await index.getAll('Psalms');
+      else if (normalizedBook === 'Psalms') results = await index.getAll('Psalm');
+    }
+    
+    return results;
   } catch (error) {
     console.warn('GetVersesByBook falling back to local library:', error);
-    return KJV_LIBRARY.filter(v => v.book === book);
+    let results = KJV_LIBRARY.filter(v => v.book === normalizedBook);
+    if (results.length === 0) {
+      const altBook = normalizedBook === 'Psalm' ? 'Psalms' : (normalizedBook === 'Psalms' ? 'Psalm' : null);
+      if (altBook) results = KJV_LIBRARY.filter(v => v.book === altBook);
+    }
+    return results;
   }
 }
 
@@ -257,6 +329,7 @@ export async function getBibleVerses(): Promise<Verse[]> {
 }
 
 export async function getChapters(book: string): Promise<number[]> {
+  const normalizedBook = normalizeBookName(book);
   try {
     const db = await initBibleDB();
     const tx = db.transaction(STORE_NAME, 'readonly');
@@ -266,7 +339,7 @@ export async function getChapters(book: string): Promise<number[]> {
     // The reference index is [book, chapter, verse]
     // We can use a cursor to find unique chapters for this book
     const chapters: number[] = [];
-    const range = IDBKeyRange.bound([book, 0, 0], [book, 999, 999]);
+    const range = IDBKeyRange.bound([normalizedBook, 0, 0], [normalizedBook, 999, 999]);
     let cursor = await index.openCursor(range);
     
     while (cursor) {
@@ -275,12 +348,34 @@ export async function getChapters(book: string): Promise<number[]> {
         chapters.push(chapter);
       }
       // Jump to the next chapter to be efficient
-      cursor = await cursor.continue([book, chapter + 1, 0]);
+      cursor = await cursor.continue([normalizedBook, chapter + 1, 0]);
     }
+    
+    // Fallback for Psalm/Psalms mismatch
+    if (chapters.length === 0) {
+      const altBook = normalizedBook === 'Psalm' ? 'Psalms' : (normalizedBook === 'Psalms' ? 'Psalm' : null);
+      if (altBook) {
+        const altRange = IDBKeyRange.bound([altBook, 0, 0], [altBook, 999, 999]);
+        let altCursor = await index.openCursor(altRange);
+        while (altCursor) {
+          const chapter = altCursor.key[1] as number;
+          if (!chapters.includes(chapter)) chapters.push(chapter);
+          altCursor = await altCursor.continue([altBook, chapter + 1, 0]);
+        }
+      }
+    }
+    
     return chapters;
   } catch (error) {
     console.warn('GetChapters falling back to local library:', error);
-    return Array.from(new Set(KJV_LIBRARY.filter(v => v.book === book).map(v => v.chapter))).sort((a, b) => a - b);
+    let chapters = Array.from(new Set(KJV_LIBRARY.filter(v => v.book === normalizedBook).map(v => v.chapter))).sort((a, b) => a - b);
+    if (chapters.length === 0) {
+      const altBook = normalizedBook === 'Psalm' ? 'Psalms' : (normalizedBook === 'Psalms' ? 'Psalm' : null);
+      if (altBook) {
+        chapters = Array.from(new Set(KJV_LIBRARY.filter(v => v.book === altBook).map(v => v.chapter))).sort((a, b) => a - b);
+      }
+    }
+    return chapters;
   }
 }
 
