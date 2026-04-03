@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause } from 'lucide-react';
+import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause, Music, Volume2, VolumeX } from 'lucide-react';
+import { GoogleGenAI, Modality } from "@google/genai";
 import { getVerseByRef, parseReference } from '../lib/bibleDb';
 import { cn } from '../lib/utils';
 
@@ -48,6 +49,15 @@ const CHOMPER_LEVELS: ChomperLevel[] = [
   { id: 20, reference: "Hebrews 11:1", title: "Faith" }
 ];
 
+declare global {
+  interface Window {
+    aistudio?: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onExit }) => {
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'GAME_OVER' | 'VICTORY'>('LEVEL_SELECT');
   const [isVerseLoading, setIsVerseLoading] = useState(false);
@@ -64,8 +74,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [highScores, setHighScores] = useState<Record<number, number>>({});
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
   const [isPaused, setIsPaused] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isMusicLoading, setIsMusicLoading] = useState(false);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const requestRef = useRef<number>(0);
   const lastSpawnTime = useRef<number>(0);
   const nextWordToSpawnRef = useRef<number>(0);
@@ -94,7 +109,113 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     
     const savedProgress = localStorage.getItem('verse_chomper_progress');
     if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
+
+    // Check for API key
+    const checkApiKey = async () => {
+      if (window.aistudio?.hasSelectedApiKey) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(hasKey);
+      }
+    };
+    checkApiKey();
   }, []);
+
+  const handleSelectKey = async () => {
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+    }
+  };
+
+  const generateMusic = async (level: ChomperLevel, verseText: string) => {
+    if (!hasApiKey) return;
+    
+    setIsMusicLoading(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const mood = getVerseMood(level.reference, level.title);
+      const prompt = `Generate a 30-second reverent electronic ${mood} track inspired by ${level.reference}: "${verseText}". The music should be atmospheric, spiritual, and steady with NO hard beats or aggressive drums. Use soft synth pads and ethereal textures.`;
+      
+      const response = await ai.models.generateContentStream({
+        model: "lyria-3-clip-preview",
+        contents: prompt,
+      });
+
+      let audioBase64 = "";
+      let mimeType = "audio/wav";
+
+      for await (const chunk of response) {
+        const parts = chunk.candidates?.[0]?.content?.parts;
+        if (!parts) continue;
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            if (!audioBase64 && part.inlineData.mimeType) {
+              mimeType = part.inlineData.mimeType;
+            }
+            audioBase64 += part.inlineData.data;
+          }
+        }
+      }
+
+      if (audioBase64) {
+        const binary = atob(audioBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+      }
+    } catch (err) {
+      console.error("Error generating music:", err);
+      // Fallback or silent fail
+    } finally {
+      setIsMusicLoading(false);
+    }
+  };
+
+  const getVerseMood = (reference: string, title: string) => {
+    const ref = reference.toLowerCase();
+    const t = title.toLowerCase();
+    if (ref.includes("psalm")) return "meditative electronic, ambient synth pads, ethereal textures";
+    if (ref.includes("revelation")) return "grand cinematic electronic, shimmering textures, reverent atmosphere";
+    if (ref.includes("proverbs")) return "steady electronic, clean synth pulses, thoughtful atmosphere";
+    if (t.includes("love")) return "warm electronic, soft glowing pads, gentle atmosphere";
+    if (t.includes("strength") || t.includes("courage")) return "inspiring electronic, rising synth textures, hopeful atmosphere";
+    if (t.includes("beginning")) return "vast ambient electronic, deep space textures, mysterious atmosphere";
+    if (t.includes("way") || t.includes("future")) return "uplifting electronic, bright synth arpeggios, forward-looking atmosphere";
+    return "reverent atmospheric electronic background music";
+  };
+
+  // Audio playback effect
+  useEffect(() => {
+    if (audioUrl && gameState === 'PLAYING') {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(audioUrl);
+        audioRef.current.loop = true;
+      } else {
+        audioRef.current.src = audioUrl;
+      }
+      
+      audioRef.current.muted = isMuted;
+      
+      const playAudio = async () => {
+        try {
+          await audioRef.current?.play();
+        } catch (e) {
+          console.error("Audio playback failed:", e);
+        }
+      };
+      playAudio();
+    } else {
+      audioRef.current?.pause();
+    }
+
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, [audioUrl, gameState, isMuted]);
 
   const saveProgress = (levelId: number, newScore: number) => {
     const updatedScores = { ...highScores, [levelId]: Math.max(highScores[levelId] || 0, newScore) };
@@ -142,6 +263,11 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         nextWordToSpawnRef.current = 0;
         distractorsRemainingRef.current = 0;
         lastTimeRef.current = 0;
+
+        // Start music generation
+        if (hasApiKey) {
+          generateMusic(level, verse.text);
+        }
       } else {
         console.error("Verse not found or empty:", level.reference);
         alert(`Could not find verse: ${level.reference}. Please make sure the Bible is downloaded in settings.`);
@@ -172,17 +298,30 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     } else {
       isCorrect = false;
       // Pick a random word from the verse that isn't the same string as the next correct word
-      const nextCorrectWord = currentWords[nextWordIndexRef.current].toLowerCase();
+      // AND isn't the word we are about to spawn as correct
+      const nextNeededWord = currentWords[nextWordIndexRef.current].toLowerCase();
+      const nextToSpawnWord = currentWords[nextWordToSpawnRef.current].toLowerCase();
+      
       const wrongIndices = currentWords.map((_, i) => i).filter(i => {
         const word = currentWords[i].toLowerCase();
-        return word !== nextCorrectWord;
+        return word !== nextNeededWord && word !== nextToSpawnWord;
       });
       
       if (wrongIndices.length > 0) {
         wordIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
       } else {
-        // Fallback if somehow all words are the same (unlikely in a verse)
-        wordIdx = (nextWordIndexRef.current + 1) % currentWords.length;
+        // If we can't find a unique word in the verse, use a generic distractor
+        const genericDistractors = ["AND", "THE", "BUT", "FOR", "WITH"];
+        const randomGeneric = genericDistractors[Math.floor(Math.random() * genericDistractors.length)];
+        // Check if generic is also the needed word
+        if (randomGeneric.toLowerCase() === nextNeededWord) {
+          wordIdx = (nextWordIndexRef.current + 2) % currentWords.length;
+        } else {
+          // We need a way to handle generic words not in the verse array
+          // For now, just pick any index that isn't the needed one
+          wordIdx = currentWords.findIndex((w, idx) => w.toLowerCase() !== nextNeededWord && idx !== nextWordIndexRef.current);
+          if (wordIdx === -1) wordIdx = (nextWordIndexRef.current + 1) % currentWords.length;
+        }
       }
       distractorsRemainingRef.current--;
     }
@@ -415,6 +554,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             <div className="flex flex-col items-end gap-3">
               <div className="flex gap-2 items-center">
                 <button 
+                  onClick={() => setIsMuted(!isMuted)}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                  title={isMuted ? "Unmute Music" : "Mute Music"}
+                >
+                  {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
+                <button 
                   onClick={() => setIsPaused(!isPaused)}
                   className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
                 >
@@ -630,11 +776,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       )}
 
       {/* Loading Overlay */}
-      {isVerseLoading && (
+      {(isVerseLoading || isMusicLoading) && (
         <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-amber-500 font-black uppercase tracking-widest text-sm">Loading Verse...</p>
+            <p className="text-amber-500 font-black uppercase tracking-widest text-sm">
+              {isVerseLoading ? "Loading Verse..." : "Generating Soundtrack..."}
+            </p>
           </div>
         </div>
       )}
@@ -651,12 +799,23 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Master the Word</p>
             </div>
           </div>
-          <button 
-            onClick={onExit}
-            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {!hasApiKey && (
+              <button
+                onClick={handleSelectKey}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-xl border border-amber-500/30 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                <Music size={14} />
+                Enable AI Music
+              </button>
+            )}
+            <button 
+              onClick={onExit}
+              className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
       )}
 
