@@ -273,9 +273,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         lastTimeRef.current = 0;
         setAudioUrl(hymnUrls[Math.floor(Math.random() * hymnUrls.length)]);
         
-        if (dontShowAgain) {
-          setGameState('PLAYING');
-        } else {
+        setGameState('PLAYING');
+        if (!dontShowAgain) {
           setShowTutorial(true);
         }
       } else {
@@ -581,6 +580,29 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
   return (
     <div className="flex flex-col h-full bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+      {/* Header (Lobby/Level Select Only) */}
+      {gameState === 'LEVEL_SELECT' && (
+        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Zap className="text-white" size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tighter uppercase italic">Verse Chomper</h1>
+              <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Master the Word</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={onExit}
+              className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Level Select Screen */}
       {gameState === 'LEVEL_SELECT' && (
         <div className="flex-1 overflow-y-auto p-6">
@@ -595,7 +617,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                 const isLocked = level.id > unlockedLevels;
                 const highScore = highScores[level.id] || 0;
                 const maxLoop = maxLoops[level.id] || 1;
-                const isSelected = currentLevelIdx === idx;
                 
                 return (
                   <div key={level.id} className="relative group">
@@ -667,6 +688,15 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Footer Instructions */}
+      {gameState === 'LEVEL_SELECT' && (
+        <div className="p-6 border-t border-white/5 bg-slate-950/80 backdrop-blur-md text-center">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
+            Drag to move • Catch words in order • 5 Lives • 10 Streak = +1 Life
+          </p>
         </div>
       )}
 
@@ -1040,37 +1070,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         </div>
       )}
 
-      {/* Header (Lobby/Level Select Only) */}
-      {gameState === 'LEVEL_SELECT' && (
-        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <Zap className="text-white" size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase italic">Verse Chomper</h1>
-              <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Master the Word</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={onExit}
-              className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Footer Instructions */}
-      {gameState === 'LEVEL_SELECT' && (
-        <div className="p-6 border-t border-white/5 bg-slate-950/80 backdrop-blur-md text-center">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
-            Drag to move • Catch words in order • 5 Lives • 10 Streak = +1 Life
-          </p>
-        </div>
-      )}
     </div>
   );
 };
