@@ -68,6 +68,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const requestRef = useRef<number>(0);
   const lastSpawnTime = useRef<number>(0);
   const nextWordToSpawnRef = useRef<number>(0);
+  const distractorsRemainingRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
 
   const gameStateRef = useRef(gameState);
   const wordsRef = useRef(words);
@@ -134,6 +136,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         setCurrentLevelIdx(idx);
         setGameState('PLAYING');
         nextWordToSpawnRef.current = 0;
+        distractorsRemainingRef.current = 0;
+        lastTimeRef.current = 0;
       } else {
         console.error("Verse not found or empty:", level.reference);
         alert(`Could not find verse: ${level.reference}. Please make sure the Bible is downloaded in settings.`);
@@ -150,33 +154,39 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     const currentWords = wordsRef.current;
     if (currentWords.length === 0) return;
 
-    const isCorrect = Math.random() > 0.4; // 60% chance for correct word
-    let wordToSpawn = "";
+    let isCorrect = false;
     let wordIdx = -1;
 
-    if (isCorrect) {
+    // Logic: 2-3 distractors between every correct word
+    if (distractorsRemainingRef.current <= 0) {
+      isCorrect = true;
       wordIdx = nextWordToSpawnRef.current;
-      wordToSpawn = currentWords[wordIdx];
+      // We don't advance nextWordToSpawnRef here, we advance it when the word is caught or missed
+      // Actually, we should advance it here to ensure the next correct word spawned is the next one in sequence
       nextWordToSpawnRef.current = (nextWordToSpawnRef.current + 1) % currentWords.length;
+      distractorsRemainingRef.current = Math.floor(Math.random() * 2) + 2; // 2 or 3 distractors
     } else {
+      isCorrect = false;
       // Pick a random word from the verse that isn't the next one needed
       const wrongIndices = currentWords.map((_, i) => i).filter(i => i !== nextWordIndexRef.current);
       if (wrongIndices.length > 0) {
         wordIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
-        wordToSpawn = currentWords[wordIdx];
       } else {
         wordIdx = nextWordToSpawnRef.current;
-        wordToSpawn = currentWords[wordIdx];
       }
+      distractorsRemainingRef.current--;
     }
+
+    const wordToSpawn = currentWords[wordIdx];
 
     const newFallingWord: FallingWord = {
       id: Date.now() + Math.random(),
       text: wordToSpawn,
       x: Math.random() * 80 + 10, // 10% to 90%
       y: -10,
-      speed: (0.3 + (loopCountRef.current * 0.15)) * (Math.random() * 0.5 + 0.75),
-      isCorrect: isCorrect && wordIdx === nextWordIndexRef.current,
+      // Base speed increases with loop count
+      speed: (0.6 + (loopCountRef.current * 0.2)) * (Math.random() * 0.4 + 0.8),
+      isCorrect: isCorrect,
       wordIndex: wordIdx
     };
 
@@ -186,57 +196,83 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const updateGame = useCallback((time: number) => {
     if (gameStateRef.current !== 'PLAYING') return;
 
-    // Spawn logic
-    const spawnRate = Math.max(500, 1500 - (loopCountRef.current * 100));
+    if (!lastTimeRef.current) lastTimeRef.current = time;
+    const deltaTime = time - lastTimeRef.current;
+    // Limit delta time to prevent huge jumps after tab switch
+    const dt = Math.min(deltaTime, 32); 
+    lastTimeRef.current = time;
+
+    // Spawn logic - faster as loops progress
+    const spawnRate = Math.max(300, 1000 - (loopCountRef.current * 100));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
       lastSpawnTime.current = time;
     }
 
     setFallingWords(prev => {
-      const next = prev.map(w => ({ ...w, y: w.y + w.speed })).filter(w => {
+      if (prev.length === 0) return prev;
+      
+      let livesLost = 0;
+      let scoreGained = 0;
+      let nextWordAdvanced = false;
+      let streakReset = false;
+      let streakIncrement = 0;
+
+      const next = prev.map(w => ({ ...w, y: w.y + (w.speed * (dt / 16)) })).filter(w => {
         // Check if correct word fell through
-        if (w.y > 100) {
-          if (w.wordIndex === nextWordIndexRef.current) {
-            setLives(l => {
-              const nl = l - 1;
-              if (nl <= 0) setGameState('GAME_OVER');
-              return nl;
-            });
-            setStreak(0);
+        if (w.y > 105) {
+          if (w.isCorrect && w.wordIndex === nextWordIndexRef.current) {
+            livesLost++;
+            streakReset = true;
           }
           return false;
         }
         
         // Collision detection
         const dist = Math.sqrt(Math.pow(w.x - avatarPosRef.current.x, 2) + Math.pow(w.y - avatarPosRef.current.y, 2));
-        if (dist < 8) { // Chomp radius
-          if (w.wordIndex === nextWordIndexRef.current) {
+        if (dist < 9) { // Slightly larger chomp radius for better feel
+          if (w.isCorrect && w.wordIndex === nextWordIndexRef.current) {
             // Correct chomp!
-            setScore(s => s + (10 * loopCountRef.current));
-            setNextWordIndex(ni => {
-              const nextIdx = (ni + 1) % wordsRef.current.length;
-              if (nextIdx === 0) setLoopCount(lc => lc + 1);
-              return nextIdx;
-            });
-            setStreak(prevStreak => {
-              const newStreak = prevStreak + 1;
-              if (newStreak % 10 === 0) setLives(l => Math.min(5, l + 1));
-              return newStreak;
-            });
+            scoreGained += (10 * loopCountRef.current);
+            nextWordAdvanced = true;
+            streakIncrement++;
           } else {
             // Wrong chomp!
-            setLives(l => {
-              const nl = l - 1;
-              if (nl <= 0) setGameState('GAME_OVER');
-              return nl;
-            });
-            setStreak(0);
+            livesLost++;
+            streakReset = true;
           }
           return false;
         }
         return true;
       });
+
+      if (livesLost > 0) {
+        setLives(l => {
+          const nl = l - livesLost;
+          if (nl <= 0) setGameState('GAME_OVER');
+          return Math.max(0, nl);
+        });
+      }
+
+      if (scoreGained > 0) setScore(s => s + scoreGained);
+      
+      if (streakReset) setStreak(0);
+      if (streakIncrement > 0) {
+        setStreak(prevStreak => {
+          const newStreak = prevStreak + streakIncrement;
+          if (newStreak % 10 === 0) setLives(l => Math.min(5, l + 1));
+          return newStreak;
+        });
+      }
+
+      if (nextWordAdvanced) {
+        setNextWordIndex(ni => {
+          const nextIdx = (ni + 1) % wordsRef.current.length;
+          if (nextIdx === 0) setLoopCount(lc => lc + 1);
+          return nextIdx;
+        });
+      }
+
       return next;
     });
 
@@ -378,18 +414,52 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
             <div className="max-w-xl mx-auto space-y-3">
               <div className="flex flex-wrap justify-center gap-1">
-                {words.map((word, i) => (
-                  <span 
-                    key={i}
-                    className={cn(
-                      "text-xs font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded transition-colors",
-                      i < nextWordIndex ? "bg-amber-500 text-slate-950" : 
-                      i === nextWordIndex ? "bg-white text-slate-950 animate-pulse" : "text-slate-600"
-                    )}
-                  >
-                    {word}
-                  </span>
-                ))}
+                {words.map((word, i) => {
+                  const isCaught = i < nextWordIndex;
+                  const isCurrent = i === nextWordIndex;
+                  
+                  // Loop 1: Show all words
+                  // Loop 2: Show caught words + current word as blank
+                  // Loop 3+: Show only caught words, others hidden
+                  let displayWord = word;
+                  let opacityClass = "opacity-100";
+                  let bgClass = "bg-slate-600";
+                  
+                  if (loopCount === 1) {
+                    bgClass = isCaught ? "bg-amber-500 text-slate-950" : isCurrent ? "bg-white text-slate-950 animate-pulse" : "text-slate-600";
+                  } else if (loopCount === 2) {
+                    if (isCaught) {
+                      bgClass = "bg-amber-500 text-slate-950";
+                    } else if (isCurrent) {
+                      displayWord = "_".repeat(word.length);
+                      bgClass = "bg-white text-slate-950 animate-pulse";
+                    } else {
+                      opacityClass = "opacity-0";
+                    }
+                  } else {
+                    if (isCaught) {
+                      bgClass = "bg-amber-500 text-slate-950";
+                    } else if (isCurrent) {
+                      displayWord = "?".repeat(Math.min(word.length, 3));
+                      bgClass = "bg-white text-slate-950 animate-pulse";
+                    } else {
+                      opacityClass = "opacity-0";
+                    }
+                  }
+
+                  return (
+                    <span 
+                      key={i}
+                      className={cn(
+                        "text-xs font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded transition-all duration-500",
+                        bgClass,
+                        opacityClass
+                      )}
+                    >
+                      {displayWord}
+                    </span>
+                  );
+                })}
               </div>
               <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
@@ -402,29 +472,39 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
           {/* Falling Words */}
           {fallingWords.map(w => (
-            <motion.div
+            <div
               key={w.id}
-              style={{ left: `${w.x}%`, top: `${w.y}%` }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ 
+                position: 'absolute',
+                left: `${w.x}%`, 
+                top: `${w.y}%`,
+                transform: 'translate3d(-50%, -50%, 0)',
+                pointerEvents: 'none'
+              }}
             >
               <div className={cn(
-                "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2",
-                w.wordIndex === nextWordIndex 
+                "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
+                w.isCorrect && w.wordIndex === nextWordIndex 
                   ? "bg-white text-slate-950 border-amber-400 scale-110" 
                   : "bg-slate-900 text-white border-white/10 opacity-80"
               )}>
                 {w.text}
               </div>
-            </motion.div>
+            </div>
           ))}
 
           {/* Avatar (Chomper) */}
-          <motion.div
-            animate={{ left: `${avatarPos.x}%`, top: `${avatarPos.y}%` }}
-            transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 w-16 h-16 z-30 pointer-events-none"
+          <div
+            style={{ 
+              position: 'absolute',
+              left: `${avatarPos.x}%`, 
+              top: `${avatarPos.y}%`,
+              transform: 'translate3d(-50%, -50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 30
+            }}
           >
-            <div className="w-full h-full bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
+            <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
               <div className="absolute top-1/4 left-1/4 w-3 h-3 bg-slate-950 rounded-full" />
               <div className="absolute top-1/4 right-1/4 w-3 h-3 bg-slate-950 rounded-full" />
               <div className="absolute bottom-2 w-8 h-4 bg-slate-950 rounded-full" />
@@ -432,15 +512,11 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             
             {/* Streak Indicator */}
             {streak >= 5 && (
-              <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute -top-8 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap"
-              >
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
                 {streak} STREAK!
-              </motion.div>
+              </div>
             )}
-          </motion.div>
+          </div>
 
           {/* Speed Up Notification */}
           <AnimatePresence>
