@@ -85,10 +85,10 @@ const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, str
         willChange: 'transform'
       }}
     >
-      <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-slate-950 rounded-full" />
-        <div className="absolute top-1/4 right-1/4 w-2 h-2 bg-slate-950 rounded-full" />
-        <div className="absolute bottom-1.5 w-6 h-3 bg-slate-950 rounded-full" />
+      <div className="w-9 h-9 bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-1.5 h-1.5 bg-slate-950 rounded-full" />
+        <div className="absolute top-1/4 right-1/4 w-1.5 h-1.5 bg-slate-950 rounded-full" />
+        <div className="absolute bottom-1 w-4.5 h-2 bg-slate-950 rounded-full" />
       </div>
       
       {streak >= 5 && (
@@ -426,7 +426,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     // Update startLoops to the highest reached
     setStartLoops(prev => ({ ...prev, [levelId]: Math.max(prev[levelId] || 1, currentLoop) }));
 
-    if (levelId === unlockedLevels && currentLoop >= 10 && levelId < CHOMPER_LEVELS.length) {
+    if (levelId === unlockedLevels && currentLoop >= 7 && levelId < CHOMPER_LEVELS.length) {
       const nextLevel = levelId + 1;
       setUnlockedLevels(nextLevel);
       localStorage.setItem('verse_chomper_progress', nextLevel.toString());
@@ -898,12 +898,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                               Loop {maxLoop}
                             </div>
                           )}
-                          {!isLocked && maxLoop < 10 && (
+                          {!isLocked && maxLoop < 7 && (
                             <div className="text-[8px] font-black text-rose-400 uppercase tracking-widest">
-                              Goal: Loop 10
+                              Goal: Loop 7
                             </div>
                           )}
-                          {!isLocked && maxLoop >= 10 && (
+                          {!isLocked && maxLoop >= 7 && (
                             <div className="flex items-center gap-1 text-emerald-400 font-black text-[8px] uppercase tracking-widest">
                               <CheckCircle2 size={10} />
                               Passed
@@ -1008,7 +1008,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                 className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none"
               >
                 <div className="bg-amber-500 text-slate-950 px-8 py-4 rounded-3xl font-black text-4xl italic uppercase tracking-tighter shadow-2xl">
-                  {loopCount === 10 ? "LEVEL PASSED!" : "Speed Up!"}
+                  {loopCount === 7 ? "LEVEL PASSED!" : "Speed Up!"}
                 </div>
               </motion.div>
             )}
@@ -1048,7 +1048,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                 <div className="flex gap-4">
                   <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-blue-400 font-bold">3</div>
                   <p className="text-slate-300 text-sm leading-relaxed">
-                    <span className="text-white font-bold">Loop for XP.</span> Completing the verse starts a new, faster loop. <span className="text-amber-400 font-bold">Reach Loop 10 to pass the level!</span>
+                    <span className="text-white font-bold">Loop for XP.</span> Completing the verse starts a new, faster loop. <span className="text-amber-400 font-bold">Reach Loop 7 to pass the level!</span>
                   </p>
                 </div>
               </div>
@@ -1142,7 +1142,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           <div className="space-y-2">
             <h2 className="text-5xl font-black uppercase italic tracking-tighter">Out of Lives</h2>
             <p className="text-slate-400 font-bold uppercase tracking-widest">You reached loop {loopCount} with {score} points</p>
-            {loopCount >= 10 && (
+            {loopCount >= 7 && (
               <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-full text-emerald-400 font-black text-xs uppercase tracking-widest animate-bounce">
                 <CheckCircle2 size={16} />
                 Level Passed! Next Level Unlocked
