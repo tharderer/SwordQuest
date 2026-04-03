@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle } from 'lucide-react';
+import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause } from 'lucide-react';
 import { getVerseByRef, parseReference } from '../lib/bibleDb';
 import { cn } from '../lib/utils';
 
@@ -63,6 +63,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [avatarPos, setAvatarPos] = useState({ x: 50, y: 80 }); // Percentage
   const [highScores, setHighScores] = useState<Record<number, number>>({});
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
+  const [isPaused, setIsPaused] = useState(false);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(0);
@@ -72,6 +73,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const lastTimeRef = useRef<number>(0);
 
   const gameStateRef = useRef(gameState);
+  const isPausedRef = useRef(isPaused);
   const wordsRef = useRef(words);
   const nextWordIndexRef = useRef(nextWordIndex);
   const loopCountRef = useRef(loopCount);
@@ -79,6 +81,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
   // Sync refs with state for the game loop
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { wordsRef.current = words; }, [words]);
   useEffect(() => { nextWordIndexRef.current = nextWordIndex; }, [nextWordIndex]);
   useEffect(() => { loopCountRef.current = loopCount; }, [loopCount]);
@@ -135,6 +138,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         setLoopCount(1);
         setCurrentLevelIdx(idx);
         setGameState('PLAYING');
+        setIsPaused(false);
         nextWordToSpawnRef.current = 0;
         distractorsRemainingRef.current = 0;
         lastTimeRef.current = 0;
@@ -167,12 +171,18 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       distractorsRemainingRef.current = Math.floor(Math.random() * 2) + 2; // 2 or 3 distractors
     } else {
       isCorrect = false;
-      // Pick a random word from the verse that isn't the next one needed
-      const wrongIndices = currentWords.map((_, i) => i).filter(i => i !== nextWordIndexRef.current);
+      // Pick a random word from the verse that isn't the same string as the next correct word
+      const nextCorrectWord = currentWords[nextWordIndexRef.current].toLowerCase();
+      const wrongIndices = currentWords.map((_, i) => i).filter(i => {
+        const word = currentWords[i].toLowerCase();
+        return word !== nextCorrectWord;
+      });
+      
       if (wrongIndices.length > 0) {
         wordIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
       } else {
-        wordIdx = nextWordToSpawnRef.current;
+        // Fallback if somehow all words are the same (unlikely in a verse)
+        wordIdx = (nextWordIndexRef.current + 1) % currentWords.length;
       }
       distractorsRemainingRef.current--;
     }
@@ -194,7 +204,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   }, []);
 
   const updateGame = useCallback((time: number) => {
-    if (gameStateRef.current !== 'PLAYING') return;
+    if (gameStateRef.current !== 'PLAYING' || isPausedRef.current) {
+      if (isPausedRef.current) {
+        lastTimeRef.current = time; // Keep time updated but don't advance
+        requestRef.current = requestAnimationFrame(updateGame);
+      }
+      return;
+    }
 
     if (!lastTimeRef.current) lastTimeRef.current = time;
     const deltaTime = time - lastTimeRef.current;
@@ -280,16 +296,19 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   }, [spawnWord]);
 
   useEffect(() => {
-    if (gameState === 'PLAYING') {
+    if (gameState === 'PLAYING' && !isPaused) {
+      requestRef.current = requestAnimationFrame(updateGame);
+    } else if (gameState === 'PLAYING' && isPaused) {
+      // Keep loop alive but updateGame handles the pause logic internally via refs
       requestRef.current = requestAnimationFrame(updateGame);
     } else {
       cancelAnimationFrame(requestRef.current);
     }
     return () => cancelAnimationFrame(requestRef.current);
-  }, [gameState, updateGame]);
+  }, [gameState, isPaused, updateGame]);
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!gameAreaRef.current || gameState !== 'PLAYING') return;
+    if (!gameAreaRef.current || gameState !== 'PLAYING' || isPaused) return;
     const rect = gameAreaRef.current.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -394,14 +413,22 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             </div>
 
             <div className="flex flex-col items-end gap-3">
-              <div className="flex gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Heart 
-                    key={i} 
-                    size={20} 
-                    className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} 
-                  />
-                ))}
+              <div className="flex gap-2 items-center">
+                <button 
+                  onClick={() => setIsPaused(!isPaused)}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                >
+                  {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+                </button>
+                <div className="flex gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Heart 
+                      key={i} 
+                      size={20} 
+                      className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} 
+                    />
+                  ))}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-black text-amber-400 leading-none">{score}</div>
@@ -411,9 +438,9 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           </div>
 
           {/* Verse Progress Bar */}
-          <div className="absolute bottom-0 left-0 right-0 p-6 z-20">
-            <div className="max-w-xl mx-auto space-y-3">
-              <div className="flex flex-wrap justify-center gap-1">
+          <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
+            <div className="max-w-2xl mx-auto space-y-3">
+              <div className="flex flex-wrap justify-center gap-1.5 max-h-[120px] overflow-y-auto pb-2 custom-scrollbar">
                 {words.map((word, i) => {
                   const isCaught = i < nextWordIndex;
                   const isCurrent = i === nextWordIndex;
@@ -484,9 +511,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             >
               <div className={cn(
                 "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
-                w.isCorrect && w.wordIndex === nextWordIndex 
-                  ? "bg-white text-slate-950 border-amber-400 scale-110" 
-                  : "bg-slate-900 text-white border-white/10 opacity-80"
+                "bg-slate-900 text-white border-white/10 opacity-80"
               )}>
                 {w.text}
               </div>
@@ -529,6 +554,31 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               >
                 <div className="bg-amber-500 text-slate-950 px-8 py-4 rounded-3xl font-black text-4xl italic uppercase tracking-tighter shadow-2xl">
                   Speed Up!
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Pause Overlay */}
+          <AnimatePresence>
+            {isPaused && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50"
+              >
+                <div className="text-center space-y-6">
+                  <div className="w-20 h-20 bg-amber-500 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-amber-500/40">
+                    <Pause size={40} className="text-slate-950" />
+                  </div>
+                  <h2 className="text-4xl font-black uppercase italic tracking-tighter">Game Paused</h2>
+                  <button
+                    onClick={() => setIsPaused(false)}
+                    className="px-8 py-4 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-2xl hover:bg-amber-400 transition-colors"
+                  >
+                    RESUME
+                  </button>
                 </div>
               </motion.div>
             )}
