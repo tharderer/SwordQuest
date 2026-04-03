@@ -202,7 +202,8 @@ import {
   getVersesByBook,
   getBooks,
   getChapters,
-  getBibleVerses
+  getBibleVerses,
+  getAllVerses
 } from './lib/bibleDb';
 import { KJV_LIBRARY } from './lib/bibleData';
 
@@ -7723,6 +7724,7 @@ export default function App() {
   const [mistakesInSession, setMistakesInSession] = useState(0);
   const [isDbReady, setIsDbReady] = useState(false);
   const [isSeeded, setIsSeeded] = useState<boolean | null>(null);
+  const [allVerses, setAllVerses] = useState<Verse[]>(KJV_LIBRARY);
   const [isQuestionBankOpen, setIsQuestionBankOpen] = useState(false);
   const [isVerseSetOpen, setIsVerseSetOpen] = useState(false);
   const [selectedGameSetId, setSelectedGameSetId] = useState<string | null>(null);
@@ -7734,6 +7736,7 @@ export default function App() {
   const [isMusicEnabled, setIsMusicEnabled] = useState(true);
   const [musicStatus, setMusicStatus] = useState<string>("Stopped");
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Jeopardy State
   const [jeopardyCategories, setJeopardyCategories] = useState<JeopardyCategory[]>([]);
@@ -7757,28 +7760,37 @@ export default function App() {
         setProgress(currentProgress);
         
         console.log("Starting Bible DB check...");
-        await initBibleDB();
+        const db = await initBibleDB();
         const seeded = await isBibleSeeded();
         setIsSeeded(seeded);
         console.log("Bible DB check complete. Seeded:", seeded);
         
-        if (!seeded) {
+        if (seeded) {
+          console.log("Bible already seeded, loading verses into memory...");
+          const verses = await getAllVerses();
+          if (verses.length > 0) {
+            setAllVerses([...verses, ...(progress?.customVerses || [])]);
+          }
+          setDownloadProgress(100);
+        } else {
           console.log("Bible not seeded, starting download...");
           setDownloadProgress(0);
-          downloadFullKJV((progress) => {
-            console.log(`Download progress: ${progress}%`);
-            setDownloadProgress(progress);
-            if (progress === 100) {
-              console.log("Download complete, setting isSeeded to true");
+          downloadFullKJV(async (progressVal) => {
+            console.log(`Download progress: ${progressVal}%`);
+            setDownloadProgress(progressVal);
+            if (progressVal === 100) {
+              console.log("Download complete, loading verses into memory...");
+              const verses = await getAllVerses();
+              if (verses.length > 0) {
+                setAllVerses([...verses, ...(progress?.customVerses || [])]);
+              }
               setIsSeeded(true);
             }
           }).catch(err => {
             console.error("Bible download failed:", err);
             setDownloadProgress(null);
+            setDownloadError(err instanceof Error ? err.message : String(err));
           });
-        } else {
-          console.log("Bible already seeded, skipping download");
-          setDownloadProgress(100);
         }
 
         setIsDbReady(true);
@@ -7798,10 +7810,6 @@ export default function App() {
     setProgress({ ...newProgress });
     setShowCustomForm(false);
   };
-
-  const allVerses = useMemo(() => {
-    return [...KJV_LIBRARY, ...(progress?.customVerses || [])];
-  }, [progress?.customVerses]);
 
   const filteredGameVerses = useMemo(() => {
     if (selectedGameSetId && progress?.verseSets) {
@@ -8005,7 +8013,7 @@ export default function App() {
               
               <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                 <span className="text-orange-500">
-                  {downloadProgress === null ? 'Connection Error' : 'Downloading...'}
+                  {downloadError ? `Error: ${downloadError}` : (downloadProgress === null ? 'Connection Error' : 'Downloading...')}
                 </span>
                 <span className="text-white">
                   {downloadProgress || 0}%
@@ -8015,13 +8023,19 @@ export default function App() {
               {downloadProgress === null && (
                 <button 
                   onClick={async () => {
+                    setDownloadError(null);
                     setDownloadProgress(0);
                     try {
                       await downloadFullKJV((p) => setDownloadProgress(p));
+                      const verses = await getAllVerses();
+                      if (verses.length > 0) {
+                        setAllVerses([...verses, ...(progress?.customVerses || [])]);
+                      }
                       setIsSeeded(true);
                     } catch (err) {
                       console.error("Retry failed:", err);
                       setDownloadProgress(null);
+                      setDownloadError(err instanceof Error ? err.message : String(err));
                     }
                   }}
                   className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-orange-900/20"
@@ -8627,11 +8641,18 @@ export default function App() {
             downloadProgress={downloadProgress}
             onRepair={async () => {
               try {
+                setDownloadError(null);
                 setDownloadProgress(0);
                 await downloadFullKJV((p) => setDownloadProgress(p), true);
+                const verses = await getAllVerses();
+                if (verses.length > 0) {
+                  setAllVerses([...verses, ...(progress?.customVerses || [])]);
+                }
+                setIsSeeded(true);
               } catch (err) {
                 console.error("Repair failed:", err);
                 setDownloadProgress(null);
+                setDownloadError(err instanceof Error ? err.message : String(err));
               }
             }}
           />

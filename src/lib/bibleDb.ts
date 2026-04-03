@@ -124,6 +124,18 @@ export async function initBibleDB() {
   }
 }
 
+export async function getAllVerses(): Promise<Verse[]> {
+  try {
+    const db = await initBibleDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    return await store.getAll();
+  } catch (error) {
+    console.error('Error getting all verses:', error);
+    return [];
+  }
+}
+
 export async function searchBible(query: string): Promise<Verse[]> {
   try {
     const db = await initBibleDB();
@@ -348,7 +360,7 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
       if (onProgress) onProgress(10);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout per source
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout per source
 
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -360,7 +372,13 @@ export async function downloadFullKJV(onProgress?: (progress: number) => void, f
           rawData = await response.text();
           currentIsText = true;
         } else {
-          rawData = await response.json();
+          const text = await response.text();
+          try {
+            rawData = JSON.parse(text);
+          } catch (jsonErr) {
+            console.error(`JSON parse error for ${url}:`, jsonErr);
+            throw new Error(`Invalid JSON format from ${url}`);
+          }
           currentIsText = false;
         }
 
