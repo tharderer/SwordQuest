@@ -368,7 +368,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     lastTimeRef.current = time;
 
     // Spawn logic - faster as loops progress, but more gradual
-    const spawnRate = Math.max(600, 1200 - (loopCountRef.current * 50));
+    const spawnRate = Math.max(350, 1300 - (loopCountRef.current * 150));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
       lastSpawnTime.current = time;
