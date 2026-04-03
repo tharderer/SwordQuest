@@ -4298,10 +4298,10 @@ const ChoiceGameUI = memo(({ options, isAskingReference, currentVerse, words, cu
     <div className="h-full p-3 grid grid-cols-2 gap-3">
       {options.map((opt: any, i: number) => {
         const isCorrect = isAskingReference 
-          ? opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()
+          ? opt === `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`
           : opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() === words[currentIndex];
         
-        let displayOpt = opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+        let displayOpt = isAskingReference ? opt : opt.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
         if (difficulty === 'master' && !isAskingReference) {
           displayOpt = opt[0] + opt.slice(1).replace(/./g, '_');
         }
@@ -5260,15 +5260,15 @@ const EndlessBlitzGame = ({
 
       return [correct, ...finalDistractors].sort(() => Math.random() - 0.5);
     } else {
-      const correct = `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+      const correct = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
       const distractors = allVerses
-        .filter(v => `${v.book} ${v.chapter} ${v.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim() !== correct)
-        .map(v => `${v.book} ${v.chapter} ${v.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim())
+        .filter(v => `${v.book} ${v.chapter}:${v.verse}` !== correct)
+        .map(v => `${v.book} ${v.chapter}:${v.verse}`)
         .sort(() => Math.random() - 0.5)
         .slice(0, 3);
       
       const finalDistractors = [...distractors];
-      const fallbackPool = ["Genesis 1 1", "John 3 16", "Psalm 23 1", "Psalm 119 105", "Proverbs 3 5"];
+      const fallbackPool = ["Genesis 1:1", "John 3:16", "Psalm 23:1", "Psalm 119:105", "Proverbs 3:5"];
       while (finalDistractors.length < 3) {
         const randomFallback = fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
         if (!finalDistractors.includes(randomFallback)) {
@@ -5599,7 +5599,7 @@ const EndlessBlitzGame = ({
   }, [volume]);
 
   const completeVerse = useCallback((choice: string, timeDelta: number) => {
-    const correctRef = `${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+    const correctRef = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
     
     // Play success sound
     playSound(880, 'sine', 0.2, 0.2);
@@ -6198,7 +6198,7 @@ const EndlessBlitzGame = ({
             <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest mb-2">Final Verse</p>
             <p className="text-lg font-bold leading-tight mb-2 italic">"{currentVerse.text.replace(/\{[^{}]*:[^{}]*\}/g, "").replace(/[^\w\s]|_/g, "").replace(/[\{\}\[\]\(\)]/g, "").replace(/\s+/g, " ").trim()}"</p>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-              — {`${currentVerse.book} ${currentVerse.chapter} ${currentVerse.verse}`.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim()}
+              — {`${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`}
             </p>
           </div>
 

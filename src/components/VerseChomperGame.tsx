@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause, Music, Volume2, VolumeX } from 'lucide-react';
+import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause, Music, Volume2, VolumeX, CheckCircle2 } from 'lucide-react';
 import { getVerseByRef, parseReference } from '../lib/bibleDb';
 import { cn } from '../lib/utils';
 
@@ -25,6 +25,18 @@ interface FallingWord {
   speed: number;
   isCorrect: boolean;
   wordIndex: number; // Index in the verse
+  isJumbled?: boolean;
+}
+
+interface Enemy {
+  id: number;
+  type: 'STATIC' | 'CHASER' | 'BAR';
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  symbol: string;
+  width?: number;
 }
 
 interface ChomperLevel {
@@ -77,15 +89,22 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [loopCount, setLoopCount] = useState(1);
+  const [startLoop, setStartLoop] = useState(1);
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [avatarPos, setAvatarPos] = useState({ x: 50, y: 80 }); // Percentage
   const [highScores, setHighScores] = useState<Record<number, number>>({});
+  const [maxLoops, setMaxLoops] = useState<Record<number, number>>({});
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
   const [isPaused, setIsPaused] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [isJumbled, setIsJumbled] = useState(false);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const requestRef = useRef<number>(0);
   const lastSpawnTime = useRef<number>(0);
   const nextWordToSpawnRef = useRef<number>(0);
@@ -112,9 +131,60 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     const savedScores = localStorage.getItem('verse_chomper_scores');
     if (savedScores) setHighScores(JSON.parse(savedScores));
     
+    const savedMaxLoops = localStorage.getItem('verse_chomper_max_loops');
+    if (savedMaxLoops) setMaxLoops(JSON.parse(savedMaxLoops));
+    
     const savedProgress = localStorage.getItem('verse_chomper_progress');
     if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
+
+    const skip = localStorage.getItem('verse_chomper_skip_tutorial');
+    if (skip === 'true') setDontShowAgain(true);
   }, []);
+
+  const playSound = useCallback((freq: number, type: OscillatorType, dur: number, vol: number = 0.2) => {
+    if (isMuted) return;
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+      
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      
+      // Frequency sweep for effects
+      if (freq > 400) {
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.5, ctx.currentTime + dur);
+      } else {
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.8, ctx.currentTime + dur);
+      }
+      
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      
+      osc.connect(g);
+      g.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + dur);
+    } catch (e) {
+      console.error("Sound playback failed:", e);
+    }
+  }, [isMuted]);
+
+  const playChompSound = useCallback((isCorrect: boolean) => {
+    if (isCorrect) {
+      playSound(440, 'sine', 0.1, 0.2);
+      setTimeout(() => playSound(660, 'sine', 0.1, 0.15), 50);
+    } else {
+      playSound(220, 'triangle', 0.2, 0.3);
+    }
+  }, [playSound]);
 
   // Audio playback effect
   useEffect(() => {
@@ -151,10 +221,14 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     };
   }, [audioUrl, gameState, isMuted]);
 
-  const saveProgress = (levelId: number, newScore: number) => {
+  const saveProgress = (levelId: number, newScore: number, currentLoop: number) => {
     const updatedScores = { ...highScores, [levelId]: Math.max(highScores[levelId] || 0, newScore) };
     setHighScores(updatedScores);
     localStorage.setItem('verse_chomper_scores', JSON.stringify(updatedScores));
+
+    const updatedMaxLoops = { ...maxLoops, [levelId]: Math.max(maxLoops[levelId] || 1, currentLoop) };
+    setMaxLoops(updatedMaxLoops);
+    localStorage.setItem('verse_chomper_max_loops', JSON.stringify(updatedMaxLoops));
 
     if (levelId === unlockedLevels && levelId < CHOMPER_LEVELS.length) {
       const nextLevel = levelId + 1;
@@ -187,17 +261,23 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         setWords(cleanWords);
         setNextWordIndex(0);
         setFallingWords([]);
+        setEnemies([]);
         setLives(5);
         setScore(0);
         setStreak(0);
-        setLoopCount(1);
+        setLoopCount(startLoop);
         setCurrentLevelIdx(idx);
-        setGameState('PLAYING');
         setIsPaused(false);
         nextWordToSpawnRef.current = 0;
         distractorsRemainingRef.current = 0;
         lastTimeRef.current = 0;
         setAudioUrl(hymnUrls[Math.floor(Math.random() * hymnUrls.length)]);
+        
+        if (dontShowAgain) {
+          setGameState('PLAYING');
+        } else {
+          setShowTutorial(true);
+        }
       } else {
         console.error("Verse not found or empty:", level.reference);
         alert(`Could not find verse: ${level.reference}. Please make sure the Bible is downloaded in settings.`);
@@ -272,6 +352,54 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     setFallingWords(prev => [...prev, newFallingWord]);
   }, []);
 
+  const spawnEnemy = useCallback(() => {
+    const loop = loopCountRef.current;
+    if (loop < 2) return;
+
+    setEnemies(prev => {
+      // Limit number of enemies
+      if (prev.length >= Math.min(3, loop - 1)) return prev;
+
+      const id = Date.now() + Math.random();
+      let newEnemy: Enemy;
+
+      if (loop === 2) {
+        newEnemy = {
+          id,
+          type: 'STATIC',
+          x: Math.random() * 80 + 10,
+          y: Math.random() * 40 + 20,
+          vx: (Math.random() - 0.5) * 0.2,
+          vy: (Math.random() - 0.5) * 0.2,
+          symbol: '#'
+        };
+      } else if (loop === 3) {
+        newEnemy = {
+          id,
+          type: 'CHASER',
+          x: Math.random() > 0.5 ? 0 : 100,
+          y: Math.random() * 100,
+          vx: 0,
+          vy: 0,
+          symbol: 'O'
+        };
+      } else {
+        newEnemy = {
+          id,
+          type: 'BAR',
+          x: 50,
+          y: Math.random() * 40 + 30,
+          vx: 0.15,
+          vy: 0,
+          symbol: '---',
+          width: 30
+        };
+      }
+
+      return [...prev, newEnemy];
+    });
+  }, []);
+
   const updateGame = useCallback((time: number) => {
     if (gameStateRef.current !== 'PLAYING' || isPausedRef.current) {
       if (isPausedRef.current) {
@@ -291,8 +419,64 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     const spawnRate = Math.max(300, 1000 - (loopCountRef.current * 100));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
+      if (Math.random() < 0.1) spawnEnemy();
       lastSpawnTime.current = time;
     }
+
+    // Enemy movement and collision
+    setEnemies(prev => {
+      if (prev.length === 0) return prev;
+      let hitEnemyType: 'STATIC' | 'CHASER' | 'BAR' | null = null;
+
+      const next = prev.map(e => {
+        let nx = e.x + (e.vx * dt);
+        let ny = e.y + (e.vy * dt);
+        let nvx = e.vx;
+        let nvy = e.vy;
+
+        if (e.type === 'STATIC') {
+          if (nx < 5 || nx > 95) nvx *= -1;
+          if (ny < 10 || ny > 60) nvy *= -1;
+        } else if (e.type === 'CHASER') {
+          const dx = avatarPosRef.current.x - e.x;
+          const dy = avatarPosRef.current.y - e.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 0) {
+            nvx = (dx / dist) * 0.05;
+            nvy = (dy / dist) * 0.05;
+          }
+        } else if (e.type === 'BAR') {
+          if (nx < 20 || nx > 80) nvx *= -1;
+        }
+
+        // Collision with player
+        const distToPlayer = Math.sqrt(Math.pow(nx - avatarPosRef.current.x, 2) + Math.pow(ny - avatarPosRef.current.y, 2));
+        const collisionDist = e.type === 'BAR' ? 12 : 6;
+        if (distToPlayer < collisionDist) {
+          hitEnemyType = e.type;
+        }
+
+        return { ...e, x: nx, y: ny, vx: nvx, vy: nvy };
+      });
+
+      if (hitEnemyType) {
+        setLives(l => {
+          const nl = l - 1;
+          if (nl <= 0) setGameState('GAME_OVER');
+          return Math.max(0, nl);
+        });
+        playChompSound(false);
+        
+        if (hitEnemyType === 'STATIC') {
+          setIsJumbled(true);
+          setTimeout(() => setIsJumbled(false), 3000);
+        }
+        
+        return []; // Clear enemies on hit
+      }
+
+      return next;
+    });
 
     setFallingWords(prev => {
       if (prev.length === 0) return prev;
@@ -320,11 +504,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         if (dist < 9) { // Slightly larger chomp radius for better feel
           if (w.isCorrect && w.wordIndex === nextWordIndexRef.current) {
             // Correct chomp!
+            playChompSound(true);
             scoreGained += (10 * loopCountRef.current);
             nextWordAdvanced = true;
             streakIncrement++;
           } else {
             // Wrong chomp!
+            playChompSound(false);
             livesLost++;
             streakReset = true;
           }
@@ -408,43 +594,75 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               {CHOMPER_LEVELS.map((level, idx) => {
                 const isLocked = level.id > unlockedLevels;
                 const highScore = highScores[level.id] || 0;
+                const maxLoop = maxLoops[level.id] || 1;
+                const isSelected = currentLevelIdx === idx;
                 
                 return (
-                  <motion.button
-                    key={level.id}
-                    whileHover={!isLocked ? { scale: 1.02 } : {}}
-                    whileTap={!isLocked ? { scale: 0.98 } : {}}
-                    onClick={() => !isLocked && startLevel(idx)}
-                    className={cn(
-                      "p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden group",
-                      isLocked 
-                        ? "bg-slate-900/50 border-white/5 opacity-50 grayscale cursor-not-allowed" 
-                        : "bg-slate-900 border-white/10 hover:border-amber-500/50"
-                    )}
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center font-black",
-                        isLocked ? "bg-slate-800 text-slate-600" : "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
-                      )}>
-                        {level.id}
-                      </div>
-                      {highScore > 0 && (
-                        <div className="flex items-center gap-1 text-amber-400 font-black text-xs">
-                          <Trophy size={12} />
-                          {highScore}
-                        </div>
+                  <div key={level.id} className="relative group">
+                    <motion.button
+                      whileHover={!isLocked ? { scale: 1.02 } : {}}
+                      whileTap={!isLocked ? { scale: 0.98 } : {}}
+                      onClick={() => !isLocked && startLevel(idx)}
+                      className={cn(
+                        "w-full p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden",
+                        isLocked 
+                          ? "bg-slate-900/50 border-white/5 opacity-50 grayscale cursor-not-allowed" 
+                          : "bg-slate-900 border-white/10 hover:border-amber-500/50"
                       )}
-                    </div>
-                    <h3 className="font-black text-lg leading-tight mb-1">{level.title}</h3>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{level.reference}</p>
-                    
-                    {!isLocked && (
-                      <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play size={20} className="text-amber-500" />
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center font-black",
+                          isLocked ? "bg-slate-800 text-slate-600" : "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
+                        )}>
+                          {level.id}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {highScore > 0 && (
+                            <div className="flex items-center gap-1 text-amber-400 font-black text-xs">
+                              <Trophy size={12} />
+                              {highScore}
+                            </div>
+                          )}
+                          {maxLoop > 1 && (
+                            <div className="flex items-center gap-1 text-blue-400 font-black text-[10px] uppercase tracking-widest">
+                              <Zap size={10} />
+                              Loop {maxLoop}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <h3 className="font-black text-lg leading-tight mb-1">{level.title}</h3>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{level.reference}</p>
+                    </motion.button>
+
+                    {!isLocked && maxLoop > 1 && (
+                      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-slate-950/80 backdrop-blur-sm p-1.5 rounded-xl border border-white/10 z-10">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStartLoop(prev => Math.max(1, prev - 1));
+                          }}
+                          className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black"
+                        >
+                          -
+                        </button>
+                        <div className="flex flex-col items-center min-w-[60px]">
+                          <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Start Loop</span>
+                          <span className="text-xs font-black text-amber-400">{startLoop}</span>
+                        </div>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStartLoop(prev => Math.min(maxLoop, prev + 1));
+                          }}
+                          className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black"
+                        >
+                          +
+                        </button>
                       </div>
                     )}
-                  </motion.button>
+                  </div>
                 );
               })}
             </div>
@@ -525,7 +743,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                   
                   // Loop 1: Show all words
                   // Loop 2: Show caught words + current word as blank
-                  // Loop 3+: Show only caught words, others hidden
+                  // Loop 3: Show initials
+                  // Loop 4+: Show only caught words, others hidden
                   let displayWord = word;
                   let opacityClass = "opacity-100";
                   let bgClass = "bg-slate-600";
@@ -541,12 +760,19 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                     } else {
                       opacityClass = "opacity-0";
                     }
-                  } else {
+                  } else if (loopCount === 3) {
                     if (isCaught) {
                       bgClass = "bg-amber-500 text-slate-950";
                     } else if (isCurrent) {
-                      displayWord = "?".repeat(Math.min(word.length, 3));
+                      displayWord = word[0] + "_".repeat(word.length - 1);
                       bgClass = "bg-white text-slate-950 animate-pulse";
+                    } else {
+                      opacityClass = "opacity-0";
+                    }
+                  } else {
+                    // Loop 4+: No bar (handled by opacity 0 for all non-caught)
+                    if (isCaught) {
+                      bgClass = "bg-amber-500 text-slate-950";
                     } else {
                       opacityClass = "opacity-0";
                     }
@@ -576,22 +802,47 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           </div>
 
           {/* Falling Words */}
-          {fallingWords.map(w => (
+          {fallingWords.map(w => {
+            const displayWord = isJumbled ? w.text.split('').sort(() => Math.random() - 0.5).join('') : w.text;
+            return (
+              <div
+                key={w.id}
+                style={{ 
+                  position: 'absolute',
+                  left: `${w.x}%`, 
+                  top: `${w.y}%`,
+                  transform: 'translate3d(-50%, -50%, 0)',
+                  pointerEvents: 'none'
+                }}
+              >
+                <div className={cn(
+                  "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
+                  "bg-slate-900 text-white border-white/10 opacity-80"
+                )}>
+                  {displayWord}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Enemies */}
+          {enemies.map(e => (
             <div
-              key={w.id}
-              style={{ 
+              key={e.id}
+              style={{
                 position: 'absolute',
-                left: `${w.x}%`, 
-                top: `${w.y}%`,
+                left: `${e.x}%`,
+                top: `${e.y}%`,
                 transform: 'translate3d(-50%, -50%, 0)',
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                zIndex: 25
               }}
             >
               <div className={cn(
-                "px-4 py-2 rounded-2xl font-black text-lg shadow-xl whitespace-nowrap border-2 transition-transform",
-                "bg-slate-900 text-white border-white/10 opacity-80"
+                "w-10 h-10 rounded-full flex items-center justify-center font-black text-xl shadow-2xl border-2 animate-pulse",
+                e.type === 'BAR' ? "w-32 h-4 rounded-full bg-rose-600 border-rose-400" : "bg-rose-600 border-rose-400 text-white"
               )}>
-                {w.text}
+                {e.symbol}
               </div>
             </div>
           ))}
@@ -637,7 +888,77 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             )}
           </AnimatePresence>
 
-          {/* Pause Overlay */}
+          {/* Instruction Overlay */}
+      <AnimatePresence>
+        {showTutorial && (
+          <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-slate-900 border-2 border-slate-800 rounded-[2.5rem] p-8 max-w-sm w-full max-h-[90vh] overflow-y-auto shadow-2xl text-white custom-scrollbar"
+            >
+              <div className="flex justify-center mb-6">
+                <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center">
+                  <Zap size={32} className="text-amber-400" />
+                </div>
+              </div>
+              
+              <h3 className="text-2xl font-black text-center mb-6 tracking-tight uppercase">Mission Briefing</h3>
+              
+              <div className="space-y-6 mb-8">
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-amber-400 font-bold">1</div>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    <span className="text-white font-bold">Catch the Words.</span> Move your avatar to catch the words of the verse in the correct order.
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-rose-400 font-bold">2</div>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    <span className="text-white font-bold">Avoid Distractors.</span> Catching the wrong word or missing the correct one costs you a life.
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-blue-400 font-bold">3</div>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    <span className="text-white font-bold">Loop for XP.</span> Completing the verse starts a new, faster loop. Keep going to maximize your score!
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mb-6 px-2">
+                <button 
+                  onClick={() => {
+                    const newVal = !dontShowAgain;
+                    setDontShowAgain(newVal);
+                    localStorage.setItem('verse_chomper_skip_tutorial', newVal.toString());
+                  }}
+                  className={cn(
+                    "w-6 h-6 rounded-md border-2 transition-all flex items-center justify-center",
+                    dontShowAgain ? "bg-amber-500 border-amber-500" : "border-slate-700 bg-slate-800"
+                  )}
+                >
+                  {dontShowAgain && <CheckCircle2 size={16} className="text-white" />}
+                </button>
+                <span className="text-xs text-slate-400 font-medium">Don't show this again</span>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setShowTutorial(false);
+                  setGameState('PLAYING');
+                }}
+                className="w-full py-5 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95"
+              >
+                I'M READY
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Pause Overlay */}
           <AnimatePresence>
             {isPaused && (
               <motion.div
@@ -696,7 +1017,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             </button>
             <button
               onClick={() => {
-                saveProgress(CHOMPER_LEVELS[currentLevelIdx].id, score);
+                saveProgress(CHOMPER_LEVELS[currentLevelIdx].id, score, loopCount);
                 setGameState('LEVEL_SELECT');
               }}
               className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm border border-white/10 hover:bg-slate-800 transition-colors"
