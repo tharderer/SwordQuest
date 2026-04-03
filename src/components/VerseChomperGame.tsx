@@ -95,6 +95,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [maxLoops, setMaxLoops] = useState<Record<number, number>>({});
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
   const [isPaused, setIsPaused] = useState(false);
+  const [startLoops, setStartLoops] = useState<Record<number, number>>({});
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -289,6 +290,22 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     }
   };
 
+  const resetLevelProgress = (levelId: number) => {
+    const updatedScores = { ...highScores };
+    delete updatedScores[levelId];
+    setHighScores(updatedScores);
+    localStorage.setItem('verse_chomper_scores', JSON.stringify(updatedScores));
+
+    const updatedMaxLoops = { ...maxLoops };
+    delete updatedMaxLoops[levelId];
+    setMaxLoops(updatedMaxLoops);
+    localStorage.setItem('verse_chomper_max_loops', JSON.stringify(updatedMaxLoops));
+
+    const updatedStartLoops = { ...startLoops };
+    delete updatedStartLoops[levelId];
+    setStartLoops(updatedStartLoops);
+  };
+
   const startLevel = async (idx: number, resumeSession?: SavedSession) => {
     const level = CHOMPER_LEVELS[idx];
     const parsed = parseReference(level.reference);
@@ -312,6 +329,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         setVerseText(verse.text);
         setWords(cleanWords);
         
+        const levelStartLoop = startLoops[level.id] || 1;
+
         if (resumeSession) {
           setNextWordIndex(resumeSession.nextWordIndex);
           setLives(resumeSession.lives);
@@ -326,8 +345,9 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           setLives(5);
           setScore(0);
           setStreak(0);
-          setLoopCount(startLoop);
-          prevLoopCount.current = startLoop;
+          setLoopCount(levelStartLoop);
+          prevLoopCount.current = levelStartLoop;
+          setStartLoop(levelStartLoop);
           nextWordToSpawnRef.current = 0;
           // Clear any old saved session when starting fresh
           localStorage.removeItem('verse_chomper_saved_session');
@@ -665,7 +685,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            setStartLoop(prev => Math.max(1, prev - 1));
+                            setStartLoops(prev => ({
+                              ...prev,
+                              [level.id]: Math.max(1, (prev[level.id] || 1) - 1)
+                            }));
                           }}
                           className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black"
                         >
@@ -673,18 +696,36 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                         </button>
                         <div className="flex flex-col items-center min-w-[60px]">
                           <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Start Loop</span>
-                          <span className="text-xs font-black text-amber-400">{startLoop}</span>
+                          <span className="text-xs font-black text-amber-400">{startLoops[level.id] || 1}</span>
                         </div>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            setStartLoop(prev => Math.min(maxLoop, prev + 1));
+                            setStartLoops(prev => ({
+                              ...prev,
+                              [level.id]: Math.min(maxLoop, (prev[level.id] || 1) + 1)
+                            }));
                           }}
                           className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md hover:bg-slate-700 text-white font-black"
                         >
                           +
                         </button>
                       </div>
+                    )}
+
+                    {!isLocked && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Reset all progress for ${level.title}?`)) {
+                            resetLevelProgress(level.id);
+                          }
+                        }}
+                        className="absolute top-4 left-4 w-8 h-8 bg-rose-500/20 hover:bg-rose-500/40 rounded-lg flex items-center justify-center text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Reset Level Progress"
+                      >
+                        <RotateCcw size={16} />
+                      </button>
                     )}
                   </div>
                 );
@@ -1041,7 +1082,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
           <div className="flex flex-col gap-3 w-full max-w-xs">
             <button
-              onClick={() => startLevel(currentLevelIdx)}
+              onClick={() => {
+                saveProgress(CHOMPER_LEVELS[currentLevelIdx].id, score, loopCount);
+                startLevel(currentLevelIdx);
+              }}
               className="w-full py-5 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-2xl hover:bg-amber-400 transition-colors flex items-center justify-center gap-3"
             >
               <RotateCcw size={24} />
