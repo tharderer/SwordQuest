@@ -26,6 +26,19 @@ interface FallingWord {
   isCorrect: boolean;
   wordIndex: number; // Index in the verse
   isJumbled?: boolean;
+  spawnedAtTargetIndex: number; // The target index when this word was spawned
+}
+
+interface Explosion {
+  id: number;
+  x: number;
+  y: number;
+}
+
+interface HeartBreak {
+  id: number;
+  x: number;
+  y: number;
 }
 
 interface ChomperLevel {
@@ -100,6 +113,68 @@ const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, str
   );
 });
 
+const ExplosionEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
+  return (
+    <motion.div
+      initial={{ scale: 0, opacity: 1 }}
+      animate={{ scale: 2.5, opacity: 0 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className="absolute pointer-events-none z-50"
+      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
+    >
+      <div className="w-16 h-16 bg-rose-500 rounded-full blur-2xl opacity-60" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ x: 0, y: 0, scale: 1 }}
+            animate={{ 
+              x: (Math.random() - 0.5) * 150, 
+              y: (Math.random() - 0.5) * 150,
+              scale: 0,
+              rotate: Math.random() * 360
+            }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="w-3 h-3 bg-amber-400 rounded-sm absolute shadow-lg shadow-amber-500/50"
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
+const HeartBreakEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
+  return (
+    <div 
+      className="absolute pointer-events-none z-50"
+      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
+    >
+      <motion.div
+        initial={{ opacity: 1, scale: 1 }}
+        animate={{ opacity: 0, scale: 1.5 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="flex"
+      >
+        <motion.div
+          initial={{ x: 0, y: 0, rotate: 0 }}
+          animate={{ x: -30, y: 40, rotate: -60 }}
+          transition={{ duration: 0.7, ease: "easeIn" }}
+        >
+          <Heart size={40} className="text-rose-600 fill-rose-600 [clip-path:inset(0_50%_0_0)]" />
+        </motion.div>
+        <motion.div
+          initial={{ x: 0, y: 0, rotate: 0 }}
+          animate={{ x: 30, y: 40, rotate: 60 }}
+          transition={{ duration: 0.7, ease: "easeIn" }}
+          className="-ml-10"
+        >
+          <Heart size={40} className="text-rose-600 fill-rose-600 [clip-path:inset(0_0_0_50%)]" />
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+};
+
 const CHOMPER_LEVELS: ChomperLevel[] = [
   { id: 1, reference: "John 3:16", title: "God's Love" },
   { id: 2, reference: "Psalm 23:1", title: "The Good Shepherd" },
@@ -132,7 +207,13 @@ declare global {
   }
 }
 
-const GameStage = React.memo(({ fallingWords, avatarPos, streak }: { fallingWords: FallingWord[], avatarPos: { x: number, y: number }, streak: number }) => {
+const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, heartBreaks }: { 
+  fallingWords: FallingWord[], 
+  avatarPos: { x: number, y: number }, 
+  streak: number,
+  explosions: Explosion[],
+  heartBreaks: HeartBreak[]
+}) => {
   return (
     <>
       {/* Falling Words */}
@@ -142,6 +223,16 @@ const GameStage = React.memo(({ fallingWords, avatarPos, streak }: { fallingWord
 
       {/* Avatar (Chomper) */}
       <Avatar pos={avatarPos} streak={streak} />
+
+      {/* Effects */}
+      <AnimatePresence>
+        {explosions.map(e => (
+          <ExplosionEffect key={e.id} x={e.x} y={e.y} />
+        ))}
+        {heartBreaks.map(h => (
+          <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
+        ))}
+      </AnimatePresence>
     </>
   );
 });
@@ -237,7 +328,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isJumbled, setIsJumbled] = useState(false);
   const [showSpeedUp, setShowSpeedUp] = useState(false);
+  const [showCircleBack, setShowCircleBack] = useState(false);
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
+  const [explosions, setExplosions] = useState<Explosion[]>([]);
+  const [heartBreaks, setHeartBreaks] = useState<HeartBreak[]>([]);
   const prevLoopCount = useRef(loopCount);
   
   const sessionRef = useRef<SavedSession | null>(null);
@@ -520,6 +614,22 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     }
   };
 
+  const addExplosion = useCallback((x: number, y: number) => {
+    const id = Date.now() + Math.random();
+    setExplosions(prev => [...prev, { id, x, y }]);
+    setTimeout(() => {
+      setExplosions(prev => prev.filter(e => e.id !== id));
+    }, 800);
+  }, []);
+
+  const addHeartBreak = useCallback((x: number, y: number) => {
+    const id = Date.now() + Math.random();
+    setHeartBreaks(prev => [...prev, { id, x, y }]);
+    setTimeout(() => {
+      setHeartBreaks(prev => prev.filter(h => h.id !== id));
+    }, 1000);
+  }, []);
+
   const spawnWord = useCallback(() => {
     const currentWords = wordsRef.current;
     if (currentWords.length === 0) return;
@@ -576,7 +686,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       // Constant fall speed
       speed: 0.45,
       isCorrect: isCorrect,
-      wordIndex: wordIdx
+      wordIndex: wordIdx,
+      spawnedAtTargetIndex: nextWordIndexRef.current
     };
 
     setFallingWords(prev => [...prev, newFallingWord]);
@@ -617,12 +728,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       
       let livesLost = 0;
       let scoreGained = 0;
-      let nextWordAdvanced = false;
+      let wordsAdvancedCount = 0;
       let streakReset = false;
       let streakIncrement = 0;
+      let circleBackBonus = false;
 
       const next: FallingWord[] = [];
-      const currentNextWordIdx = nextWordIndexRef.current;
+      let currentNextWordIdx = nextWordIndexRef.current;
       const currentAvatarPos = avatarPosRef.current;
       const currentLoop = loopCountRef.current;
 
@@ -634,6 +746,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         if (newY > 105) {
           if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
             livesLost++;
+            addExplosion(w.x, 95);
+            addHeartBreak(w.x, 95);
             streakReset = true;
             nextWordToSpawnRef.current = currentNextWordIdx;
           }
@@ -649,11 +763,20 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
             playChompSound(true);
             scoreGained += (10 * currentLoop);
-            nextWordAdvanced = true;
+            
+            // Circle back bonus check
+            if (w.spawnedAtTargetIndex < w.wordIndex) {
+              circleBackBonus = true;
+            }
+
+            wordsAdvancedCount++;
+            currentNextWordIdx = (currentNextWordIdx + 1) % wordsRef.current.length;
+            nextWordIndexRef.current = currentNextWordIdx; // Update ref immediately for same-frame sequence
             streakIncrement++;
           } else {
             playChompSound(false);
             livesLost++;
+            addHeartBreak(currentAvatarPos.x, currentAvatarPos.y);
             streakReset = true;
           }
           continue;
@@ -677,6 +800,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
       if (scoreGained > 0) setScore(s => s + scoreGained);
       
+      if (circleBackBonus) {
+        setLives(l => Math.min(5, l + 1));
+        setShowCircleBack(true);
+        setTimeout(() => setShowCircleBack(false), 1500);
+      }
+
       if (streakReset) setStreak(0);
       if (streakIncrement > 0) {
         setStreak(prevStreak => {
@@ -686,11 +815,14 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         });
       }
 
-      if (nextWordAdvanced) {
+      if (wordsAdvancedCount > 0) {
         setNextWordIndex(ni => {
-          const nextIdx = (ni + 1) % wordsRef.current.length;
-          if (nextIdx === 0) {
-            setLoopCount(lc => lc + 1);
+          let nextIdx = ni;
+          for (let k = 0; k < wordsAdvancedCount; k++) {
+            nextIdx = (nextIdx + 1) % wordsRef.current.length;
+            if (nextIdx === 0) {
+              setLoopCount(lc => lc + 1);
+            }
           }
           return nextIdx;
         });
@@ -996,7 +1128,13 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           <VerseProgressBar words={words} nextWordIndex={nextWordIndex} loopCount={loopCount} />
 
           {/* Game Stage (Falling Words & Avatar) */}
-          <GameStage fallingWords={fallingWords} avatarPos={avatarPos} streak={streak} />
+          <GameStage 
+            fallingWords={fallingWords} 
+            avatarPos={avatarPos} 
+            streak={streak} 
+            explosions={explosions}
+            heartBreaks={heartBreaks}
+          />
 
           {/* Speed Up Notification */}
           <AnimatePresence>
@@ -1009,6 +1147,19 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               >
                 <div className="bg-amber-500 text-slate-950 px-8 py-4 rounded-3xl font-black text-4xl italic uppercase tracking-tighter shadow-2xl">
                   {loopCount === 8 ? "LEVEL PASSED!" : "Speed Up!"}
+                </div>
+              </motion.div>
+            )}
+            {showCircleBack && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none"
+              >
+                <div className="bg-emerald-500 text-white px-8 py-4 rounded-3xl font-black text-4xl italic uppercase tracking-tighter shadow-2xl flex flex-col items-center">
+                  <span>Circle back!</span>
+                  <span className="text-xl">+1 LIFE!</span>
                 </div>
               </motion.div>
             )}
@@ -1049,6 +1200,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                   <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-blue-400 font-bold">3</div>
                   <p className="text-slate-300 text-sm leading-relaxed">
                     <span className="text-white font-bold">Loop for XP.</span> Completing the verse starts a new, faster loop. <span className="text-amber-400 font-bold">Pass Loop 7 to pass the level!</span>
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-emerald-400 font-bold">4</div>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    <span className="text-white font-bold">Circle back!</span> If you catch a word and the next one is already on screen, circle back to catch it for an <span className="text-emerald-400 font-bold">EXTRA LIFE!</span>
                   </p>
                 </div>
               </div>
