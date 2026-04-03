@@ -28,17 +28,6 @@ interface FallingWord {
   isJumbled?: boolean;
 }
 
-interface Enemy {
-  id: number;
-  type: 'STATIC' | 'CHASER' | 'BAR';
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  symbol: string;
-  width?: number;
-}
-
 interface ChomperLevel {
   id: number;
   reference: string;
@@ -90,7 +79,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [streak, setStreak] = useState(0);
   const [loopCount, setLoopCount] = useState(1);
   const [startLoop, setStartLoop] = useState(1);
-  const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [avatarPos, setAvatarPos] = useState({ x: 50, y: 80 }); // Percentage
   const [highScores, setHighScores] = useState<Record<number, number>>({});
   const [maxLoops, setMaxLoops] = useState<Record<number, number>>({});
@@ -274,7 +262,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         setWords(cleanWords);
         setNextWordIndex(0);
         setFallingWords([]);
-        setEnemies([]);
         setLives(5);
         setScore(0);
         setStreak(0);
@@ -357,61 +344,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       x: Math.random() * 80 + 10, // 10% to 90%
       y: -10,
       // Base speed increases with loop count
-      speed: (0.3 + (loopCountRef.current * 0.15)) * (Math.random() * 0.4 + 0.8),
+      speed: (0.3 + (loopCountRef.current * 0.15)),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
 
     setFallingWords(prev => [...prev, newFallingWord]);
-  }, []);
-
-  const spawnEnemy = useCallback(() => {
-    const loop = loopCountRef.current;
-    if (loop < 2) return;
-
-    setEnemies(prev => {
-      // Limit number of enemies
-      const maxEnemies = loop === 3 ? 1 : Math.min(3, loop - 1);
-      if (prev.length >= maxEnemies) return prev;
-
-      const id = Date.now() + Math.random();
-      let newEnemy: Enemy;
-
-      if (loop === 2) {
-        newEnemy = {
-          id,
-          type: 'STATIC',
-          x: Math.random() * 80 + 10,
-          y: Math.random() * 40 + 20,
-          vx: (Math.random() - 0.5) * 0.1,
-          vy: (Math.random() - 0.5) * 0.1,
-          symbol: '#'
-        };
-      } else if (loop === 3) {
-        newEnemy = {
-          id,
-          type: 'CHASER',
-          x: Math.random() > 0.5 ? 0 : 100,
-          y: Math.random() * 100,
-          vx: 0,
-          vy: 0,
-          symbol: 'O'
-        };
-      } else {
-        newEnemy = {
-          id,
-          type: 'BAR',
-          x: 50,
-          y: Math.random() * 40 + 30,
-          vx: 0.15,
-          vy: 0,
-          symbol: '---',
-          width: 30
-        };
-      }
-
-      return [...prev, newEnemy];
-    });
   }, []);
 
   const updateGame = useCallback((time: number) => {
@@ -433,62 +371,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     const spawnRate = Math.max(150, 800 - (loopCountRef.current * 150));
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
-      if (Math.random() < 0.1) spawnEnemy();
       lastSpawnTime.current = time;
     }
-
-    // Enemy movement and collision
-    setEnemies(prev => {
-      if (prev.length === 0) return prev;
-      let hitEnemyType: 'STATIC' | 'CHASER' | 'BAR' | null = null;
-
-      const next = prev.map(e => {
-        let nx = e.x + (e.vx * dt);
-        let ny = e.y + (e.vy * dt);
-        let nvx = e.vx;
-        let nvy = e.vy;
-
-        if (e.type === 'STATIC') {
-          if (nx < 5) { nx = 5; nvx = Math.abs(nvx); }
-          else if (nx > 95) { nx = 95; nvx = -Math.abs(nvx); }
-          
-          if (ny < 10) { ny = 10; nvy = Math.abs(nvy); }
-          else if (ny > 90) { ny = 90; nvy = -Math.abs(nvy); }
-        } else if (e.type === 'CHASER') {
-          const dx = avatarPosRef.current.x - e.x;
-          const dy = avatarPosRef.current.y - e.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist > 0) {
-            nvx = (dx / dist) * 0.008; // Reduced from 0.015
-            nvy = (dy / dist) * 0.008; // Reduced from 0.015
-          }
-        } else if (e.type === 'BAR') {
-          if (nx < 20 || nx > 80) nvx *= -1;
-        }
-
-        // Collision with player
-        const distToPlayer = Math.sqrt(Math.pow(nx - avatarPosRef.current.x, 2) + Math.pow(ny - avatarPosRef.current.y, 2));
-        const collisionDist = e.type === 'BAR' ? 12 : 6;
-        if (distToPlayer < collisionDist) {
-          hitEnemyType = e.type;
-        }
-
-        return { ...e, x: nx, y: ny, vx: nvx, vy: nvy };
-      });
-
-      if (hitEnemyType) {
-        setLives(l => {
-          const nl = l - 1;
-          if (nl <= 0) setGameState('GAME_OVER');
-          return Math.max(0, nl);
-        });
-        playChompSound(false);
-        
-        return []; // Clear enemies on hit
-      }
-
-      return next;
-    });
 
     setFallingWords(prev => {
       if (prev.length === 0) return prev;
@@ -555,7 +439,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           const nextIdx = (ni + 1) % wordsRef.current.length;
           if (nextIdx === 0) {
             setLoopCount(lc => lc + 1);
-            setEnemies([]); // Clear enemies on new loop
           }
           return nextIdx;
         });
@@ -869,28 +752,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               </div>
             );
           })}
-
-          {/* Enemies */}
-          {enemies.map(e => (
-            <div
-              key={e.id}
-              style={{
-                position: 'absolute',
-                left: `${e.x}%`,
-                top: `${e.y}%`,
-                transform: 'translate3d(-50%, -50%, 0)',
-                pointerEvents: 'none',
-                zIndex: 25
-              }}
-            >
-              <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center font-black text-xl shadow-2xl border-2 animate-pulse",
-                e.type === 'BAR' ? "w-32 h-4 rounded-full bg-rose-600 border-rose-400" : "bg-rose-600 border-rose-400 text-white"
-              )}>
-                {e.symbol}
-              </div>
-            </div>
-          ))}
 
           {/* Avatar (Chomper) */}
           <div
