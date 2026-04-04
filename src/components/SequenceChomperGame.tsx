@@ -175,67 +175,48 @@ const Avatar = React.memo(({ pos, streak, loopCount }: { pos: { x: number, y: nu
   );
 });
 
-const ExplosionEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
+const ExplosionEffect = React.memo(({ x, y }: { x: number, y: number }) => {
   return (
-    <motion.div
-      initial={{ scale: 0, opacity: 1 }}
-      animate={{ scale: 2.5, opacity: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="absolute pointer-events-none z-50"
+    <div
+      className="absolute pointer-events-none z-50 animate-explosion"
       style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
     >
       <div className="w-16 h-16 bg-rose-500 rounded-full blur-2xl opacity-60" />
       <div className="absolute inset-0 flex items-center justify-center">
-        {[...Array(12)].map((_, i) => (
-          <motion.div
+        {[...Array(8)].map((_, i) => (
+          <div
             key={i}
-            initial={{ x: 0, y: 0, scale: 1 }}
-            animate={{ 
-              x: (Math.random() - 0.5) * 150, 
-              y: (Math.random() - 0.5) * 150,
-              scale: 0,
-              rotate: Math.random() * 360
-            }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="w-3 h-3 bg-amber-400 rounded-sm absolute shadow-lg shadow-amber-500/50"
+            className="w-2 h-2 bg-amber-400 rounded-sm absolute shadow-lg shadow-amber-500/50 animate-particle"
+            style={{ 
+              '--tx': `${(Math.random() - 0.5) * 120}px`, 
+              '--ty': `${(Math.random() - 0.5) * 120}px`,
+              '--tr': `${Math.random() * 360}deg`,
+              animationDelay: `${Math.random() * 0.1}s`
+            } as any}
           />
         ))}
       </div>
-    </motion.div>
-  );
-};
-
-const HeartBreakEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
-  return (
-    <div 
-      className="absolute pointer-events-none z-50"
-      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
-    >
-      <motion.div
-        initial={{ opacity: 1, scale: 1 }}
-        animate={{ opacity: 0, scale: 1.5 }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className="flex"
-      >
-        <motion.div
-          initial={{ x: 0, y: 0, rotate: 0 }}
-          animate={{ x: -30, y: 40, rotate: -60 }}
-          transition={{ duration: 0.7, ease: "easeIn" }}
-        >
-          <Heart size={40} className="text-rose-600 fill-rose-600 [clip-path:inset(0_50%_0_0)]" />
-        </motion.div>
-        <motion.div
-          initial={{ x: 0, y: 0, rotate: 0 }}
-          animate={{ x: 30, y: 40, rotate: 60 }}
-          transition={{ duration: 0.7, ease: "easeIn" }}
-          className="-ml-10"
-        >
-          <Heart size={40} className="text-rose-600 fill-rose-600 [clip-path:inset(0_0_0_50%)]" />
-        </motion.div>
-      </motion.div>
     </div>
   );
-};
+});
+
+const HeartBreakEffect = React.memo(({ x, y }: { x: number, y: number }) => {
+  return (
+    <div 
+      className="absolute pointer-events-none z-50 animate-heartbreak-container"
+      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
+    >
+      <div className="flex animate-heartbreak-fade">
+        <div className="animate-heartbreak-left">
+          <Heart size={32} className="text-rose-600 fill-rose-600 [clip-path:inset(0_50%_0_0)]" />
+        </div>
+        <div className="animate-heartbreak-right -ml-8">
+          <Heart size={32} className="text-rose-600 fill-rose-600 [clip-path:inset(0_0_0_50%)]" />
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const SequenceProgressBar = React.memo(({ items, nextWordIndex, loopCount }: { items: string[], nextWordIndex: number, loopCount: number }) => {
   const currentWordRef = useRef<HTMLSpanElement>(null);
@@ -301,6 +282,92 @@ const SequenceProgressBar = React.memo(({ items, nextWordIndex, loopCount }: { i
             animate={{ width: `${items.length > 0 ? (nextWordIndex / items.length) * 100 : 0}%` }}
             className="h-full bg-amber-500"
           />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const HUD = React.memo(({ 
+  currentLevelIdx, 
+  loopCount, 
+  isMusicEnabled, 
+  setIsMusicEnabled, 
+  selectedMusicStyle, 
+  setSelectedMusicStyle, 
+  isPaused, 
+  setIsPaused, 
+  lives, 
+  score 
+}: { 
+  currentLevelIdx: number, 
+  loopCount: number, 
+  isMusicEnabled: boolean, 
+  setIsMusicEnabled: (v: boolean) => void, 
+  selectedMusicStyle: string, 
+  setSelectedMusicStyle: (v: string) => void, 
+  isPaused: boolean, 
+  setIsPaused: (v: boolean) => void, 
+  lives: number, 
+  score: number 
+}) => {
+  return (
+    <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent gap-2">
+      <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-amber-500 rounded-full text-slate-950 font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">
+            Level {INITIAL_SEQUENCES[currentLevelIdx].id}
+          </div>
+          <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-white/10 rounded-full text-white font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">
+            Loop {loopCount}
+          </div>
+        </div>
+        <h2 className="font-black text-sm sm:text-xl tracking-tighter uppercase italic truncate">{INITIAL_SEQUENCES[currentLevelIdx].title}</h2>
+      </div>
+
+      <div className="flex flex-col items-end gap-2 sm:gap-3 shrink-0">
+        <div className="flex gap-1.5 sm:gap-2 items-center">
+          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 bg-white/5 rounded-xl border border-white/10 mr-1 sm:mr-2">
+            <button 
+              onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+              className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              {isMusicEnabled ? <Volume2 size={12} className="text-white" /> : <VolumeX size={12} className="text-white/40" />}
+            </button>
+            <select 
+              value={selectedMusicStyle}
+              onChange={(e) => setSelectedMusicStyle(e.target.value)}
+              className="bg-transparent text-white text-[7px] sm:text-[8px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer max-w-[50px] sm:max-w-none"
+            >
+              <option value="hymns" className="bg-slate-900">Hymns</option>
+              <option value="gospel" className="bg-slate-900">Gospel</option>
+              <option value="acoustic" className="bg-slate-900">Acoustic</option>
+              <option value="ambient" className="bg-slate-900">Ambient</option>
+              <option value="lofi" className="bg-slate-900">Lo-Fi</option>
+              <option value="classical" className="bg-slate-900">Classical</option>
+              <option value="retro" className="bg-slate-900">Retro</option>
+              <option value="epic" className="bg-slate-900">Epic</option>
+            </select>
+          </div>
+          <button 
+            onClick={() => setIsPaused(!isPaused)}
+            className="p-1.5 sm:p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+          >
+            {isPaused ? <Play size={14} sm:size={18} fill="currentColor" /> : <Pause size={14} sm:size={18} fill="currentColor" />}
+          </button>
+          <div className="flex gap-0.5 sm:gap-1">
+            {[...Array(5)].map((_, i) => (
+              <Heart 
+                key={i} 
+                size={14}
+                className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} 
+              />
+            ))}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl sm:text-3xl font-black text-amber-400 leading-none">{score}</div>
+          <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">Score</div>
         </div>
       </div>
     </div>
@@ -768,52 +835,18 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
       {gameState === 'PLAYING' && (
         <div ref={gameAreaRef} onMouseMove={handleMouseMove} onTouchMove={handleMouseMove} className="flex-1 relative overflow-hidden cursor-none touch-none">
           {/* HUD */}
-          <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent gap-2">
-            <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-amber-500 rounded-full text-slate-950 font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">Level {currentLevelIdx + 1}</div>
-                <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-white/10 rounded-full text-white font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">Loop {loopCount}</div>
-              </div>
-              <h2 className="font-black text-sm sm:text-xl tracking-tighter uppercase italic truncate">{sequences[currentLevelIdx].title}</h2>
-            </div>
-            <div className="flex flex-col items-end gap-2 sm:gap-3 shrink-0">
-              <div className="flex gap-1.5 sm:gap-2 items-center">
-                <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md mr-1 sm:mr-2">
-                  <Music className={cn("w-3 h-3 sm:w-3.5 sm:h-3.5", isMusicEnabled ? "text-amber-400" : "text-white/20")} />
-                  <select 
-                    value={selectedMusicStyle}
-                    onChange={(e) => setSelectedMusicStyle(e.target.value)}
-                    className="bg-transparent text-white text-[7px] sm:text-[10px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer max-w-[50px] sm:max-w-none"
-                  >
-                    <option value="hymns" className="bg-slate-900">Hymns</option>
-                    <option value="gospel" className="bg-slate-900">Gospel</option>
-                    <option value="acoustic" className="bg-slate-900">Acoustic</option>
-                    <option value="ambient" className="bg-slate-900">Ambient</option>
-                    <option value="lofi" className="bg-slate-900">Lo-Fi</option>
-                    <option value="classical" className="bg-slate-900">Classical</option>
-                    <option value="retro" className="bg-slate-900">Retro</option>
-                    <option value="epic" className="bg-slate-900">Epic</option>
-                  </select>
-                  <div className="w-px h-2 sm:h-3 bg-white/10 mx-0.5 sm:mx-1" />
-                  <button 
-                    onClick={() => setIsMusicEnabled(!isMusicEnabled)}
-                    className="p-0.5 sm:p-1 hover:bg-white/10 rounded-lg transition-colors"
-                  >
-                    {isMusicEnabled ? <Volume2 size={12} className="text-white" /> : <VolumeX size={12} className="text-white/40" />}
-                  </button>
-                </div>
-                <button onClick={() => setIsPaused(!isPaused)} className="p-1.5 sm:p-2 bg-white/10 rounded-xl">
-                  {isPaused ? <Play size={14} sm:size={18} fill="currentColor" /> : <Pause size={14} sm:size={18} fill="currentColor" />}
-                </button>
-                <div className="flex gap-0.5 sm:gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Heart key={i} size={14} className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} />
-                  ))}
-                </div>
-              </div>
-              <div className="text-xl sm:text-3xl font-black text-amber-400 leading-none">{score}</div>
-            </div>
-          </div>
+          <HUD 
+            currentLevelIdx={currentLevelIdx}
+            loopCount={loopCount}
+            isMusicEnabled={isMusicEnabled}
+            setIsMusicEnabled={setIsMusicEnabled}
+            selectedMusicStyle={selectedMusicStyle}
+            setSelectedMusicStyle={setSelectedMusicStyle}
+            isPaused={isPaused}
+            setIsPaused={setIsPaused}
+            lives={lives}
+            score={score}
+          />
           <SequenceProgressBar items={items} nextWordIndex={nextWordIndex} loopCount={loopCount} />
           {fallingWords.map(w => <FallingWordItem key={w.id} word={w} />)}
           {explosions.map(e => <ExplosionEffect key={e.id} x={e.x} y={e.y} />)}

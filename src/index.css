@@ -14,7 +14,7 @@
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  overflow: hidden;
   background-color: var(--color-background);
   color: #2D3436;
 }
@@ -83,5 +83,53 @@ body {
 @keyframes pulse {
   0%, 100% { opacity: 0.2; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+@keyframes explosion {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+}
+.animate-explosion {
+  animation: explosion 0.6s ease-out forwards;
+}
+
+@keyframes particle {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(var(--tx), var(--ty)) rotate(var(--tr)) scale(0); }
+}
+.animate-particle {
+  animation: particle 0.6s ease-out forwards;
+}
+
+@keyframes heartbreak-container {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  100% { transform: translate(-50%, -50%) scale(1.5); }
+}
+.animate-heartbreak-container {
+  animation: heartbreak-container 0.8s ease-in forwards;
+}
+
+@keyframes heartbreak-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-heartbreak-fade {
+  animation: heartbreak-fade 0.8s ease-in 0.2s forwards;
+}
+
+@keyframes heartbreak-left {
+  0% { transform: translate(0, 0) rotate(0); }
+  100% { transform: translate(-30px, 40px) rotate(-60deg); }
+}
+.animate-heartbreak-left {
+  animation: heartbreak-left 0.7s ease-in forwards;
+}
+
+@keyframes heartbreak-right {
+  0% { transform: translate(0, 0) rotate(0); }
+  100% { transform: translate(30px, 40px) rotate(60deg); }
+}
+.animate-heartbreak-right {
+  animation: heartbreak-right 0.7s ease-in forwards;
 }
 
