@@ -603,7 +603,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
     for (const w of prev) {
       const newY = w.y + (w.speed * (dt / 16));
       if (newY > 105) {
-        if (w.isCorrect && w.wordIndex === activeNextWordIdx) {
+        if (w.wordIndex === activeNextWordIdx) {
           livesLost++;
           streakReset = true;
           nextWordToSpawnRef.current = activeNextWordIdx;
@@ -613,7 +613,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
       const dx = w.x - currentAvatarPos.x;
       const dy = newY - currentAvatarPos.y;
       if (dx * dx + dy * dy < 81) {
-        if (w.isCorrect && w.wordIndex === activeNextWordIdx) {
+        if (w.wordIndex === activeNextWordIdx) {
           caughtWord = w;
           scoreGained += (10 * currentLoop * (currentStreak >= 10 ? 2 : 1));
           nextWordAdvanced = true;

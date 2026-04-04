@@ -789,7 +789,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
         
         // Check if correct word fell through
         if (newY > 105) {
-          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+          if (w.wordIndex === currentNextWordIdx) {
             livesLost++;
             addExplosion(w.x, 95);
             addHeartBreak(w.x, 95);
@@ -805,7 +805,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
         const distSq = dx * dx + dy * dy;
         
           if (distSq < 81) { // 9^2 = 81
-            if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+            if (w.wordIndex === currentNextWordIdx) {
               playChompSound(true);
               // Double points in Fever Mode
               scoreGained += (10 * currentLoop * (isFever ? 2 : 1));

@@ -93,6 +93,7 @@ import { MissionaryJourneysGame } from './components/MissionaryJourneysGame';
 import { BibleWitsAndWagersGame } from './components/BibleWitsAndWagersGame';
 import { VerseChomperGame } from './components/VerseChomperGame';
 import { SequenceChomperGame } from './components/SequenceChomperGame';
+import { BibleReader } from './components/BibleReader';
 import { cn } from './lib/utils';
 import { Verse, UserProgress, VerseSet } from './types';
 
@@ -8468,6 +8469,18 @@ export default function App() {
                   ))}
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {view === 'bible_reader' && (
+            <motion.div 
+              key="bible_reader"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex flex-col"
+            >
+              <BibleReader onExit={() => setView('dashboard')} />
             </motion.div>
           )}
 
