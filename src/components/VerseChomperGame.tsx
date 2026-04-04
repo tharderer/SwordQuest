@@ -124,7 +124,7 @@ const ExplosionEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
     >
       <div className="w-16 h-16 bg-rose-500 rounded-full blur-2xl opacity-60" />
       <div className="absolute inset-0 flex items-center justify-center">
-        {[...Array(12)].map((_, i) => (
+        {[...Array(6)].map((_, i) => (
           <motion.div
             key={i}
             initial={{ x: 0, y: 0, scale: 1 }}
@@ -207,6 +207,29 @@ declare global {
   }
 }
 
+const FallingWordsLayer = React.memo(({ fallingWords }: { fallingWords: FallingWord[] }) => {
+  return (
+    <>
+      {fallingWords.map(w => (
+        <FallingWordItem key={w.id} word={w} />
+      ))}
+    </>
+  );
+});
+
+const EffectsLayer = React.memo(({ explosions, heartBreaks }: { explosions: Explosion[], heartBreaks: HeartBreak[] }) => {
+  return (
+    <AnimatePresence>
+      {explosions.map(e => (
+        <ExplosionEffect key={e.id} x={e.x} y={e.y} />
+      ))}
+      {heartBreaks.map(h => (
+        <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
+      ))}
+    </AnimatePresence>
+  );
+});
+
 const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, heartBreaks }: { 
   fallingWords: FallingWord[], 
   avatarPos: { x: number, y: number }, 
@@ -216,23 +239,9 @@ const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, hea
 }) => {
   return (
     <>
-      {/* Falling Words */}
-      {fallingWords.map(w => (
-        <FallingWordItem key={w.id} word={w} />
-      ))}
-
-      {/* Avatar (Chomper) */}
+      <FallingWordsLayer fallingWords={fallingWords} />
       <Avatar pos={avatarPos} streak={streak} />
-
-      {/* Effects */}
-      <AnimatePresence>
-        {explosions.map(e => (
-          <ExplosionEffect key={e.id} x={e.x} y={e.y} />
-        ))}
-        {heartBreaks.map(h => (
-          <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
-        ))}
-      </AnimatePresence>
+      <EffectsLayer explosions={explosions} heartBreaks={heartBreaks} />
     </>
   );
 });
@@ -360,6 +369,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const nextWordToSpawnRef = useRef<number>(0);
   const distractorsRemainingRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const prevAvatarPosRef = useRef(avatarPos);
 
   const gameStateRef = useRef(gameState);
   const isPausedRef = useRef(isPaused);
@@ -736,6 +746,10 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       const next: FallingWord[] = [];
       let currentNextWordIdx = nextWordIndexRef.current;
       const currentAvatarPos = avatarPosRef.current;
+      const prevAvatarPos = prevAvatarPosRef.current;
+      const isMovingUp = currentAvatarPos.y < prevAvatarPos.y - 0.2;
+      prevAvatarPosRef.current = currentAvatarPos;
+      
       const currentLoop = loopCountRef.current;
 
       for (let i = 0; i < prev.length; i++) {
@@ -764,8 +778,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             playChompSound(true);
             scoreGained += (10 * currentLoop);
             
-            // Circle back bonus check
-            if (w.spawnedAtTargetIndex < w.wordIndex) {
+            // Circle back bonus check: word was on screen before it was the target AND user is moving up
+            if (w.spawnedAtTargetIndex < w.wordIndex && isMovingUp) {
               circleBackBonus = true;
             }
 
@@ -1212,7 +1226,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                 <div className="flex gap-4">
                   <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-emerald-400 font-bold">4</div>
                   <p className="text-slate-300 text-sm leading-relaxed">
-                    <span className="text-white font-bold">Circle back!</span> If you catch a word and the next one is already on screen, circle back to catch it for an <span className="text-emerald-400 font-bold">EXTRA LIFE!</span>
+                    <span className="text-white font-bold">Circle back!</span> Catch the next word by <span className="text-emerald-400 font-bold">moving upwards</span> to grab a word already on screen for an <span className="text-emerald-400 font-bold">EXTRA LIFE!</span>
                   </p>
                 </div>
               </div>
