@@ -7940,7 +7940,7 @@ export default function App() {
     setView('dashboard');
   };
 
-  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper';
+  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper';
 
   if (!progress || !isDbReady) {
     return (

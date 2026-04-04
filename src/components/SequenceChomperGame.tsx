@@ -54,23 +54,18 @@ const INITIAL_SEQUENCES: BibleSequence[] = [
   { id: 1, title: "Days of Creation", description: "The 7 days of creation in order", items: ["Light", "Firmament", "Dry Land", "Sun & Moon", "Fish & Birds", "Animals & Man", "Rest"], book: "Genesis" },
   { id: 2, title: "Rivers of Eden", description: "The four rivers flowing out of Eden", items: ["Pishon", "Gihon", "Tigris", "Euphrates"], book: "Genesis" },
   { id: 3, title: "Noah's Sons", description: "The three sons of Noah", items: ["Shem", "Ham", "Japheth"], book: "Genesis" },
-  { id: 4, title: "Patriarchs", description: "The fathers of the faith", items: ["Abraham", "Isaac", "Jacob", "Joseph"], book: "Genesis" },
-  { id: 5, title: "Plagues of Egypt", description: "The ten plagues sent upon Egypt", items: ["Blood", "Frogs", "Lice", "Flies", "Livestock", "Boils", "Hail", "Locusts", "Darkness", "Firstborn"], book: "Exodus" },
-  { id: 6, title: "Ten Commandments", description: "The laws given to Moses", items: ["One God", "No Idols", "No Vain Name", "Sabbath", "Honor Parents", "No Murder", "No Adultery", "No Stealing", "No False Witness", "No Coveting"], book: "Exodus" },
-  { id: 7, title: "Tabernacle Furniture", description: "Holy items in the Tabernacle", items: ["Ark", "Table", "Lampstand", "Incense Altar", "Burnt Altar", "Laver"], book: "Exodus" },
-  { id: 8, title: "High Priest Garments", description: "Sacred clothing for Aaron", items: ["Breastplate", "Ephod", "Robe", "Tunic", "Turban", "Sash"], book: "Exodus" },
-  { id: 9, title: "Tribes of Israel", description: "The twelve tribes", items: ["Reuben", "Simeon", "Levi", "Judah", "Dan", "Naphtali", "Gad", "Asher", "Issachar", "Zebulun", "Joseph", "Benjamin"], book: "Numbers" },
-  { id: 10, title: "Spies of Israel", description: "The twelve spies sent to Canaan", items: ["Shammua", "Shaphat", "Caleb", "Igal", "Oshea", "Palti", "Gaddiel", "Gaddi", "Ammiel", "Sethur", "Nahbi", "Geuel"], book: "Numbers" },
-  { id: 11, title: "Judges of Israel", description: "Leaders before the kings", items: ["Othniel", "Ehud", "Shamgar", "Deborah", "Gideon", "Tola", "Jair", "Jephthah", "Ibzan", "Elon", "Abdon", "Samson"], book: "Judges" },
-  { id: 12, title: "United Kingdom Kings", description: "First three kings of Israel", items: ["Saul", "David", "Solomon"], book: "1 Samuel" },
-  { id: 13, title: "Major Prophets", description: "The longer prophetic books", items: ["Isaiah", "Jeremiah", "Ezekiel", "Daniel"], book: "Isaiah" },
-  { id: 14, title: "Minor Prophets", description: "The twelve shorter prophetic books", items: ["Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi"], book: "Hosea" },
-  { id: 15, title: "Fruits of the Spirit", description: "Qualities of a godly life", items: ["Love", "Joy", "Peace", "Patience", "Kindness", "Goodness", "Faithfulness", "Gentleness", "Self-Control"], book: "Galatians" },
-  { id: 16, title: "Armor of God", description: "Spiritual protection", items: ["Truth", "Righteousness", "Peace", "Faith", "Salvation", "Spirit"], book: "Ephesians" },
-  { id: 17, title: "Seven Churches", description: "Churches in Asia Minor", items: ["Ephesus", "Smyrna", "Pergamum", "Thyatira", "Sardis", "Philadelphia", "Laodicea"], book: "Revelation" },
-  { id: 18, title: "Seven Seals", description: "Judgments from the scroll", items: ["White Horse", "Red Horse", "Black Horse", "Pale Horse", "Souls", "Earthquake", "Silence"], book: "Revelation" },
-  { id: 19, title: "Seven Trumpets", description: "Angelic warnings", items: ["Hail & Fire", "Mountain", "Star", "Darkness", "Locusts", "Euphrates", "Kingdom"], book: "Revelation" },
-  { id: 20, title: "Seven Bowls", description: "Final plagues of wrath", items: ["Sores", "Sea", "Rivers", "Sun", "Darkness", "Euphrates", "Voices"], book: "Revelation" }
+  { id: 4, title: "Patriarchs", description: "The fathers of the faith in order", items: ["Abraham", "Isaac", "Jacob", "Joseph"], book: "Genesis" },
+  { id: 5, title: "Plagues of Egypt", description: "The ten plagues sent upon Egypt in order", items: ["Blood", "Frogs", "Lice", "Flies", "Livestock", "Boils", "Hail", "Locusts", "Darkness", "Firstborn"], book: "Exodus" },
+  { id: 6, title: "Ten Commandments", description: "The laws given to Moses in order", items: ["One God", "No Idols", "No Vain Name", "Sabbath", "Honor Parents", "No Murder", "No Adultery", "No Stealing", "No False Witness", "No Coveting"], book: "Exodus" },
+  { id: 7, title: "Tribes of Israel", description: "The twelve tribes in birth order", items: ["Reuben", "Simeon", "Levi", "Judah", "Dan", "Naphtali", "Gad", "Asher", "Issachar", "Zebulun", "Joseph", "Benjamin"], book: "Genesis" },
+  { id: 8, title: "Judges of Israel", description: "Leaders in chronological order", items: ["Othniel", "Ehud", "Shamgar", "Deborah", "Gideon", "Tola", "Jair", "Jephthah", "Ibzan", "Elon", "Abdon", "Samson"], book: "Judges" },
+  { id: 9, title: "United Kingdom Kings", description: "First three kings of Israel in order", items: ["Saul", "David", "Solomon"], book: "1 Samuel" },
+  { id: 10, title: "The Twelve Apostles", description: "The apostles as listed in Matthew 10", items: ["Peter", "Andrew", "James", "John", "Philip", "Bartholomew", "Thomas", "Matthew", "James (son of Alphaeus)", "Thaddaeus", "Simon", "Judas"], book: "Matthew" },
+  { id: 11, title: "The Beatitudes", description: "The blessings from the Sermon on the Mount", items: ["Poor in Spirit", "Mourn", "Meek", "Hunger for Righteousness", "Merciful", "Pure in Heart", "Peacemakers", "Persecuted"], book: "Matthew" },
+  { id: 12, title: "Seven Churches", description: "Churches in Asia Minor in order", items: ["Ephesus", "Smyrna", "Pergamum", "Thyatira", "Sardis", "Philadelphia", "Laodicea"], book: "Revelation" },
+  { id: 13, title: "Seven Seals", description: "Judgments from the scroll in order", items: ["White Horse", "Red Horse", "Black Horse", "Pale Horse", "Souls", "Earthquake", "Silence"], book: "Revelation" },
+  { id: 14, title: "Seven Trumpets", description: "Angelic warnings in order", items: ["Hail & Fire", "Mountain", "Star", "Darkness", "Locusts", "Euphrates", "Kingdom"], book: "Revelation" },
+  { id: 15, title: "Seven Bowls", description: "Final plagues of wrath in order", items: ["Sores", "Sea", "Rivers", "Sun", "Darkness", "Euphrates", "Voices"], book: "Revelation" }
 ];
 
 const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
@@ -321,6 +316,9 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [heartBreaks, setHeartBreaks] = useState<HeartBreak[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const fallingWordsRef = useRef<FallingWord[]>([]);
+  useEffect(() => { fallingWordsRef.current = fallingWords; }, [fallingWords]);
 
   useEffect(() => {
     if (explosions.length > 0) {
@@ -583,68 +581,91 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
     if (!lastTimeRef.current) lastTimeRef.current = time;
     const dt = Math.min(time - lastTimeRef.current, 32);
     lastTimeRef.current = time;
+
     if (time - lastSpawnTime.current > 600) {
       spawnWord();
       lastSpawnTime.current = time;
     }
-    setFallingWords(prev => {
-      let livesLost = 0;
-      let scoreGained = 0;
-      let nextWordAdvanced = false;
-      let streakIncrement = 0;
-      let streakReset = false;
-      const next: FallingWord[] = [];
-      const currentNextWordIdx = nextWordIndexRef.current;
-      const currentAvatarPos = avatarPosRef.current;
-      const currentLoop = loopCountRef.current;
-      for (const w of prev) {
-        const newY = w.y + (w.speed * (dt / 16));
-        if (newY > 105) {
-          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
-            livesLost++;
-            streakReset = true;
-            nextWordToSpawnRef.current = currentNextWordIdx;
-          }
-          continue;
+
+    const prev = fallingWordsRef.current;
+    const next: FallingWord[] = [];
+    const currentNextWordIdx = nextWordIndexRef.current;
+    const currentAvatarPos = avatarPosRef.current;
+    const currentLoop = loopCountRef.current;
+    const currentStreak = streakRef.current;
+
+    let livesLost = 0;
+    let scoreGained = 0;
+    let nextWordAdvanced = false;
+    let streakIncrement = 0;
+    let streakReset = false;
+    let caughtWord: FallingWord | null = null;
+    let missedWordPos: {x: number, y: number} | null = null;
+
+    for (const w of prev) {
+      const newY = w.y + (w.speed * (dt / 16));
+      if (newY > 105) {
+        if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+          livesLost++;
+          streakReset = true;
+          nextWordToSpawnRef.current = currentNextWordIdx;
         }
-        const dx = w.x - currentAvatarPos.x;
-        const dy = newY - currentAvatarPos.y;
-        if (dx * dx + dy * dy < 81) {
-          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
-            playChompSound(true);
-            setExplosions(prev => [...prev, { id: Date.now() + Math.random(), x: w.x, y: newY }]);
-            scoreGained += (10 * currentLoop * (streakRef.current >= 10 ? 2 : 1));
-            nextWordAdvanced = true;
-            streakIncrement++;
-          } else {
-            playChompSound(false);
-            setHeartBreaks(prev => [...prev, { id: Date.now() + Math.random(), x: currentAvatarPos.x, y: currentAvatarPos.y }]);
-            livesLost++;
-            streakReset = true;
-          }
-          continue;
-        }
-        next.push({ ...w, y: newY });
+        continue;
       }
-      if (livesLost > 0) setLives(l => {
+      const dx = w.x - currentAvatarPos.x;
+      const dy = newY - currentAvatarPos.y;
+      if (dx * dx + dy * dy < 81) {
+        if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+          caughtWord = w;
+          scoreGained += (10 * currentLoop * (currentStreak >= 10 ? 2 : 1));
+          nextWordAdvanced = true;
+          streakIncrement++;
+        } else {
+          missedWordPos = { x: currentAvatarPos.x, y: currentAvatarPos.y };
+          livesLost++;
+          streakReset = true;
+        }
+        continue;
+      }
+      next.push({ ...w, y: newY });
+    }
+
+    // Apply state updates
+    setFallingWords(next);
+
+    if (caughtWord) {
+      playChompSound(true);
+      setExplosions(prevExp => [...prevExp, { id: Date.now() + Math.random(), x: caughtWord!.x, y: caughtWord!.y + (caughtWord!.speed * (dt / 16)) }]);
+    }
+    if (missedWordPos) {
+      playChompSound(false);
+      setHeartBreaks(prevHb => [...prevHb, { id: Date.now() + Math.random(), x: missedWordPos!.x, y: missedWordPos!.y }]);
+    }
+
+    if (livesLost > 0) {
+      setLives(l => {
         const nl = l - livesLost;
         if (nl <= 0) setGameState('GAME_OVER');
         return Math.max(0, nl);
       });
-      if (scoreGained > 0) setScore(s => s + scoreGained);
-      if (streakReset) setStreak(0);
-      if (streakIncrement > 0) setStreak(s => {
+    }
+    if (scoreGained > 0) setScore(s => s + scoreGained);
+    if (streakReset) setStreak(0);
+    if (streakIncrement > 0) {
+      setStreak(s => {
         const ns = s + streakIncrement;
         if (ns % 10 === 0) setLives(l => Math.min(5, l + 1));
         return ns;
       });
-      if (nextWordAdvanced) setNextWordIndex(ni => {
+    }
+    if (nextWordAdvanced) {
+      setNextWordIndex(ni => {
         const nextIdx = (ni + 1) % itemsRef.current.length;
         if (nextIdx === 0) setLoopCount(lc => lc + 1);
         return nextIdx;
       });
-      return next;
-    });
+    }
+
     requestRef.current = requestAnimationFrame(updateGame);
   }, [spawnWord, playChompSound]);
 
