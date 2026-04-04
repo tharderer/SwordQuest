@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Coins, User, Bot, Trophy, ArrowRight, RotateCcw, HelpCircle, Sparkles, Database, Play, AlertCircle, Trash2, Timer } from 'lucide-react';
+import { Coins, User, Bot, Trophy, ArrowRight, RotateCcw, HelpCircle, Sparkles, Database, Play, AlertCircle, Trash2, Timer, Music, Volume2, VolumeX, X } from 'lucide-react';
 import { bibleQuestionService, BibleQuestion } from '../services/bibleQuestionService';
 import { getVerseByRef } from '../lib/bibleDb';
+import { cn } from '../lib/utils';
 
 interface Question {
   text: string;
@@ -82,7 +83,25 @@ const PLAYER_COLORS = [
   "#0d9488", // Teal
 ];
 
-export const BibleWitsAndWagersGame: React.FC = () => {
+interface BibleWitsAndWagersGameProps {
+  onExit: () => void;
+  isMusicEnabled: boolean;
+  setIsMusicEnabled: (enabled: boolean) => void;
+  selectedMusicStyle: string;
+  setSelectedMusicStyle: (style: string) => void;
+  volume: number;
+  setVolume: (volume: number) => void;
+}
+
+export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({ 
+  onExit,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
+  volume,
+  setVolume
+}) => {
   const [questions, setQuestions] = useState<BibleQuestion[]>([]);
   const [scores, setScores] = useState<PlayerScore[]>(() => [
     { name: "You", score: 0, isUser: true, color: PLAYER_COLORS[0] },
@@ -574,9 +593,41 @@ export const BibleWitsAndWagersGame: React.FC = () => {
               <p className="text-[10px] font-bold opacity-60">Round {round} of 7</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-white/50 px-4 py-1 rounded-full border border-[#d4af37]">
-            <Coins className="text-[#d4af37] w-5 h-5" />
-            <span className="font-bold">{totalUserChips} Chips</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/50 rounded-xl border border-[#d4af37]/30 backdrop-blur-md">
+              <Music className={cn("w-3.5 h-3.5", isMusicEnabled ? "text-[#d4af37]" : "text-[#2c1e11]/20")} />
+              <select 
+                value={selectedMusicStyle}
+                onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                className="bg-transparent text-[#2c1e11] text-[10px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+              >
+                <option value="hymns" className="bg-[#f4e4bc]">Hymns</option>
+                <option value="gospel" className="bg-[#f4e4bc]">Gospel</option>
+                <option value="acoustic" className="bg-[#f4e4bc]">Acoustic</option>
+                <option value="ambient" className="bg-[#f4e4bc]">Ambient</option>
+                <option value="lofi" className="bg-[#f4e4bc]">Lo-Fi</option>
+                <option value="classical" className="bg-[#f4e4bc]">Classical</option>
+                <option value="retro" className="bg-[#f4e4bc]">Retro</option>
+                <option value="epic" className="bg-[#f4e4bc]">Epic</option>
+              </select>
+              <div className="w-px h-3 bg-[#2c1e11]/10 mx-1" />
+              <button 
+                onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                {isMusicEnabled ? <Volume2 size={14} className="text-[#2c1e11]" /> : <VolumeX size={14} className="text-[#2c1e11]/40" />}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 bg-white/50 px-4 py-1 rounded-full border border-[#d4af37]">
+              <Coins className="text-[#d4af37] w-5 h-5" />
+              <span className="font-bold">{totalUserChips} Chips</span>
+            </div>
+            <button 
+              onClick={onExit}
+              className="w-8 h-8 rounded-lg bg-white/30 hover:bg-white/50 flex items-center justify-center transition-colors border border-[#d4af37]/20"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}
@@ -619,6 +670,40 @@ export const BibleWitsAndWagersGame: React.FC = () => {
                   Bible <span className="text-[#d4af37]">Wits</span> & Wagers
                 </h1>
                 <p className="text-sm font-bold opacity-60 uppercase tracking-[0.2em]">The Ultimate Biblical Trivia Challenge</p>
+                
+                <div className="flex items-center justify-center gap-4 px-6 py-3 bg-white/40 rounded-2xl border border-[#d4af37]/20 backdrop-blur-md mx-auto w-fit">
+                  <Music className={cn("w-5 h-5", isMusicEnabled ? "text-[#d4af37]" : "text-[#2c1e11]/20")} />
+                  <select 
+                    value={selectedMusicStyle}
+                    onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                    className="bg-transparent text-[#2c1e11] text-xs font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                  >
+                    <option value="hymns" className="bg-[#f4e4bc]">Hymns</option>
+                    <option value="gospel" className="bg-[#f4e4bc]">Gospel</option>
+                    <option value="acoustic" className="bg-[#f4e4bc]">Acoustic</option>
+                    <option value="ambient" className="bg-[#f4e4bc]">Ambient</option>
+                    <option value="lofi" className="bg-[#f4e4bc]">Lo-Fi</option>
+                    <option value="classical" className="bg-[#f4e4bc]">Classical</option>
+                    <option value="retro" className="bg-[#f4e4bc]">Retro</option>
+                    <option value="epic" className="bg-[#f4e4bc]">Epic</option>
+                  </select>
+                  <div className="w-px h-4 bg-[#2c1e11]/10 mx-2" />
+                  <button 
+                    onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                  >
+                    {isMusicEnabled ? <Volume2 size={18} className="text-[#2c1e11]" /> : <VolumeX size={18} className="text-[#2c1e11]/40" />}
+                  </button>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.1" 
+                    value={volume} 
+                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    className="w-24 h-1 bg-[#2c1e11]/20 rounded-full appearance-none cursor-pointer accent-[#d4af37]"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 w-full max-w-sm">

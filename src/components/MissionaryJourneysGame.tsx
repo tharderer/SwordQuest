@@ -1,15 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Compass, MapPin, ChevronRight, Award, RotateCcw, X, BookOpen, AlertCircle } from 'lucide-react';
+import { Compass, MapPin, ChevronRight, Award, RotateCcw, X, BookOpen, AlertCircle, Music, Volume2, VolumeX } from 'lucide-react';
 import { MISSIONARY_JOURNEYS, MissionaryNode } from '../missionaryData';
 import { cn } from '../lib/utils';
 
 interface MissionaryJourneysGameProps {
   onComplete: (xp: number) => void;
   onExit: () => void;
+  isMusicEnabled: boolean;
+  setIsMusicEnabled: (enabled: boolean) => void;
+  selectedMusicStyle: string;
+  setSelectedMusicStyle: (style: string) => void;
+  volume: number;
+  setVolume: (volume: number) => void;
 }
 
-export const MissionaryJourneysGame: React.FC<MissionaryJourneysGameProps> = ({ onComplete, onExit }) => {
+export const MissionaryJourneysGame: React.FC<MissionaryJourneysGameProps> = ({ 
+  onComplete, 
+  onExit,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
+  volume,
+  setVolume
+}) => {
   const [currentNodeId, setCurrentNodeId] = useState<string>('start');
   const [totalXp, setTotalXp] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
@@ -239,6 +254,30 @@ export const MissionaryJourneysGame: React.FC<MissionaryJourneysGameProps> = ({ 
           </div>
           
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md">
+              <Music className={cn("w-3.5 h-3.5", isMusicEnabled ? "text-amber-400" : "text-white/20")} />
+              <select 
+                value={selectedMusicStyle}
+                onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                className="bg-transparent text-white text-[10px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+              >
+                <option value="hymns" className="bg-slate-900">Hymns</option>
+                <option value="gospel" className="bg-slate-900">Gospel</option>
+                <option value="acoustic" className="bg-slate-900">Acoustic</option>
+                <option value="ambient" className="bg-slate-900">Ambient</option>
+                <option value="lofi" className="bg-slate-900">Lo-Fi</option>
+                <option value="classical" className="bg-slate-900">Classical</option>
+                <option value="retro" className="bg-slate-900">Retro</option>
+                <option value="epic" className="bg-slate-900">Epic</option>
+              </select>
+              <div className="w-px h-3 bg-white/10 mx-1" />
+              <button 
+                onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                {isMusicEnabled ? <Volume2 size={14} className="text-white" /> : <VolumeX size={14} className="text-white/40" />}
+              </button>
+            </div>
             <div className="flex flex-col items-end">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Rank: {getRank()}</span>
               <span className="text-xl font-black text-amber-400 leading-none">{totalXp} XP</span>

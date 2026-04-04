@@ -15,6 +15,12 @@ const hymnUrls = [
 interface SequenceChomperProps {
   onComplete: (xp: number) => void;
   onExit: () => void;
+  isMusicEnabled: boolean;
+  setIsMusicEnabled: (enabled: boolean) => void;
+  selectedMusicStyle: string;
+  setSelectedMusicStyle: (style: string) => void;
+  volume: number;
+  setVolume: (volume: number) => void;
 }
 
 interface FallingWord {
@@ -288,7 +294,16 @@ const SequenceProgressBar = React.memo(({ items, nextWordIndex, loopCount }: { i
   );
 });
 
-export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete, onExit }) => {
+export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ 
+  onComplete, 
+  onExit,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
+  volume,
+  setVolume
+}) => {
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'GAME_OVER' | 'VICTORY'>('LEVEL_SELECT');
   const [isLoading, setIsLoading] = useState(false);
   const [sequences, setSequences] = useState<BibleSequence[]>(INITIAL_SEQUENCES);
@@ -755,6 +770,30 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
             </div>
             <div className="flex flex-col items-end gap-3">
               <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md mr-2">
+                  <Music className={cn("w-3.5 h-3.5", isMusicEnabled ? "text-amber-400" : "text-white/20")} />
+                  <select 
+                    value={selectedMusicStyle}
+                    onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                    className="bg-transparent text-white text-[10px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                  >
+                    <option value="hymns" className="bg-slate-900">Hymns</option>
+                    <option value="gospel" className="bg-slate-900">Gospel</option>
+                    <option value="acoustic" className="bg-slate-900">Acoustic</option>
+                    <option value="ambient" className="bg-slate-900">Ambient</option>
+                    <option value="lofi" className="bg-slate-900">Lo-Fi</option>
+                    <option value="classical" className="bg-slate-900">Classical</option>
+                    <option value="retro" className="bg-slate-900">Retro</option>
+                    <option value="epic" className="bg-slate-900">Epic</option>
+                  </select>
+                  <div className="w-px h-3 bg-white/10 mx-1" />
+                  <button 
+                    onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    {isMusicEnabled ? <Volume2 size={14} className="text-white" /> : <VolumeX size={14} className="text-white/40" />}
+                  </button>
+                </div>
                 <button onClick={() => setIsPaused(!isPaused)} className="p-2 bg-white/10 rounded-xl">{isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}</button>
                 <div className="flex gap-1">{[...Array(5)].map((_, i) => <Heart key={i} size={20} className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} />)}</div>
               </div>

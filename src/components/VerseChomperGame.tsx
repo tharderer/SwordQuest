@@ -15,7 +15,12 @@ const hymnUrls = [
 interface VerseChomperProps {
   onComplete: (xp: number) => void;
   onExit: () => void;
-  isMuted: boolean;
+  isMusicEnabled: boolean;
+  setIsMusicEnabled: (enabled: boolean) => void;
+  selectedMusicStyle: string;
+  setSelectedMusicStyle: (style: string) => void;
+  volume: number;
+  setVolume: (volume: number) => void;
 }
 
 interface FallingWord {
@@ -363,7 +368,16 @@ const VerseProgressBar = React.memo(({ words, nextWordIndex, loopCount }: { word
   );
 });
 
-export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onExit }) => {
+export const VerseChomperGame: React.FC<VerseChomperProps> = ({ 
+  onComplete, 
+  onExit,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
+  volume,
+  setVolume
+}) => {
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'GAME_OVER' | 'VICTORY'>('LEVEL_SELECT');
   const [isVerseLoading, setIsVerseLoading] = useState(false);
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
@@ -1145,6 +1159,28 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
             <div className="flex flex-col items-end gap-3">
               <div className="flex gap-2 items-center">
+                <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-xl border border-white/10 mr-2">
+                  <button 
+                    onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    {isMusicEnabled ? <Volume2 size={14} className="text-white" /> : <VolumeX size={14} className="text-white/40" />}
+                  </button>
+                  <select 
+                    value={selectedMusicStyle}
+                    onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                    className="bg-transparent text-white text-[8px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                  >
+                    <option value="hymns" className="bg-slate-900">Hymns</option>
+                    <option value="gospel" className="bg-slate-900">Gospel</option>
+                    <option value="acoustic" className="bg-slate-900">Acoustic</option>
+                    <option value="ambient" className="bg-slate-900">Ambient</option>
+                    <option value="lofi" className="bg-slate-900">Lo-Fi</option>
+                    <option value="classical" className="bg-slate-900">Classical</option>
+                    <option value="retro" className="bg-slate-900">Retro</option>
+                    <option value="epic" className="bg-slate-900">Epic</option>
+                  </select>
+                </div>
                 <button 
                   onClick={() => setIsPaused(!isPaused)}
                   className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"

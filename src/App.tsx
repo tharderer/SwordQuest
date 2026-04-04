@@ -36,6 +36,7 @@ import {
   TowerControl as Tower,
   Quote,
   Volume2,
+  VolumeX,
   Music,
   ChevronUp,
   ChevronDown,
@@ -2536,6 +2537,8 @@ const BibleTriviaTowerGame = ({
   setVolume,
   isMusicEnabled,
   setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
   musicStatus,
   setMusicStatus,
   setIsQuestionBankOpen,
@@ -2550,6 +2553,8 @@ const BibleTriviaTowerGame = ({
   setVolume: (v: number) => void,
   isMusicEnabled: boolean,
   setIsMusicEnabled: (v: boolean) => void,
+  selectedMusicStyle: string,
+  setSelectedMusicStyle: (v: string) => void,
   musicStatus: string,
   setMusicStatus: (v: string) => void,
   setIsQuestionBankOpen: (v: boolean) => void,
@@ -3450,6 +3455,8 @@ const BibleTriviaTowerGame = ({
         setVolume={setVolume}
         isMusicEnabled={isMusicEnabled}
         setIsMusicEnabled={setIsMusicEnabled}
+        selectedMusicStyle={selectedMusicStyle}
+        setSelectedMusicStyle={setSelectedMusicStyle}
         musicStatus={musicStatus}
         onOpenBank={() => {
           setBankStore(JEOPARDY_STORE);
@@ -3732,7 +3739,31 @@ const generateBoggleGrid = (words: string[], verseText: string) => {
   return { grid: bestGrid, placedWords: bestWords };
 };
 
-const BoggleGame = ({ verse, onComplete, onExit, difficulty, setDifficulty }: { verse: Verse, onComplete: (xp: number) => void, onExit: () => void, difficulty: Difficulty, setDifficulty: (d: Difficulty) => void }) => {
+const BoggleGame = ({ 
+  verse, 
+  onComplete, 
+  onExit, 
+  difficulty, 
+  setDifficulty,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
+  volume,
+  setVolume
+}: { 
+  verse: Verse, 
+  onComplete: (xp: number) => void, 
+  onExit: () => void, 
+  difficulty: Difficulty, 
+  setDifficulty: (d: Difficulty) => void,
+  isMusicEnabled: boolean,
+  setIsMusicEnabled: (v: boolean) => void,
+  selectedMusicStyle: string,
+  setSelectedMusicStyle: (v: string) => void,
+  volume: number,
+  setVolume: (v: number) => void
+}) => {
   const allPossibleWords = useMemo(() => {
     const cleanText = verse.text.replace(/[.,!?;:"'()\[\]]/g, "");
     return Array.from(new Set(cleanText.split(/\s+/).filter(w => w.length >= 3).map(w => w.toUpperCase())));
@@ -4003,6 +4034,29 @@ const BoggleGame = ({ verse, onComplete, onExit, difficulty, setDifficulty }: { 
                 {d}
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded-lg border border-white/10">
+            <Music className={cn("w-3 h-3", isMusicEnabled ? "text-blue-400" : "text-white/20")} />
+            <select 
+              value={selectedMusicStyle}
+              onChange={(e) => setSelectedMusicStyle(e.target.value)}
+              className="bg-transparent text-white text-[8px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+            >
+              <option value="hymns" className="bg-slate-900">Hymns</option>
+              <option value="gospel" className="bg-slate-900">Gospel</option>
+              <option value="acoustic" className="bg-slate-900">Acoustic</option>
+              <option value="ambient" className="bg-slate-900">Ambient</option>
+              <option value="lofi" className="bg-slate-900">Lo-Fi</option>
+              <option value="classical" className="bg-slate-900">Classical</option>
+              <option value="retro" className="bg-slate-900">Retro</option>
+              <option value="epic" className="bg-slate-900">Epic</option>
+            </select>
+            <button 
+              onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+              className="p-0.5 hover:bg-white/10 rounded transition-colors"
+            >
+              {isMusicEnabled ? <Volume2 size={10} className="text-white" /> : <VolumeX size={10} className="text-white/40" />}
+            </button>
           </div>
         </div>
 
@@ -4398,7 +4452,13 @@ const BibleJeopardyGame = ({
   mode = 'bible',
   onModeChange,
   onUpdateGameState,
-  boardId
+  boardId,
+  isMusicEnabled,
+  setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
+  volume,
+  setVolume
 }: { 
   onExit: () => void, 
   categories: JeopardyCategory[],
@@ -4412,7 +4472,13 @@ const BibleJeopardyGame = ({
   mode?: JeopardyMode,
   onModeChange?: (mode: JeopardyMode) => void,
   onUpdateGameState?: (boardId: string, gameState: JeopardyGameState) => void,
-  boardId: string | null
+  boardId: string | null,
+  isMusicEnabled: boolean,
+  setIsMusicEnabled: (v: boolean) => void,
+  selectedMusicStyle: string,
+  setSelectedMusicStyle: (v: string) => void,
+  volume: number,
+  setVolume: (v: number) => void
 }) => {
   const difficulty = initialDifficulty;
   const [teamCount, setTeamCount] = useState(2);
@@ -4636,23 +4702,64 @@ const BibleJeopardyGame = ({
               </motion.p>
             </div>
 
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ delay: 1.4, type: 'spring', stiffness: 400, damping: 10 }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log("Enter Game Clicked");
-                setGameState('intro');
-              }}
-              className="mt-16 px-16 py-6 bg-yellow-400 text-blue-900 rounded-full font-black text-3xl shadow-[0_20px_50px_rgba(250,204,21,0.4)] hover:shadow-[0_25px_60px_rgba(250,204,21,0.5)] transition-all flex items-center gap-4 group relative z-[110]"
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+              className="flex flex-col items-center gap-4 mt-12"
             >
-              ENTER GAME
-              <ChevronRight size={32} className="group-hover:translate-x-2 transition-transform" />
-            </motion.button>
+              <div className="flex items-center gap-4 px-6 py-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md">
+                <Music className={cn("w-5 h-5", isMusicEnabled ? "text-yellow-400" : "text-white/20")} />
+                <select 
+                  value={selectedMusicStyle}
+                  onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                  className="bg-transparent text-white text-xs font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                >
+                  <option value="hymns" className="bg-blue-900">Hymns</option>
+                  <option value="gospel" className="bg-blue-900">Gospel</option>
+                  <option value="acoustic" className="bg-blue-900">Acoustic</option>
+                  <option value="ambient" className="bg-blue-900">Ambient</option>
+                  <option value="lofi" className="bg-blue-900">Lo-Fi</option>
+                  <option value="classical" className="bg-blue-900">Classical</option>
+                  <option value="retro" className="bg-blue-900">Retro</option>
+                  <option value="epic" className="bg-blue-900">Epic</option>
+                </select>
+                <div className="w-px h-4 bg-white/10 mx-2" />
+                <button 
+                  onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                >
+                  {isMusicEnabled ? <Volume2 size={18} className="text-white" /> : <VolumeX size={18} className="text-white/40" />}
+                </button>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.1" 
+                  value={volume} 
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="w-24 h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-yellow-400"
+                />
+              </div>
+              
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ delay: 1.4, type: 'spring', stiffness: 400, damping: 10 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Enter Game Clicked");
+                  setGameState('intro');
+                }}
+                className="px-16 py-6 bg-yellow-400 text-blue-900 rounded-full font-black text-3xl shadow-[0_20px_50px_rgba(250,204,21,0.4)] hover:shadow-[0_25px_60px_rgba(250,204,21,0.5)] transition-all flex items-center gap-4 group relative z-[110]"
+              >
+                ENTER GAME
+                <ChevronRight size={32} className="group-hover:translate-x-2 transition-transform" />
+              </motion.button>
+            </motion.div>
 
             {/* Background Decoration - CRITICAL: pointer-events-none to prevent blocking clicks */}
             <div className="absolute top-10 left-10 opacity-10 pointer-events-none select-none">
@@ -6995,6 +7102,8 @@ const MathTowerGame = ({
   setVolume,
   isMusicEnabled,
   setIsMusicEnabled,
+  selectedMusicStyle,
+  setSelectedMusicStyle,
   musicStatus,
   setMusicStatus,
   setIsQuestionBankOpen,
@@ -7008,6 +7117,8 @@ const MathTowerGame = ({
   setVolume: (v: number) => void,
   isMusicEnabled: boolean,
   setIsMusicEnabled: (v: boolean) => void,
+  selectedMusicStyle: string,
+  setSelectedMusicStyle: (v: string) => void,
   musicStatus: string,
   setMusicStatus: (v: string) => void,
   setIsQuestionBankOpen: (v: boolean) => void,
@@ -7410,6 +7521,8 @@ const MathTowerGame = ({
         setVolume={setVolume}
         isMusicEnabled={isMusicEnabled}
         setIsMusicEnabled={setIsMusicEnabled}
+        selectedMusicStyle={selectedMusicStyle}
+        setSelectedMusicStyle={setSelectedMusicStyle}
         musicStatus={musicStatus}
         onOpenBank={() => {
           setBankStore(JEOPARDY_STORE);
@@ -7672,13 +7785,11 @@ export default function App() {
     const musicUrls: Record<string, string[]> = {
       hymns: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
       ],
       gospel: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3"
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
       ],
       acoustic: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3",
@@ -7686,8 +7797,7 @@ export default function App() {
       ],
       ambient: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
       ],
       lofi: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
@@ -7695,7 +7805,7 @@ export default function App() {
       ],
       classical: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3"
       ],
       retro: [
         "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
@@ -8357,6 +8467,8 @@ export default function App() {
                 setVolume={setVolume}
                 isMusicEnabled={isMusicEnabled}
                 setIsMusicEnabled={setIsMusicEnabled}
+                selectedMusicStyle={selectedMusicStyle}
+                setSelectedMusicStyle={setSelectedMusicStyle}
                 musicStatus={musicStatus}
                 setMusicStatus={setMusicStatus}
                 setIsQuestionBankOpen={setIsQuestionBankOpen}
@@ -8382,6 +8494,8 @@ export default function App() {
                 setVolume={setVolume}
                 isMusicEnabled={isMusicEnabled}
                 setIsMusicEnabled={setIsMusicEnabled}
+                selectedMusicStyle={selectedMusicStyle}
+                setSelectedMusicStyle={setSelectedMusicStyle}
                 musicStatus={musicStatus}
                 setMusicStatus={setMusicStatus}
                 setIsQuestionBankOpen={setIsQuestionBankOpen}
@@ -8407,6 +8521,12 @@ export default function App() {
                 setView('dashboard');
               }}
               onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
             />
           </motion.div>
         )}
@@ -8427,6 +8547,12 @@ export default function App() {
                 setView('dashboard');
               }}
               onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
             />
           </motion.div>
         )}
@@ -8442,6 +8568,12 @@ export default function App() {
               <MissionaryJourneysGame 
                 onComplete={handleGameComplete} 
                 onExit={() => setView('dashboard')}
+                isMusicEnabled={isMusicEnabled}
+                setIsMusicEnabled={setIsMusicEnabled}
+                selectedMusicStyle={selectedMusicStyle}
+                setSelectedMusicStyle={setSelectedMusicStyle}
+                volume={volume}
+                setVolume={setVolume}
               />
             </motion.div>
           )}
@@ -8454,7 +8586,15 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="h-full flex flex-col bg-[#FDFCF0]"
             >
-              <BibleWitsAndWagersGame />
+              <BibleWitsAndWagersGame 
+              onExit={() => setView('map')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
+            />
             </motion.div>
           )}
 
@@ -8472,6 +8612,12 @@ export default function App() {
                 setDifficulty={setBoggleDifficulty}
                 onComplete={handleGameComplete} 
                 onExit={() => setView('dashboard')}
+                isMusicEnabled={isMusicEnabled}
+                setIsMusicEnabled={setIsMusicEnabled}
+                selectedMusicStyle={selectedMusicStyle}
+                setSelectedMusicStyle={setSelectedMusicStyle}
+                volume={volume}
+                setVolume={setVolume}
               />
             </motion.div>
           )}
@@ -8571,6 +8717,12 @@ export default function App() {
               onModeChange={setJeopardyMode}
               onUpdateGameState={updateJeopardyGameState}
               boardId={currentJeopardyBoardId}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
             />
           </motion.div>
         )}
