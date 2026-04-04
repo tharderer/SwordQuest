@@ -238,6 +238,18 @@ const HeartBreakEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
 };
 
 const SequenceProgressBar = React.memo(({ items, nextWordIndex, loopCount }: { items: string[], nextWordIndex: number, loopCount: number }) => {
+  const currentWordRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (currentWordRef.current) {
+      currentWordRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [nextWordIndex]);
+
   return (
     <div className="absolute bottom-0 left-0 right-0 p-4 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
       <div className="max-w-2xl mx-auto space-y-2">
@@ -272,6 +284,7 @@ const SequenceProgressBar = React.memo(({ items, nextWordIndex, loopCount }: { i
             return (
               <span 
                 key={i}
+                ref={isCurrent ? currentWordRef : null}
                 className={cn(
                   "text-xs font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded transition-all duration-500",
                   bgClass,
