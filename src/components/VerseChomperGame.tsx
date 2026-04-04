@@ -681,8 +681,9 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       text: wordToSpawn,
       x: Math.random() * 80 + 10, // 10% to 90%
       y: -10,
-      // Constant fall speed
-      speed: 0.45,
+      // Speed increases by 10% per loop, starting from 0.45 at Loop 1
+      // Capped at 2.0 to maintain readability as requested
+      speed: Math.min(2.0, 0.45 * Math.pow(1.1, loopCountRef.current - 1)),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
@@ -713,8 +714,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     const dt = Math.min(deltaTime, 32); 
     lastTimeRef.current = time;
 
-    // Spawn logic - faster as loops progress, but more gradual
-    const spawnRate = Math.max(1, 650 - (loopCountRef.current * 50));
+    // Spawn rate stays constant at Loop 1 level (600ms)
+    const spawnRate = 600;
     if (time - lastSpawnTime.current > spawnRate) {
       spawnWord();
       lastSpawnTime.current = time;
