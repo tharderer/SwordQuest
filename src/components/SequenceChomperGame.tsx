@@ -699,7 +699,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-dvh bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+    <div className="flex flex-col h-dvh bg-slate-950 text-white font-sans overflow-hidden fixed inset-0 select-none touch-none">
       {gameState === 'LEVEL_SELECT' && (
         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
           <div className="flex items-center gap-3">
@@ -773,22 +773,23 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
 
       {gameState === 'PLAYING' && (
         <div ref={gameAreaRef} onMouseMove={handleMouseMove} onTouchMove={handleMouseMove} className="flex-1 relative overflow-hidden cursor-none touch-none">
-          <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-20">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="px-3 py-1 bg-amber-500 rounded-full text-slate-950 font-black text-xs uppercase">Level {currentLevelIdx + 1}</div>
-                <div className="px-3 py-1 bg-white/10 rounded-full text-white font-black text-xs uppercase">Loop {loopCount}</div>
+          {/* HUD */}
+          <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent gap-2">
+            <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-amber-500 rounded-full text-slate-950 font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">Level {currentLevelIdx + 1}</div>
+                <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-white/10 rounded-full text-white font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">Loop {loopCount}</div>
               </div>
-              <h2 className="font-black text-xl tracking-tighter uppercase italic">{sequences[currentLevelIdx].title}</h2>
+              <h2 className="font-black text-sm sm:text-xl tracking-tighter uppercase italic truncate">{sequences[currentLevelIdx].title}</h2>
             </div>
-            <div className="flex flex-col items-end gap-3">
-              <div className="flex gap-2 items-center">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md mr-2">
-                  <Music className={cn("w-3.5 h-3.5", isMusicEnabled ? "text-amber-400" : "text-white/20")} />
+            <div className="flex flex-col items-end gap-2 sm:gap-3 shrink-0">
+              <div className="flex gap-1.5 sm:gap-2 items-center">
+                <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 bg-white/5 rounded-xl border border-white/10 backdrop-blur-md mr-1 sm:mr-2">
+                  <Music className={cn("w-3 h-3 sm:w-3.5 sm:h-3.5", isMusicEnabled ? "text-amber-400" : "text-white/20")} />
                   <select 
                     value={selectedMusicStyle}
                     onChange={(e) => setSelectedMusicStyle(e.target.value)}
-                    className="bg-transparent text-white text-[10px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                    className="bg-transparent text-white text-[7px] sm:text-[10px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer max-w-[50px] sm:max-w-none"
                   >
                     <option value="hymns" className="bg-slate-900">Hymns</option>
                     <option value="gospel" className="bg-slate-900">Gospel</option>
@@ -799,18 +800,24 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
                     <option value="retro" className="bg-slate-900">Retro</option>
                     <option value="epic" className="bg-slate-900">Epic</option>
                   </select>
-                  <div className="w-px h-3 bg-white/10 mx-1" />
+                  <div className="w-px h-2 sm:h-3 bg-white/10 mx-0.5 sm:mx-1" />
                   <button 
                     onClick={() => setIsMusicEnabled(!isMusicEnabled)}
-                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                    className="p-0.5 sm:p-1 hover:bg-white/10 rounded-lg transition-colors"
                   >
-                    {isMusicEnabled ? <Volume2 size={14} className="text-white" /> : <VolumeX size={14} className="text-white/40" />}
+                    {isMusicEnabled ? <Volume2 size={12} className="text-white" /> : <VolumeX size={12} className="text-white/40" />}
                   </button>
                 </div>
-                <button onClick={() => setIsPaused(!isPaused)} className="p-2 bg-white/10 rounded-xl">{isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}</button>
-                <div className="flex gap-1">{[...Array(5)].map((_, i) => <Heart key={i} size={20} className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} />)}</div>
+                <button onClick={() => setIsPaused(!isPaused)} className="p-1.5 sm:p-2 bg-white/10 rounded-xl">
+                  {isPaused ? <Play size={14} sm:size={18} fill="currentColor" /> : <Pause size={14} sm:size={18} fill="currentColor" />}
+                </button>
+                <div className="flex gap-0.5 sm:gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Heart key={i} size={14} className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} />
+                  ))}
+                </div>
               </div>
-              <div className="text-3xl font-black text-amber-400">{score}</div>
+              <div className="text-xl sm:text-3xl font-black text-amber-400 leading-none">{score}</div>
             </div>
           </div>
           <SequenceProgressBar items={items} nextWordIndex={nextWordIndex} loopCount={loopCount} />

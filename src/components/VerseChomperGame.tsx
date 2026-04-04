@@ -904,7 +904,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-dvh bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+    <div className="flex flex-col h-dvh bg-slate-950 text-white font-sans overflow-hidden fixed inset-0 select-none touch-none">
       {/* Fever Mode Background Pulse */}
       {gameState === 'PLAYING' && streak >= 10 && (
         <motion.div 
@@ -1157,32 +1157,32 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
             </div>
           )}
           {/* HUD */}
-          <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="px-3 py-1 bg-amber-500 rounded-full text-slate-950 font-black text-xs uppercase tracking-tighter">
+          <div className="absolute top-0 left-0 right-0 p-3 sm:p-6 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent gap-2">
+            <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-amber-500 rounded-full text-slate-950 font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">
                   Level {CHOMPER_LEVELS[currentLevelIdx].id}
                 </div>
-                <div className="px-3 py-1 bg-white/10 rounded-full text-white font-black text-xs uppercase tracking-tighter">
+                <div className="px-2 sm:px-3 py-0.5 sm:py-1 bg-white/10 rounded-full text-white font-black text-[10px] sm:text-xs uppercase tracking-tighter whitespace-nowrap">
                   Loop {loopCount}
                 </div>
               </div>
-              <h2 className="font-black text-xl tracking-tighter uppercase italic">{CHOMPER_LEVELS[currentLevelIdx].reference}</h2>
+              <h2 className="font-black text-sm sm:text-xl tracking-tighter uppercase italic truncate">{CHOMPER_LEVELS[currentLevelIdx].reference}</h2>
             </div>
 
-            <div className="flex flex-col items-end gap-3">
-              <div className="flex gap-2 items-center">
-                <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-xl border border-white/10 mr-2">
+            <div className="flex flex-col items-end gap-2 sm:gap-3 shrink-0">
+              <div className="flex gap-1.5 sm:gap-2 items-center">
+                <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 bg-white/5 rounded-xl border border-white/10 mr-1 sm:mr-2">
                   <button 
                     onClick={() => setIsMusicEnabled(!isMusicEnabled)}
                     className="p-1 hover:bg-white/10 rounded-lg transition-colors"
                   >
-                    {isMusicEnabled ? <Volume2 size={14} className="text-white" /> : <VolumeX size={14} className="text-white/40" />}
+                    {isMusicEnabled ? <Volume2 size={12} className="text-white" /> : <VolumeX size={12} className="text-white/40" />}
                   </button>
                   <select 
                     value={selectedMusicStyle}
                     onChange={(e) => setSelectedMusicStyle(e.target.value)}
-                    className="bg-transparent text-white text-[8px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                    className="bg-transparent text-white text-[7px] sm:text-[8px] font-bold uppercase tracking-widest outline-none border-none cursor-pointer max-w-[50px] sm:max-w-none"
                   >
                     <option value="hymns" className="bg-slate-900">Hymns</option>
                     <option value="gospel" className="bg-slate-900">Gospel</option>
@@ -1196,23 +1196,23 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
                 </div>
                 <button 
                   onClick={() => setIsPaused(!isPaused)}
-                  className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                  className="p-1.5 sm:p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
                 >
-                  {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+                  {isPaused ? <Play size={14} sm:size={18} fill="currentColor" /> : <Pause size={14} sm:size={18} fill="currentColor" />}
                 </button>
-                <div className="flex gap-1">
+                <div className="flex gap-0.5 sm:gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Heart 
                       key={i} 
-                      size={20} 
+                      size={14}
                       className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} 
                     />
                   ))}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-black text-amber-400 leading-none">{score}</div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Score</div>
+                <div className="text-xl sm:text-3xl font-black text-amber-400 leading-none">{score}</div>
+                <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">Score</div>
               </div>
             </div>
           </div>
