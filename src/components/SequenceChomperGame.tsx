@@ -318,7 +318,6 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fallingWordsRef = useRef<FallingWord[]>([]);
-  useEffect(() => { fallingWordsRef.current = fallingWords; }, [fallingWords]);
 
   useEffect(() => {
     if (explosions.length > 0) {
@@ -509,6 +508,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
       localStorage.removeItem('sequence_chomper_saved_session');
       setSavedSession(null);
     }
+    fallingWordsRef.current = [];
     setFallingWords([]);
     setCurrentLevelIdx(idx);
     setIsPaused(false);
@@ -567,7 +567,8 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
-    setFallingWords(prev => [...prev, newFallingWord]);
+    fallingWordsRef.current.push(newFallingWord);
+    setFallingWords([...fallingWordsRef.current]);
   }, []);
 
   const updateGame = useCallback((time: number) => {
@@ -631,7 +632,8 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
     }
 
     // Apply state updates
-    setFallingWords(next);
+    fallingWordsRef.current = next;
+    setFallingWords([...next]);
 
     if (caughtWord) {
       playChompSound(true);
