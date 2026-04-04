@@ -38,14 +38,12 @@ interface Explosion {
   id: number;
   x: number;
   y: number;
-  createdAt: number;
 }
 
 interface HeartBreak {
   id: number;
   x: number;
   y: number;
-  createdAt: number;
 }
 
 interface ChomperLevel {
@@ -86,9 +84,8 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
     </div>
   );
 }, (prev, next) => {
-  // Only re-render if position or text changed significantly (approx every other frame at 60fps)
   return prev.word.id === next.word.id && 
-         Math.abs(prev.word.y - next.word.y) < 0.5 && 
+         prev.word.y === next.word.y && 
          prev.word.x === next.word.x;
 });
 
@@ -672,15 +669,19 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
   };
 
   const addExplosion = useCallback((x: number, y: number) => {
-    const now = Date.now();
-    const id = now + Math.random();
-    setExplosions(prev => [...prev, { id, x, y, createdAt: now }]);
+    const id = Date.now() + Math.random();
+    setExplosions(prev => [...prev, { id, x, y }]);
+    setTimeout(() => {
+      setExplosions(current => current.filter(e => e.id !== id));
+    }, 800);
   }, []);
 
   const addHeartBreak = useCallback((x: number, y: number) => {
-    const now = Date.now();
-    const id = now + Math.random();
-    setHeartBreaks(prev => [...prev, { id, x, y, createdAt: now }]);
+    const id = Date.now() + Math.random();
+    setHeartBreaks(prev => [...prev, { id, x, y }]);
+    setTimeout(() => {
+      setHeartBreaks(current => current.filter(h => h.id !== id));
+    }, 1000);
   }, []);
 
   const spawnWord = useCallback(() => {
@@ -867,17 +868,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({
           return nextIdx;
         });
       }
-
-      // Clean up old explosions and heartBreaks
-      const now = Date.now();
-      setExplosions(prevExp => {
-        const filtered = prevExp.filter(e => now - e.createdAt < 800);
-        return filtered.length !== prevExp.length ? filtered : prevExp;
-      });
-      setHeartBreaks(prevHb => {
-        const filtered = prevHb.filter(h => now - h.createdAt < 1000);
-        return filtered.length !== prevHb.length ? filtered : prevHb;
-      });
 
       return next;
     });

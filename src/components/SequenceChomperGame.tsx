@@ -37,14 +37,12 @@ interface Explosion {
   id: number;
   x: number;
   y: number;
-  createdAt: number;
 }
 
 interface HeartBreak {
   id: number;
   x: number;
   y: number;
-  createdAt: number;
 }
 
 interface SavedSession {
@@ -98,7 +96,7 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
   );
 }, (prev, next) => {
   return prev.word.id === next.word.id && 
-         Math.abs(prev.word.y - next.word.y) < 0.5 && 
+         prev.word.y === next.word.y && 
          prev.word.x === next.word.x;
 });
 
@@ -632,31 +630,23 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
 
     // Apply state updates
     fallingWordsRef.current = next;
-    setFallingWords([...next]);
-
-    // Clean up old explosions and heartBreaks
-    const now = Date.now();
-    setExplosions(prevExp => {
-      const filtered = prevExp.filter(e => now - e.createdAt < 800);
-      if (caughtWord) {
-        return [...filtered, { id: now + Math.random(), x: caughtWord!.x, y: caughtWord!.y + (caughtWord!.speed * (dt / 16)), createdAt: now }];
-      }
-      return filtered.length !== prevExp.length ? filtered : prevExp;
-    });
-
-    setHeartBreaks(prevHb => {
-      const filtered = prevHb.filter(h => now - h.createdAt < 1000);
-      if (missedWordPos) {
-        return [...filtered, { id: now + Math.random(), x: missedWordPos!.x, y: missedWordPos!.y, createdAt: now }];
-      }
-      return filtered.length !== prevHb.length ? filtered : prevHb;
-    });
+    setFallingWords(next);
 
     if (caughtWord) {
       playChompSound(true);
+      const id = Date.now() + Math.random();
+      setExplosions(prev => [...prev, { id, x: caughtWord!.x, y: caughtWord!.y + (caughtWord!.speed * (dt / 16)) }]);
+      setTimeout(() => {
+        setExplosions(current => current.filter(e => e.id !== id));
+      }, 800);
     }
     if (missedWordPos) {
       playChompSound(false);
+      const id = Date.now() + Math.random();
+      setHeartBreaks(prev => [...prev, { id, x: missedWordPos!.x, y: missedWordPos!.y }]);
+      setTimeout(() => {
+        setHeartBreaks(current => current.filter(h => h.id !== id));
+      }, 1000);
     }
 
     if (livesLost > 0) {
