@@ -752,15 +752,18 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     }
 
     const wordToSpawn = currentWords[wordIdx];
+    const totalWords = currentWords.length;
+    const currentProgressQuarters = totalWords > 0 ? Math.floor((nextWordIndexRef.current / totalWords) * 4) : 0;
+    const totalQuarters = (loopCountRef.current - 1) * 4 + currentProgressQuarters;
 
     const newFallingWord: FallingWord = {
       id: Date.now() + Math.random(),
       text: wordToSpawn,
       x: Math.random() * 80 + 10, // 10% to 90%
       y: -10,
-      // Speed increases by 10% per loop, starting from 0.45 at Loop 1
+      // Speed increases by 3% each quarter of a loop, starting from 0.45 at Loop 1
       // Capped at 2.0 to maintain readability as requested
-      speed: Math.min(2.0, 0.45 * Math.pow(1.1, loopCountRef.current - 1)),
+      speed: Math.min(2.0, 0.45 * Math.pow(1.03, totalQuarters)),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
@@ -1249,17 +1252,17 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             loopCount={loopCount}
           />
 
-          {/* Speed Up Notification */}
+          {/* Speed Up Notification (Top Flash) */}
           <AnimatePresence>
             {showSpeedUp && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.5 }}
-                className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none"
+                initial={{ y: -100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -100, opacity: 0 }}
+                className="absolute top-24 left-0 right-0 flex justify-center z-50 pointer-events-none"
               >
-                <div className="bg-amber-500 text-slate-950 px-8 py-4 rounded-3xl font-black text-4xl italic uppercase tracking-tighter shadow-2xl">
-                  {loopCount === 8 ? "LEVEL PASSED!" : "Speed Up!"}
+                <div className="bg-amber-500 text-slate-950 px-6 py-2 rounded-full font-black text-xl italic uppercase tracking-tighter shadow-2xl border-2 border-white/20">
+                  {loopCount === 8 ? "LEVEL PASSED!" : `LOOP ${loopCount} START!`}
                 </div>
               </motion.div>
             )}
