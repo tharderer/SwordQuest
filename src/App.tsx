@@ -1160,7 +1160,18 @@ const QuestionBankOverlay = ({ isOpen, onClose, storeName = JEOPARDY_STORE }: { 
   );
 };
 
-const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabled, setIsMusicEnabled, musicStatus, onOpenBank, onOpenWitsBank, onRepair, downloadProgress }: any) => {
+const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabled, setIsMusicEnabled, selectedMusicStyle, setSelectedMusicStyle, onOpenBank, onOpenWitsBank, onRepair, downloadProgress }: any) => {
+  const musicStyles = [
+    { id: 'hymns', name: 'Piano Hymns', icon: <Music className="w-4 h-4" /> },
+    { id: 'gospel', name: 'Gospel Classics', icon: <Music className="w-4 h-4" /> },
+    { id: 'acoustic', name: 'Acoustic Worship', icon: <Music className="w-4 h-4" /> },
+    { id: 'ambient', name: 'Ambient Prayer', icon: <Music className="w-4 h-4" /> },
+    { id: 'lofi', name: 'Lo-Fi Study', icon: <Music className="w-4 h-4" /> },
+    { id: 'classical', name: 'Classical Sacred', icon: <Music className="w-4 h-4" /> },
+    { id: 'retro', name: 'Retro 8-bit', icon: <Music className="w-4 h-4" /> },
+    { id: 'epic', name: 'Epic Orchestral', icon: <Music className="w-4 h-4" /> }
+  ];
+
   return (
     <>
       <AnimatePresence>
@@ -1176,7 +1187,7 @@ const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabl
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-slate-900 border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl"
+              className="bg-slate-900 border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-8">
@@ -1206,26 +1217,49 @@ const SettingsOverlay = memo(({ isOpen, onClose, volume, setVolume, isMusicEnabl
                   />
                 </div>
 
-                <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <Music className={cn("w-5 h-5", isMusicEnabled ? "text-blue-400" : "text-white/30")} />
-                    <div>
-                      <span className="text-white font-bold uppercase tracking-widest text-xs block">Background Music</span>
-                      <span className="text-[10px] text-white/40 uppercase font-bold">{musicStatus}</span>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <Music className={cn("w-5 h-5", isMusicEnabled ? "text-blue-400" : "text-white/30")} />
+                      <div>
+                        <span className="text-white font-bold uppercase tracking-widest text-xs block">Background Music</span>
+                        <span className="text-[10px] text-white/40 uppercase font-bold">{isMusicEnabled ? "Playing" : "Muted"}</span>
+                      </div>
                     </div>
+                    <button 
+                      onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                      className={cn(
+                        "w-12 h-6 rounded-full transition-all relative",
+                        isMusicEnabled ? "bg-blue-600" : "bg-slate-700"
+                      )}
+                    >
+                      <motion.div 
+                        animate={{ x: isMusicEnabled ? 24 : 4 }}
+                        className="absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow-lg"
+                      />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setIsMusicEnabled(!isMusicEnabled)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-all relative",
-                      isMusicEnabled ? "bg-blue-600" : "bg-slate-700"
-                    )}
-                  >
-                    <motion.div 
-                      animate={{ x: isMusicEnabled ? 24 : 4 }}
-                      className="absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow-lg"
-                    />
-                  </button>
+
+                  {isMusicEnabled && (
+                    <div className="grid grid-cols-1 gap-2">
+                      <span className="text-[10px] text-white/40 uppercase font-bold px-2">Music Style</span>
+                      {musicStyles.map(style => (
+                        <button
+                          key={style.id}
+                          onClick={() => setSelectedMusicStyle(style.id)}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl border transition-all",
+                            selectedMusicStyle === style.id 
+                              ? "bg-blue-600/20 border-blue-500/50 text-blue-400" 
+                              : "bg-white/5 border-white/5 text-white/50 hover:bg-white/10"
+                          )}
+                        >
+                          {style.icon}
+                          <span className="text-xs font-bold uppercase tracking-wider">{style.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
@@ -2711,18 +2745,7 @@ const BibleTriviaTowerGame = ({
   const playCorrectSound = () => playSound(880, 'sine', 0.1);
   const playIncorrectSound = () => playSound(220, 'sawtooth', 0.2);
 
-  useEffect(() => {
-    if (showStart || isGameOver || !isMusicEnabled || isPaused || isStudyOpen) {
-      if (audioRef.current) audioRef.current.pause();
-      return;
-    }
-    if (!audioRef.current) {
-      audioRef.current = new Audio(hymnUrls[Math.floor(Math.random() * hymnUrls.length)]);
-      audioRef.current.loop = true;
-    }
-    audioRef.current.volume = volume * 0.3;
-    audioRef.current.play().catch(() => {});
-  }, [showStart, isGameOver, isMusicEnabled, isPaused, isStudyOpen, volume]);
+  // Music is now universal
 
   useEffect(() => {
     if (showStart || isGameOver || isPaused || isLoading || isStudyOpen) return;
@@ -5559,58 +5582,7 @@ const EndlessBlitzGame = ({
     playCorrectSound();
   }, [playCorrectSound]);
 
-  // External Music Player - Play/Pause Logic
-  useEffect(() => {
-    if (showStart || isGameOver || showTutorial || !isMusicEnabled || isPaused) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        setMusicStatus("Paused");
-      }
-      return;
-    }
-
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.loop = false;
-      audioRef.current.onended = () => {
-        const nextIdx = Math.floor(Math.random() * hymnUrls.length);
-        audioRef.current!.src = hymnUrls[nextIdx];
-        audioRef.current!.load();
-        audioRef.current!.play().catch(e => console.error("Audio play failed:", e));
-      };
-      audioRef.current.onplay = () => setMusicStatus("Playing");
-      audioRef.current.onpause = () => setMusicStatus("Paused");
-      audioRef.current.onerror = (e) => {
-        // Only log if it's a real error, not a source change
-        if (audioRef.current?.error) {
-          console.warn("Audio source error, trying next track...");
-          setMusicStatus("Error");
-          const nextIdx = Math.floor(Math.random() * hymnUrls.length);
-          audioRef.current!.src = hymnUrls[nextIdx];
-          audioRef.current!.load();
-          audioRef.current!.play().catch(() => {}); // Silent catch for retry
-        }
-      };
-    }
-
-    if (audioRef.current.paused) {
-      if (!audioRef.current.src) {
-        const startIdx = Math.floor(Math.random() * hymnUrls.length);
-        audioRef.current.src = hymnUrls[startIdx];
-        audioRef.current.load();
-      }
-      audioRef.current.play()
-        .then(() => setMusicStatus("Playing"))
-        .catch(e => {
-          console.error("Audio play failed in effect:", e);
-          setMusicStatus("Blocked");
-        });
-    }
-
-    return () => {
-      if (audioRef.current) audioRef.current.pause();
-    };
-  }, [showStart, isGameOver, showTutorial, isMusicEnabled, isPaused]);
+  // Music is now universal
 
   // External Hymn Player - Volume Logic
   useEffect(() => {
@@ -6029,44 +6001,7 @@ const EndlessBlitzGame = ({
       audioCtxRef.current.resume();
     }
     
-    // Also trigger the music audio if enabled
-    if (isMusicEnabled) {
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-        audioRef.current.loop = false;
-        audioRef.current.onended = () => {
-          const nextIdx = Math.floor(Math.random() * hymnUrls.length);
-          audioRef.current!.src = hymnUrls[nextIdx];
-          audioRef.current!.load();
-          audioRef.current!.play().catch(e => console.error("Audio play failed:", e));
-        };
-        audioRef.current.onplay = () => setMusicStatus("Playing");
-        audioRef.current.onpause = () => setMusicStatus("Paused");
-        audioRef.current.onerror = (e) => {
-          console.error("Audio error in handleStart:", e);
-          setMusicStatus("Error");
-          const nextIdx = Math.floor(Math.random() * hymnUrls.length);
-          audioRef.current!.src = hymnUrls[nextIdx];
-          audioRef.current!.load();
-          audioRef.current!.play().catch(err => console.error("Audio retry failed:", err));
-        };
-      }
-      
-      if (audioRef.current.paused) {
-        const startIdx = Math.floor(Math.random() * hymnUrls.length);
-        audioRef.current.src = hymnUrls[startIdx];
-        audioRef.current.load();
-        audioRef.current.volume = volume * 0.4;
-        audioRef.current.play()
-          .then(() => {
-            setMusicStatus("Playing");
-          })
-          .catch(e => {
-            console.error("Initial audio play failed:", e);
-            setMusicStatus("Blocked");
-          });
-      }
-    }
+    // Music is now universal
     
     setShowStart(false);
   };
@@ -7253,32 +7188,7 @@ const MathTowerGame = ({
     playSound(180, 'triangle', 0.3, 0.4, false);
   }, [playSound]);
 
-  useEffect(() => {
-    if (showStart || isGameOver || !isMusicEnabled || isPaused || isOutOfHearts) {
-      if (audioRef.current) audioRef.current.pause();
-      return;
-    }
-
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.loop = false;
-      audioRef.current.onended = () => {
-        const nextIdx = Math.floor(Math.random() * hymnUrls.length);
-        audioRef.current!.src = hymnUrls[nextIdx];
-        audioRef.current!.load();
-        audioRef.current!.play().catch(e => console.error("Audio play failed:", e));
-      };
-    }
-
-    if (audioRef.current.paused) {
-      if (!audioRef.current.src) {
-        const startIdx = Math.floor(Math.random() * hymnUrls.length);
-        audioRef.current.src = hymnUrls[startIdx];
-        audioRef.current.load();
-      }
-      audioRef.current.play().catch(() => {});
-    }
-  }, [showStart, isGameOver, isMusicEnabled, isPaused, isOutOfHearts]);
+  // Music is now universal
 
   const OP_COLORS = {
     addition: '#3b82f6', // blue
@@ -7734,7 +7644,8 @@ export default function App() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showMasteredVerses, setShowMasteredVerses] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper'>('dashboard');
+  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper';
   const [boggleDifficulty, setBoggleDifficulty] = useState<Difficulty>('easy');
   const [referenceTowerDifficulty, setReferenceTowerDifficulty] = useState<ReferenceTowerDifficulty>('easy');
   const [showReward, setShowReward] = useState(false);
@@ -7754,6 +7665,75 @@ export default function App() {
   const [bankStore, setBankStore] = useState(JEOPARDY_STORE);
   const [volume, setVolume] = useState(0.5);
   const [isMusicEnabled, setIsMusicEnabled] = useState(true);
+  const [selectedMusicStyle, setSelectedMusicStyle] = useState('hymns');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const musicUrls: Record<string, string[]> = {
+      hymns: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"
+      ],
+      gospel: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3"
+      ],
+      acoustic: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3"
+      ],
+      ambient: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3"
+      ],
+      lofi: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3"
+      ],
+      classical: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+      ],
+      retro: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"
+      ],
+      epic: [
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3",
+        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"
+      ]
+    };
+
+    const currentUrls = musicUrls[selectedMusicStyle] || musicUrls.hymns;
+    const randomUrl = currentUrls[Math.floor(Math.random() * currentUrls.length)];
+
+    if (!audioRef.current) {
+      audioRef.current = new Audio(randomUrl);
+      audioRef.current.loop = true;
+    } else if (audioRef.current.src !== randomUrl) {
+      audioRef.current.src = randomUrl;
+    }
+
+    audioRef.current.muted = !isMusicEnabled;
+    audioRef.current.volume = volume * 0.3;
+
+    if (isMusicEnabled && isGameView) {
+      audioRef.current.play().then(() => setMusicStatus("Playing")).catch(e => {
+        console.error("Audio playback failed:", e);
+        setMusicStatus("Error");
+      });
+    } else {
+      audioRef.current.pause();
+      setMusicStatus(isMusicEnabled ? "Paused" : "Muted");
+    }
+
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, [isMusicEnabled, selectedMusicStyle, volume, isGameView]);
   const [musicStatus, setMusicStatus] = useState<string>("Stopped");
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -7959,7 +7939,7 @@ export default function App() {
     setView('dashboard');
   };
 
-  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper';
+
 
   if (!progress || !isDbReady) {
     return (
@@ -8663,7 +8643,8 @@ export default function App() {
             setVolume={setVolume}
             isMusicEnabled={isMusicEnabled}
             setIsMusicEnabled={setIsMusicEnabled}
-            musicStatus={musicStatus}
+            selectedMusicStyle={selectedMusicStyle}
+            setSelectedMusicStyle={setSelectedMusicStyle}
             onOpenBank={() => {
               setBankStore(JEOPARDY_STORE);
               setIsQuestionBankOpen(true);

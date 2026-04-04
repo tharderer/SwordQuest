@@ -15,6 +15,7 @@ const hymnUrls = [
 interface VerseChomperProps {
   onComplete: (xp: number) => void;
   onExit: () => void;
+  isMuted: boolean;
 }
 
 interface FallingWord {
@@ -382,8 +383,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [isPaused, setIsPaused] = useState(false);
   const [startLoops, setStartLoops] = useState<Record<number, number>>({});
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [selectedMusicStyle, setSelectedMusicStyle] = useState<'hymn' | 'retro' | 'epic' | 'pop'>('hymn');
   const [showTutorial, setShowTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isJumbled, setIsJumbled] = useState(false);
@@ -490,7 +489,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   }, [gameState, isPaused]);
 
   const playSound = useCallback((freq: number, type: OscillatorType, dur: number, vol: number = 0.2) => {
-    if (isMuted) return;
+    // Sound effects are still local but respect a prop or global state if needed
+    // For now, we'll keep them enabled or add a prop later if requested
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -523,7 +523,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     } catch (e) {
       console.error("Sound playback failed:", e);
     }
-  }, [isMuted]);
+  }, []);
 
   const playChompSound = useCallback((isCorrect: boolean) => {
     if (isCorrect) {
@@ -534,54 +534,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     }
   }, [playSound]);
 
-  // Audio playback effect
-  useEffect(() => {
-    if (gameState === 'PLAYING') {
-      const styleUrls = {
-        hymn: hymnUrls,
-        retro: [
-          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"
-        ],
-        epic: [
-          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3",
-          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"
-        ],
-        pop: [
-          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3",
-          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3"
-        ]
-      };
-
-      const currentUrls = styleUrls[selectedMusicStyle];
-      const randomUrl = currentUrls[Math.floor(Math.random() * currentUrls.length)];
-
-      if (!audioRef.current) {
-        audioRef.current = new Audio(randomUrl);
-        audioRef.current.loop = true;
-      } else if (audioRef.current.src !== randomUrl) {
-        audioRef.current.src = randomUrl;
-      }
-      
-      audioRef.current.muted = isMuted;
-      audioRef.current.volume = 0.3;
-      
-      const playAudio = async () => {
-        try {
-          await audioRef.current?.play();
-        } catch (e) {
-          console.error("Audio playback failed:", e);
-        }
-      };
-      playAudio();
-    } else {
-      audioRef.current?.pause();
-    }
-
-    return () => {
-      audioRef.current?.pause();
-    };
-  }, [gameState, isMuted, selectedMusicStyle]);
+  // Audio playback effect - removed as it's now universal
 
   const saveProgress = (levelId: number, newScore: number, currentLoop: number) => {
     const updatedScores = { ...highScores, [levelId]: Math.max(highScores[levelId] || 0, newScore) };
@@ -1003,23 +956,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               </motion.div>
             )}
 
-            {/* Music Selection */}
-            <div className="flex flex-wrap justify-center gap-2 mb-8">
-              {(['hymn', 'retro', 'epic', 'pop'] as const).map((style) => (
-                <button
-                  key={style}
-                  onClick={() => setSelectedMusicStyle(style)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2",
-                    selectedMusicStyle === style 
-                      ? "bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20" 
-                      : "bg-slate-900 text-slate-400 border-white/5 hover:border-white/10"
-                  )}
-                >
-                  {style} VIBE
-                </button>
-              ))}
-            </div>
+            {/* Music Selection Removed - Now Universal */}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {CHOMPER_LEVELS.map((level, idx) => {
@@ -1208,13 +1145,6 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
             <div className="flex flex-col items-end gap-3">
               <div className="flex gap-2 items-center">
-                <button 
-                  onClick={() => setIsMuted(!isMuted)}
-                  className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
-                  title={isMuted ? "Unmute Music" : "Mute Music"}
-                >
-                  {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                </button>
                 <button 
                   onClick={() => setIsPaused(!isPaused)}
                   className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"

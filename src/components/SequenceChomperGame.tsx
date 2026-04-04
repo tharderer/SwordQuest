@@ -307,8 +307,6 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
   const [isPaused, setIsPaused] = useState(false);
   const [startLoops, setStartLoops] = useState<Record<number, number>>({});
-  const [isMuted, setIsMuted] = useState(false);
-  const [selectedMusicStyle, setSelectedMusicStyle] = useState<'hymn' | 'retro' | 'epic' | 'pop'>('hymn');
   const [showTutorial, setShowTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [showSpeedUp, setShowSpeedUp] = useState(false);
@@ -413,7 +411,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
   }, [gameState, isPaused]);
 
   const playSound = useCallback((freq: number, type: OscillatorType, dur: number, vol: number = 0.2) => {
-    if (isMuted) return;
+    // Sound effects are still local but respect a prop or global state if needed
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -439,7 +437,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
     } catch (e) {
       console.error("Sound playback failed:", e);
     }
-  }, [isMuted]);
+  }, []);
 
   const playChompSound = useCallback((isCorrect: boolean) => {
     if (isCorrect) {
@@ -450,23 +448,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
     }
   }, [playSound]);
 
-  useEffect(() => {
-    if (gameState === 'PLAYING') {
-      const randomUrl = hymnUrls[Math.floor(Math.random() * hymnUrls.length)];
-      if (!audioRef.current) {
-        audioRef.current = new Audio(randomUrl);
-        audioRef.current.loop = true;
-      } else if (audioRef.current.src !== randomUrl) {
-        audioRef.current.src = randomUrl;
-      }
-      audioRef.current.muted = isMuted;
-      audioRef.current.volume = 0.3;
-      audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
-    } else {
-      audioRef.current?.pause();
-    }
-    return () => audioRef.current?.pause();
-  }, [gameState, isMuted, selectedMusicStyle]);
+  // Audio playback effect - removed as it's now universal
 
   const saveProgress = (levelId: number, newScore: number, currentLoop: number) => {
     const updatedScores = { ...highScores, [levelId]: Math.max(highScores[levelId] || 0, newScore) };
@@ -590,7 +572,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
 
     const prev = fallingWordsRef.current;
     const next: FallingWord[] = [];
-    const currentNextWordIdx = nextWordIndexRef.current;
+    let activeNextWordIdx = nextWordIndexRef.current;
     const currentAvatarPos = avatarPosRef.current;
     const currentLoop = loopCountRef.current;
     const currentStreak = streakRef.current;
@@ -606,21 +588,22 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
     for (const w of prev) {
       const newY = w.y + (w.speed * (dt / 16));
       if (newY > 105) {
-        if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+        if (w.isCorrect && w.wordIndex === activeNextWordIdx) {
           livesLost++;
           streakReset = true;
-          nextWordToSpawnRef.current = currentNextWordIdx;
+          nextWordToSpawnRef.current = activeNextWordIdx;
         }
         continue;
       }
       const dx = w.x - currentAvatarPos.x;
       const dy = newY - currentAvatarPos.y;
       if (dx * dx + dy * dy < 81) {
-        if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+        if (w.isCorrect && w.wordIndex === activeNextWordIdx) {
           caughtWord = w;
           scoreGained += (10 * currentLoop * (currentStreak >= 10 ? 2 : 1));
           nextWordAdvanced = true;
           streakIncrement++;
+          activeNextWordIdx = (activeNextWordIdx + 1) % itemsRef.current.length;
         } else {
           missedWordPos = { x: currentAvatarPos.x, y: currentAvatarPos.y };
           livesLost++;
