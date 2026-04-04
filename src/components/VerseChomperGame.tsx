@@ -141,14 +141,12 @@ const Avatar = React.memo(({ pos, streak, loopCount }: { pos: { x: number, y: nu
         willChange: 'transform'
       }}
     >
-      <motion.div 
-        animate={isFever ? { scale: [1, 1.1, 1], rotate: [0, 2, -2, 0] } : {}}
-        transition={{ duration: 0.2, repeat: Infinity }}
+      <div 
         className={cn(
           "w-9 h-9 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden transition-colors duration-500",
           skinColor,
           shadowColor,
-          isFever && "ring-4 ring-orange-500 ring-offset-2 ring-offset-transparent"
+          isFever && "ring-4 ring-orange-500 ring-offset-2 ring-offset-transparent animate-fever"
         )}
       >
         <div className="absolute top-1/4 left-1/4 w-1.5 h-1.5 bg-slate-950 rounded-full" />
@@ -156,13 +154,9 @@ const Avatar = React.memo(({ pos, streak, loopCount }: { pos: { x: number, y: nu
         <div className="absolute bottom-1 w-4.5 h-2 bg-slate-950 rounded-full" />
         {extraEffects}
         {isFever && (
-          <motion.div 
-            animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.2, 1] }}
-            transition={{ duration: 0.5, repeat: Infinity }}
-            className="absolute inset-0 bg-gradient-to-t from-orange-600/40 to-transparent"
-          />
+          <div className="absolute inset-0 bg-gradient-to-t from-orange-600/40 to-transparent animate-fever-glow" />
         )}
-      </motion.div>
+      </div>
       
       {streak >= 5 && (
         <div className={cn(
@@ -270,14 +264,12 @@ const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, hea
       <Avatar pos={avatarPos} streak={streak} loopCount={loopCount} />
 
       {/* Effects */}
-      <AnimatePresence>
-        {explosions.map(e => (
-          <ExplosionEffect key={e.id} x={e.x} y={e.y} />
-        ))}
-        {heartBreaks.map(h => (
-          <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
-        ))}
-      </AnimatePresence>
+      {explosions.map(e => (
+        <ExplosionEffect key={e.id} x={e.x} y={e.y} />
+      ))}
+      {heartBreaks.map(h => (
+        <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
+      ))}
     </>
   );
 });
