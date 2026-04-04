@@ -7830,20 +7830,43 @@ export default function App() {
     audioRef.current.muted = !isMusicEnabled;
     audioRef.current.volume = volume * 0.3;
 
-    if (isMusicEnabled && isGameView) {
-      audioRef.current.play().then(() => setMusicStatus("Playing")).catch(e => {
-        console.error("Audio playback failed:", e);
-        setMusicStatus("Error");
-      });
-    } else {
-      audioRef.current.pause();
-      setMusicStatus(isMusicEnabled ? "Paused" : "Muted");
-    }
+    const playAudio = () => {
+      if (isMusicEnabled && audioRef.current) {
+        audioRef.current.play()
+          .then(() => setMusicStatus("Playing"))
+          .catch(e => {
+            if (e.name === "NotAllowedError") {
+              setMusicStatus("Waiting for interaction");
+            } else {
+              console.error("Audio playback failed:", e);
+              setMusicStatus("Error");
+            }
+          });
+      } else if (audioRef.current) {
+        audioRef.current.pause();
+        setMusicStatus(isMusicEnabled ? "Paused" : "Muted");
+      }
+    };
+
+    playAudio();
+
+    const handleInteraction = () => {
+      if (isMusicEnabled && audioRef.current && audioRef.current.paused) {
+        playAudio();
+      }
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
 
     return () => {
       audioRef.current?.pause();
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
     };
-  }, [isMusicEnabled, selectedMusicStyle, volume, isGameView]);
+  }, [isMusicEnabled, selectedMusicStyle, volume]);
   const [musicStatus, setMusicStatus] = useState<string>("Stopped");
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
