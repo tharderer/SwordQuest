@@ -322,6 +322,20 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
   const [heartBreaks, setHeartBreaks] = useState<HeartBreak[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  useEffect(() => {
+    if (explosions.length > 0) {
+      const timer = setTimeout(() => setExplosions(prev => prev.slice(1)), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [explosions]);
+
+  useEffect(() => {
+    if (heartBreaks.length > 0) {
+      const timer = setTimeout(() => setHeartBreaks(prev => prev.slice(1)), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [heartBreaks]);
+
   const prevLoopCount = useRef(loopCount);
   const sessionRef = useRef<SavedSession | null>(null);
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -598,11 +612,13 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
         if (dx * dx + dy * dy < 81) {
           if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
             playChompSound(true);
+            setExplosions(prev => [...prev, { id: Date.now() + Math.random(), x: w.x, y: newY }]);
             scoreGained += (10 * currentLoop * (streakRef.current >= 10 ? 2 : 1));
             nextWordAdvanced = true;
             streakIncrement++;
           } else {
             playChompSound(false);
+            setHeartBreaks(prev => [...prev, { id: Date.now() + Math.random(), x: currentAvatarPos.x, y: currentAvatarPos.y }]);
             livesLost++;
             streakReset = true;
           }
@@ -741,7 +757,72 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
           </div>
           <SequenceProgressBar items={items} nextWordIndex={nextWordIndex} loopCount={loopCount} />
           {fallingWords.map(w => <FallingWordItem key={w.id} word={w} />)}
+          {explosions.map(e => <ExplosionEffect key={e.id} x={e.x} y={e.y} />)}
+          {heartBreaks.map(h => <HeartBreakEffect key={h.id} x={h.x} y={h.y} />)}
           <Avatar pos={avatarPos} streak={streak} loopCount={loopCount} />
+          <AnimatePresence>
+            {showTutorial && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-[100] flex items-center justify-center p-6"
+              >
+                <div className="max-w-md w-full bg-slate-900 border-2 border-amber-500/30 rounded-[2.5rem] p-8 shadow-2xl shadow-amber-500/10 text-center space-y-8">
+                  <div className="w-20 h-20 bg-amber-500 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20 rotate-3">
+                    <Zap size={40} className="text-slate-950" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-black uppercase italic tracking-tighter text-white">Mission Briefing</h2>
+                    <p className="text-amber-400 font-bold uppercase tracking-widest text-xs">Sequence: {sequences[currentLevelIdx].title}</p>
+                  </div>
+
+                  <div className="space-y-4 text-left">
+                    <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0 mt-1">
+                        <CheckCircle2 size={18} />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm uppercase">The Objective</h4>
+                        <p className="text-xs text-slate-400 leading-relaxed">Catch the sequence items in the correct biblical order. Use your mouse or touch to move.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center shrink-0 mt-1">
+                        <AlertCircle size={18} />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm uppercase">The Danger</h4>
+                        <p className="text-xs text-slate-400 leading-relaxed">Catching the wrong item or missing the correct one costs a life. You have 5 lives.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <button 
+                      onClick={() => setShowTutorial(false)}
+                      className="w-full py-5 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+                    >
+                      START MISSION
+                    </button>
+                    
+                    <button 
+                      onClick={() => {
+                        setDontShowAgain(true);
+                        localStorage.setItem('sequence_chomper_skip_tutorial', 'true');
+                        setShowTutorial(false);
+                      }}
+                      className="text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-white transition-colors"
+                    >
+                      Don't show this again
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence>
             {showSpeedUp && (
               <motion.div initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -100, opacity: 0 }} className="absolute top-24 left-0 right-0 flex justify-center z-50 pointer-events-none">
