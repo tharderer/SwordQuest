@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause, Music, Volume2, VolumeX, CheckCircle2, Sparkles, Plus, Ghost } from 'lucide-react';
+import { Heart, Trophy, Play, RotateCcw, X, Zap, Star, ChevronRight, AlertCircle, Pause, Music, Volume2, VolumeX, CheckCircle2, Sparkles, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateBibleSequences, BibleSequence } from '../services/geminiService';
 
@@ -31,20 +31,6 @@ interface FallingWord {
   speed: number;
   isCorrect: boolean;
   wordIndex: number; // Index in the sequence
-}
-
-interface FallingHeart {
-  id: number;
-  x: number;
-  y: number;
-  speed: number;
-}
-
-interface Monster {
-  id: number;
-  x: number;
-  y: number;
-  speed: number;
 }
 
 interface Explosion {
@@ -112,56 +98,6 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
   return prev.word.id === next.word.id && 
          Math.abs(prev.word.y - next.word.y) < 0.5 && 
          prev.word.x === next.word.x;
-});
-
-const FallingHeartItem = React.memo(({ heart }: { heart: FallingHeart }) => {
-  return (
-    <motion.div
-      initial={{ scale: 0, rotate: -20 }}
-      animate={{ scale: 1, rotate: 0 }}
-      style={{ 
-        position: 'absolute',
-        left: `${heart.x}%`, 
-        top: `${heart.y}%`,
-        transform: 'translate3d(-50%, -50%, 0)',
-        pointerEvents: 'none',
-        willChange: 'transform'
-      }}
-    >
-      <div className="p-3 bg-rose-500 rounded-full shadow-lg shadow-rose-500/50 border-2 border-white/50 animate-pulse">
-        <Heart className="w-6 h-6 text-white fill-current" />
-      </div>
-    </motion.div>
-  );
-}, (prev, next) => {
-  return prev.heart.id === next.heart.id && 
-         Math.abs(prev.heart.y - next.heart.y) < 0.5 && 
-         prev.heart.x === next.heart.x;
-});
-
-const MonsterItem = React.memo(({ monster }: { monster: Monster }) => {
-  return (
-    <motion.div
-      initial={{ scale: 0, rotate: 20 }}
-      animate={{ scale: 1, rotate: 0 }}
-      style={{ 
-        position: 'absolute',
-        left: `${monster.x}%`, 
-        top: `${monster.y}%`,
-        transform: 'translate3d(-50%, -50%, 0)',
-        pointerEvents: 'none',
-        willChange: 'transform'
-      }}
-    >
-      <div className="p-3 bg-purple-600 rounded-2xl shadow-lg shadow-purple-900/50 border-2 border-purple-400 animate-bounce">
-        <Ghost className="w-8 h-8 text-white fill-current" />
-      </div>
-    </motion.div>
-  );
-}, (prev, next) => {
-  return prev.monster.id === next.monster.id && 
-         Math.abs(prev.monster.y - next.monster.y) < 0.5 && 
-         prev.monster.x === next.monster.x;
 });
 
 const Avatar = React.memo(({ pos, streak, loopCount }: { pos: { x: number, y: number }, streak: number, loopCount: number }) => {
@@ -375,8 +311,6 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
   const [items, setItems] = useState<string[]>([]);
   const [nextWordIndex, setNextWordIndex] = useState(0);
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
-  const [fallingHearts, setFallingHearts] = useState<FallingHeart[]>([]);
-  const [monsters, setMonsters] = useState<Monster[]>([]);
   const [lives, setLives] = useState(5);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -397,10 +331,6 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fallingWordsRef = useRef<FallingWord[]>([]);
-  const fallingHeartsRef = useRef<FallingHeart[]>([]);
-  const monstersRef = useRef<Monster[]>([]);
-  const nextHeartSpawnRef = useRef<number>(0);
-  const nextMonsterSpawnRef = useRef<number>(0);
 
   useEffect(() => {
     if (explosions.length > 0) {
@@ -625,55 +555,18 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
     const totalWords = currentItems.length;
     const currentProgressQuarters = totalWords > 0 ? Math.floor((nextWordIndexRef.current / totalWords) * 4) : 0;
     const totalQuarters = (loopCountRef.current - 1) * 4 + currentProgressQuarters;
-    const baseSpeed = 0.675 * Math.pow(1.0355, totalQuarters);
-
     const newFallingWord: FallingWord = {
       id: Date.now() + Math.random(),
       text: wordToSpawn,
       x: Math.random() * 80 + 10,
       y: -10,
-      speed: baseSpeed,
+      // Speed increases by ~3.55% each quarter of a loop (15% per loop), starting from 0.225 at Loop 1
+      speed: 0.225 * Math.pow(1.0355, totalQuarters),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
     fallingWordsRef.current.push(newFallingWord);
     setFallingWords([...fallingWordsRef.current]);
-  }, []);
-
-  const spawnHeart = useCallback(() => {
-    const totalWords = itemsRef.current.length;
-    const currentProgressQuarters = totalWords > 0 ? Math.floor((nextWordIndexRef.current / totalWords) * 4) : 0;
-    const totalQuarters = (loopCountRef.current - 1) * 4 + currentProgressQuarters;
-    const baseSpeed = 0.675 * Math.pow(1.0355, totalQuarters);
-
-    const newHeart: FallingHeart = {
-      id: Date.now() + Math.random(),
-      x: Math.random() * 80 + 10,
-      y: -10,
-      speed: baseSpeed * 0.8
-    };
-
-    fallingHeartsRef.current.push(newHeart);
-    setFallingHearts([...fallingHeartsRef.current]);
-    nextHeartSpawnRef.current = Date.now() + 20000 + Math.random() * 20000;
-  }, []);
-
-  const spawnMonster = useCallback(() => {
-    const totalWords = itemsRef.current.length;
-    const currentProgressQuarters = totalWords > 0 ? Math.floor((nextWordIndexRef.current / totalWords) * 4) : 0;
-    const totalQuarters = (loopCountRef.current - 1) * 4 + currentProgressQuarters;
-    const baseSpeed = 0.675 * Math.pow(1.0355, totalQuarters);
-
-    const newMonster: Monster = {
-      id: Date.now() + Math.random(),
-      x: Math.random() * 80 + 10,
-      y: -10,
-      speed: baseSpeed * 1.2
-    };
-
-    monstersRef.current.push(newMonster);
-    setMonsters([...monstersRef.current]);
-    nextMonsterSpawnRef.current = Date.now() + 8000 + Math.random() * 12000;
   }, []);
 
   const updateGame = useCallback((time: number) => {
@@ -693,73 +586,10 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
       lastSpawnTime.current = time;
     }
 
-    // Spawn hearts and monsters
-    const now = Date.now();
-    if (now > nextHeartSpawnRef.current) {
-      spawnHeart();
-    }
-    if (now > nextMonsterSpawnRef.current) {
-      spawnMonster();
-    }
-
-    const currentAvatarPos = avatarPosRef.current;
-
-    // Update hearts
-    setFallingHearts(prev => {
-      const next: FallingHeart[] = [];
-      let heartsCaught = 0;
-      for (const h of prev) {
-        const newY = h.y + (h.speed * (dt / 16));
-        if (newY > 105) continue;
-
-        const dx = h.x - currentAvatarPos.x;
-        const dy = newY - currentAvatarPos.y;
-        if (dx * dx + dy * dy < 81) {
-          heartsCaught++;
-          continue;
-        }
-        next.push({ ...h, y: newY });
-      }
-      if (heartsCaught > 0) {
-        setLives(l => Math.min(l + heartsCaught, 10));
-      }
-      fallingHeartsRef.current = next;
-      return next;
-    });
-
-    // Update monsters
-    setMonsters(prev => {
-      const next: Monster[] = [];
-      let monstersHit = 0;
-      for (const m of prev) {
-        const newY = m.y + (m.speed * (dt / 16));
-        if (newY > 105) continue;
-
-        const dx = m.x - currentAvatarPos.x;
-        const dy = newY - currentAvatarPos.y;
-        if (dx * dx + dy * dy < 100) {
-          monstersHit++;
-          setHeartBreaks(prevHb => [...prevHb, { id: Date.now() + Math.random(), x: currentAvatarPos.x, y: currentAvatarPos.y }]);
-          setHeartBreaks(prevHb => [...prevHb, { id: Date.now() + Math.random(), x: currentAvatarPos.x + 5, y: currentAvatarPos.y - 5 }]);
-          continue;
-        }
-        next.push({ ...m, y: newY });
-      }
-      if (monstersHit > 0) {
-        setLives(l => {
-          const nl = l - (monstersHit * 2);
-          if (nl <= 0) setGameState('GAME_OVER');
-          return Math.max(0, nl);
-        });
-        setStreak(0);
-      }
-      monstersRef.current = next;
-      return next;
-    });
-
     const prev = fallingWordsRef.current;
     const next: FallingWord[] = [];
     let activeNextWordIdx = nextWordIndexRef.current;
+    const currentAvatarPos = avatarPosRef.current;
     const currentLoop = loopCountRef.current;
     const currentStreak = streakRef.current;
 
@@ -966,15 +796,13 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
                   </button>
                 </div>
                 <button onClick={() => setIsPaused(!isPaused)} className="p-2 bg-white/10 rounded-xl">{isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}</button>
-                <div className="flex gap-1">{[...Array(Math.max(5, lives))].map((_, i) => <Heart key={i} size={20} className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} />)}</div>
+                <div className="flex gap-1">{[...Array(5)].map((_, i) => <Heart key={i} size={20} className={cn(i < lives ? "text-rose-500 fill-rose-500" : "text-slate-800")} />)}</div>
               </div>
               <div className="text-3xl font-black text-amber-400">{score}</div>
             </div>
           </div>
           <SequenceProgressBar items={items} nextWordIndex={nextWordIndex} loopCount={loopCount} />
           {fallingWords.map(w => <FallingWordItem key={w.id} word={w} />)}
-          {fallingHearts.map(h => <FallingHeartItem key={h.id} heart={h} />)}
-          {monsters.map(m => <MonsterItem key={m.id} monster={m} />)}
           {explosions.map(e => <ExplosionEffect key={e.id} x={e.x} y={e.y} />)}
           {heartBreaks.map(h => <HeartBreakEffect key={h.id} x={h.x} y={h.y} />)}
           <Avatar pos={avatarPos} streak={streak} loopCount={loopCount} />
