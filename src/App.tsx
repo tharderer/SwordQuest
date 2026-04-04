@@ -91,6 +91,7 @@ import confetti from 'canvas-confetti';
 import { MissionaryJourneysGame } from './components/MissionaryJourneysGame';
 import { BibleWitsAndWagersGame } from './components/BibleWitsAndWagersGame';
 import { VerseChomperGame } from './components/VerseChomperGame';
+import { SequenceChomperGame } from './components/SequenceChomperGame';
 import { cn } from './lib/utils';
 import { Verse, UserProgress, VerseSet } from './types';
 
@@ -8115,6 +8116,19 @@ export default function App() {
                 VERSE CHOMPER
               </motion.button>
 
+              {/* Sequence Chomper Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('sequence_chomper')}
+                className="w-full py-6 bg-slate-900 text-amber-400 rounded-3xl font-black text-2xl shadow-xl shadow-amber-500/10 flex items-center justify-center gap-4 group border-b-8 border-slate-950"
+              >
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Zap size={28} className="text-slate-950" />
+                </div>
+                SEQUENCE CHOMPER
+              </motion.button>
+
               {/* Tower Games Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8405,6 +8419,26 @@ export default function App() {
             className="h-full flex flex-col bg-slate-950"
           >
             <VerseChomperGame 
+              onComplete={(xp) => {
+                if (progress) {
+                  setProgress({ ...progress, xp: progress.xp + xp });
+                }
+                setView('dashboard');
+              }}
+              onExit={() => setView('dashboard')}
+            />
+          </motion.div>
+        )}
+
+        {view === 'sequence_chomper' && (
+          <motion.div 
+            key="sequence_chomper"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full flex flex-col bg-slate-950"
+          >
+            <SequenceChomperGame 
               onComplete={(xp) => {
                 if (progress) {
                   setProgress({ ...progress, xp: progress.xp + xp });

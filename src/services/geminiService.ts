@@ -126,3 +126,58 @@ export const generateBibleQuestionsBatch = async (
   }
   throw lastError;
 };
+
+export interface BibleSequence {
+  id: number;
+  title: string;
+  description: string;
+  items: string[];
+  book: string;
+}
+
+export const generateBibleSequences = async (
+  lastBook: string,
+  count = 5
+): Promise<BibleSequence[]> => {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `JSON only. List ${count} famous Bible sequences or lists that use one word (or very short phrases) per item. 
+      Examples: Days of Creation, Ten Plagues, Fruits of the Spirit, Armor of God, Sons of Jacob, Kings of Israel.
+      Start from the book of ${lastBook} onwards.
+      Format: {"sequences": [{"title": "Title", "description": "Short description", "items": ["Item1", "Item2", ...], "book": "BookName"}]}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            sequences: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  items: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  book: { type: Type.STRING }
+                },
+                required: ["title", "description", "items", "book"]
+              }
+            }
+          },
+          required: ["sequences"]
+        }
+      }
+    });
+
+    const data = JSON.parse(response.text || '{"sequences": []}');
+    return data.sequences.map((s: any, i: number) => ({
+      ...s,
+      id: Date.now() + i
+    }));
+  } catch (error) {
+    console.error("Error generating sequences:", error);
+    throw error;
+  }
+};
