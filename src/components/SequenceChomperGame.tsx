@@ -560,8 +560,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
       text: wordToSpawn,
       x: Math.random() * 80 + 10,
       y: -10,
-      // Speed increases by ~3.55% each quarter of a loop (15% per loop), starting from 0.225 at Loop 1
-      speed: 0.225 * Math.pow(1.0355, totalQuarters),
+      speed: 0.45 * Math.pow(1.03, totalQuarters),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
