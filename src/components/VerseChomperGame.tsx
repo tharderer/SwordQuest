@@ -78,11 +78,6 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
       </div>
     </div>
   );
-}, (prev, next) => {
-  // Only re-render if position or text changed significantly (approx every other frame at 60fps)
-  return prev.word.id === next.word.id && 
-         Math.abs(prev.word.y - next.word.y) < 0.5 && 
-         prev.word.x === next.word.x;
 });
 
 const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, streak: number }) => {
@@ -207,29 +202,6 @@ declare global {
   }
 }
 
-const FallingWordsLayer = React.memo(({ fallingWords }: { fallingWords: FallingWord[] }) => {
-  return (
-    <>
-      {fallingWords.map(w => (
-        <FallingWordItem key={w.id} word={w} />
-      ))}
-    </>
-  );
-});
-
-const EffectsLayer = React.memo(({ explosions, heartBreaks }: { explosions: Explosion[], heartBreaks: HeartBreak[] }) => {
-  return (
-    <AnimatePresence>
-      {explosions.map(e => (
-        <ExplosionEffect key={e.id} x={e.x} y={e.y} />
-      ))}
-      {heartBreaks.map(h => (
-        <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
-      ))}
-    </AnimatePresence>
-  );
-});
-
 const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, heartBreaks }: { 
   fallingWords: FallingWord[], 
   avatarPos: { x: number, y: number }, 
@@ -239,9 +211,23 @@ const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, hea
 }) => {
   return (
     <>
-      <FallingWordsLayer fallingWords={fallingWords} />
+      {/* Falling Words */}
+      {fallingWords.map(w => (
+        <FallingWordItem key={w.id} word={w} />
+      ))}
+
+      {/* Avatar (Chomper) */}
       <Avatar pos={avatarPos} streak={streak} />
-      <EffectsLayer explosions={explosions} heartBreaks={heartBreaks} />
+
+      {/* Effects */}
+      <AnimatePresence>
+        {explosions.map(e => (
+          <ExplosionEffect key={e.id} x={e.x} y={e.y} />
+        ))}
+        {heartBreaks.map(h => (
+          <HeartBreakEffect key={h.id} x={h.x} y={h.y} />
+        ))}
+      </AnimatePresence>
     </>
   );
 });
@@ -733,24 +719,24 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       lastSpawnTime.current = time;
     }
 
-    setFallingWords(prev => {
-      if (prev.length === 0 && distractorsRemainingRef.current > 0) return prev;
-      
-      let livesLost = 0;
-      let scoreGained = 0;
-      let wordsAdvancedCount = 0;
-      let streakReset = false;
-      let streakIncrement = 0;
-      let circleBackBonus = false;
+    // Game Logic Calculations
+    let livesLost = 0;
+    let scoreGained = 0;
+    let wordsAdvancedCount = 0;
+    let streakReset = false;
+    let streakIncrement = 0;
+    let circleBackBonus = false;
 
+    const currentNextWordIdx = nextWordIndexRef.current;
+    const currentAvatarPos = avatarPosRef.current;
+    const prevAvatarPos = prevAvatarPosRef.current;
+    const isMovingUp = currentAvatarPos.y < prevAvatarPos.y - 0.2;
+    prevAvatarPosRef.current = currentAvatarPos;
+    const currentLoop = loopCountRef.current;
+
+    setFallingWords(prev => {
       const next: FallingWord[] = [];
-      let currentNextWordIdx = nextWordIndexRef.current;
-      const currentAvatarPos = avatarPosRef.current;
-      const prevAvatarPos = prevAvatarPosRef.current;
-      const isMovingUp = currentAvatarPos.y < prevAvatarPos.y - 0.2;
-      prevAvatarPosRef.current = currentAvatarPos;
-      
-      const currentLoop = loopCountRef.current;
+      let tempNextWordIdx = currentNextWordIdx;
 
       for (let i = 0; i < prev.length; i++) {
         const w = prev[i];
@@ -758,12 +744,12 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         
         // Check if correct word fell through
         if (newY > 105) {
-          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+          if (w.isCorrect && w.wordIndex === tempNextWordIdx) {
             livesLost++;
             addExplosion(w.x, 95);
             addHeartBreak(w.x, 95);
             streakReset = true;
-            nextWordToSpawnRef.current = currentNextWordIdx;
+            nextWordToSpawnRef.current = tempNextWordIdx;
           }
           continue;
         }
@@ -774,18 +760,17 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         const distSq = dx * dx + dy * dy;
         
         if (distSq < 81) { // 9^2 = 81
-          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+          if (w.isCorrect && w.wordIndex === tempNextWordIdx) {
             playChompSound(true);
             scoreGained += (10 * currentLoop);
             
-            // Circle back bonus check: word was on screen before it was the target AND user is moving up
             if (w.spawnedAtTargetIndex < w.wordIndex && isMovingUp) {
               circleBackBonus = true;
             }
 
             wordsAdvancedCount++;
-            currentNextWordIdx = (currentNextWordIdx + 1) % wordsRef.current.length;
-            nextWordIndexRef.current = currentNextWordIdx; // Update ref immediately for same-frame sequence
+            tempNextWordIdx = (tempNextWordIdx + 1) % wordsRef.current.length;
+            nextWordIndexRef.current = tempNextWordIdx;
             streakIncrement++;
           } else {
             playChompSound(false);
@@ -796,57 +781,52 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
           continue;
         }
 
-        // Only create a new object if the position changed
-        if (newY !== w.y) {
-          next.push({ ...w, y: newY });
-        } else {
-          next.push(w);
-        }
+        next.push({ ...w, y: newY });
       }
-
-      if (livesLost > 0) {
-        setLives(l => {
-          const nl = l - livesLost;
-          if (nl <= 0) setGameState('GAME_OVER');
-          return Math.max(0, nl);
-        });
-      }
-
-      if (scoreGained > 0) setScore(s => s + scoreGained);
-      
-      if (circleBackBonus) {
-        setLives(l => l + 1);
-        setShowCircleBack(true);
-        setTimeout(() => setShowCircleBack(false), 1500);
-      }
-
-      if (streakReset) setStreak(0);
-      if (streakIncrement > 0) {
-        setStreak(prevStreak => {
-          const newStreak = prevStreak + streakIncrement;
-          if (newStreak % 10 === 0) setLives(l => l + 1);
-          return newStreak;
-        });
-      }
-
-      if (wordsAdvancedCount > 0) {
-        setNextWordIndex(ni => {
-          let nextIdx = ni;
-          for (let k = 0; k < wordsAdvancedCount; k++) {
-            nextIdx = (nextIdx + 1) % wordsRef.current.length;
-            if (nextIdx === 0) {
-              setLoopCount(lc => lc + 1);
-            }
-          }
-          return nextIdx;
-        });
-      }
-
       return next;
     });
 
+    // Apply side effects outside of setFallingWords
+    if (livesLost > 0) {
+      setLives(l => {
+        const nl = l - livesLost;
+        if (nl <= 0) setGameState('GAME_OVER');
+        return Math.max(0, nl);
+      });
+    }
+
+    if (scoreGained > 0) setScore(s => s + scoreGained);
+    
+    if (circleBackBonus) {
+      setLives(l => l + 1);
+      setShowCircleBack(true);
+      setTimeout(() => setShowCircleBack(false), 1500);
+    }
+
+    if (streakReset) setStreak(0);
+    if (streakIncrement > 0) {
+      setStreak(prevStreak => {
+        const newStreak = prevStreak + streakIncrement;
+        if (newStreak % 10 === 0) setLives(l => l + 1);
+        return newStreak;
+      });
+    }
+
+    if (wordsAdvancedCount > 0) {
+      setNextWordIndex(ni => {
+        let nextIdx = ni;
+        for (let k = 0; k < wordsAdvancedCount; k++) {
+          nextIdx = (nextIdx + 1) % wordsRef.current.length;
+          if (nextIdx === 0) {
+            setLoopCount(lc => lc + 1);
+          }
+        }
+        return nextIdx;
+      });
+    }
+
     requestRef.current = requestAnimationFrame(updateGame);
-  }, [spawnWord]);
+  }, [spawnWord, addExplosion, addHeartBreak, playChompSound]);
 
   useEffect(() => {
     if (gameState === 'PLAYING' && !isPaused) {
