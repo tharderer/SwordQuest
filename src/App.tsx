@@ -3709,7 +3709,7 @@ const generateBoggleGrid = (words: string[], verseText: string) => {
   return { grid: bestGrid, placedWords: bestWords };
 };
 
-const BoggleGame = ({ verse, onComplete, onExit, difficulty }: { verse: Verse, onComplete: (xp: number) => void, onExit: () => void, difficulty: Difficulty }) => {
+const BoggleGame = ({ verse, onComplete, onExit, difficulty, setDifficulty }: { verse: Verse, onComplete: (xp: number) => void, onExit: () => void, difficulty: Difficulty, setDifficulty: (d: Difficulty) => void }) => {
   const allPossibleWords = useMemo(() => {
     const cleanText = verse.text.replace(/[.,!?;:"'()\[\]]/g, "");
     return Array.from(new Set(cleanText.split(/\s+/).filter(w => w.length >= 3).map(w => w.toUpperCase())));
@@ -3964,6 +3964,25 @@ const BoggleGame = ({ verse, onComplete, onExit, difficulty }: { verse: Verse, o
           </span>
         </div>
         
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex gap-1">
+            {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDifficulty(d)}
+                className={cn(
+                  "px-2 py-1 rounded-lg font-black text-[8px] uppercase tracking-tighter transition-all border",
+                  difficulty === d 
+                    ? "bg-indigo-500 border-indigo-400 text-white shadow-lg" 
+                    : "bg-slate-900 border-slate-800 text-slate-500 hover:border-indigo-500/50"
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button 
           onClick={onExit}
           className="p-1 text-white/40 hover:text-white transition-colors"
@@ -7961,8 +7980,8 @@ export default function App() {
 
   return (
     <div className={cn(
-      "max-w-md mx-auto min-h-screen flex flex-col font-sans bg-background",
-      !isGameView && "pb-24"
+      "max-w-md mx-auto h-screen flex flex-col font-sans bg-background overflow-hidden",
+      !isGameView && "pb-0"
     )}>
       {/* Header */}
       {!isGameView && (
@@ -8063,7 +8082,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={cn("flex-1", !isGameView ? "overflow-y-auto" : "overflow-hidden h-dvh")}>
+      <main className={cn("flex-1", !isGameView ? "overflow-y-auto pb-24" : "overflow-hidden h-dvh")}>
         <AnimatePresence mode="wait">
           {view === 'dashboard' && (
             <motion.div 
@@ -8103,6 +8122,19 @@ export default function App() {
                 </div>
               </motion.div>
 
+              {/* Bible Reader Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('bible_reader')}
+                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <BookOpen size={28} className="text-white" />
+                </div>
+                READ THE BIBLE
+              </motion.button>
+
               {/* Verse Chomper Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8127,6 +8159,19 @@ export default function App() {
                   <Zap size={28} className="text-slate-950" />
                 </div>
                 SEQUENCE CHOMPER
+              </motion.button>
+
+              {/* Verse Boggle Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleStartBoggle}
+                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Grid size={28} className="text-white" />
+                </div>
+                PLAY VERSE BOGGLE
               </motion.button>
 
               {/* Tower Games Action Button */}
@@ -8162,37 +8207,6 @@ export default function App() {
                 PLAY MATH TOWER
               </motion.button>
 
-              {/* Verse Boggle Difficulty Selector */}
-              <div className="flex gap-2 mb-2">
-                {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setBoggleDifficulty(d)}
-                    className={cn(
-                      "flex-1 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-all border-2",
-                      boggleDifficulty === d 
-                        ? "bg-indigo-500 border-indigo-400 text-white shadow-lg" 
-                        : "bg-white border-gray-100 text-gray-400 hover:border-indigo-200"
-                    )}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-
-              {/* Verse Boggle Action Button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleStartBoggle}
-                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
-              >
-                <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                  <Grid size={28} className="text-white" />
-                </div>
-                PLAY VERSE BOGGLE
-              </motion.button>
-
               {/* Bible Jeopardy Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8219,19 +8233,6 @@ export default function App() {
                 MISSIONARY JOURNEYS
               </motion.button>
 
-              {/* Bible Reader Action Button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setView('bible_reader')}
-                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
-              >
-                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                  <BookOpen size={28} className="text-white" />
-                </div>
-                READ THE BIBLE
-              </motion.button>
-
               {/* Bible Wits & Wagers Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8245,19 +8246,6 @@ export default function App() {
                 WITS & WAGERS
               </motion.button>
 
-              {/* Question Bank Action Button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setIsQuestionBankOpen(true)}
-                className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
-              >
-                <div className="w-12 h-12 bg-orange-400 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                  <Database size={28} className="text-white" />
-                </div>
-                QUESTION BANK
-              </motion.button>
-
               {/* Verse Sets Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8269,6 +8257,19 @@ export default function App() {
                   <Library size={28} className="text-white" />
                 </div>
                 VERSE SETS
+              </motion.button>
+
+              {/* Question Bank Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setIsQuestionBankOpen(true)}
+                className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-orange-400 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Database size={28} className="text-white" />
+                </div>
+                QUESTION BANK
               </motion.button>
 
               {/* Daily Quests Card */}
@@ -8488,6 +8489,7 @@ export default function App() {
               <BoggleGame 
                 verse={getNextEndlessVerse(filteredGameVerses)} 
                 difficulty={boggleDifficulty}
+                setDifficulty={setBoggleDifficulty}
                 onComplete={handleGameComplete} 
                 onExit={() => setView('dashboard')}
               />
