@@ -84,7 +84,46 @@ const FallingWordItem = React.memo(({ word }: { word: FallingWord }) => {
          prev.word.x === next.word.x;
 });
 
-const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, streak: number }) => {
+const Avatar = React.memo(({ pos, streak, loopCount }: { pos: { x: number, y: number }, streak: number, loopCount: number }) => {
+  const isFever = streak >= 10;
+  
+  // Skin logic
+  let skinColor = "bg-amber-500";
+  let shadowColor = "shadow-amber-500/40";
+  let skinName = "Standard";
+  let extraEffects = null;
+
+  if (loopCount >= 7) {
+    skinColor = "bg-yellow-400";
+    shadowColor = "shadow-yellow-400/60";
+    skinName = "Golden";
+    extraEffects = (
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            animate={{ 
+              scale: [0, 1, 0],
+              opacity: [0, 1, 0],
+              x: [0, (Math.random() - 0.5) * 40],
+              y: [0, (Math.random() - 0.5) * 40]
+            }}
+            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+            className="absolute left-1/2 top-1/2 w-1 h-1 bg-white rounded-full"
+          />
+        ))}
+      </div>
+    );
+  } else if (loopCount >= 5) {
+    skinColor = "bg-slate-300";
+    shadowColor = "shadow-slate-400/50";
+    skinName = "Robot";
+  } else if (loopCount >= 3) {
+    skinColor = "bg-cyan-400";
+    shadowColor = "shadow-cyan-400/70";
+    skinName = "Neon";
+  }
+
   return (
     <div
       style={{ 
@@ -97,15 +136,35 @@ const Avatar = React.memo(({ pos, streak }: { pos: { x: number, y: number }, str
         willChange: 'transform'
       }}
     >
-      <div className="w-9 h-9 bg-amber-500 rounded-full flex items-center justify-center shadow-2xl shadow-amber-500/40 relative overflow-hidden">
+      <motion.div 
+        animate={isFever ? { scale: [1, 1.1, 1], rotate: [0, 2, -2, 0] } : {}}
+        transition={{ duration: 0.2, repeat: Infinity }}
+        className={cn(
+          "w-9 h-9 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden transition-colors duration-500",
+          skinColor,
+          shadowColor,
+          isFever && "ring-4 ring-orange-500 ring-offset-2 ring-offset-transparent"
+        )}
+      >
         <div className="absolute top-1/4 left-1/4 w-1.5 h-1.5 bg-slate-950 rounded-full" />
         <div className="absolute top-1/4 right-1/4 w-1.5 h-1.5 bg-slate-950 rounded-full" />
         <div className="absolute bottom-1 w-4.5 h-2 bg-slate-950 rounded-full" />
-      </div>
+        {extraEffects}
+        {isFever && (
+          <motion.div 
+            animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.2, 1] }}
+            transition={{ duration: 0.5, repeat: Infinity }}
+            className="absolute inset-0 bg-gradient-to-t from-orange-600/40 to-transparent"
+          />
+        )}
+      </motion.div>
       
       {streak >= 5 && (
-        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
-          {streak} STREAK!
+        <div className={cn(
+          "absolute -top-8 left-1/2 -translate-x-1/2 text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap shadow-lg transition-colors",
+          isFever ? "bg-orange-600 animate-pulse scale-110" : "bg-blue-500"
+        )}>
+          {streak} {isFever ? "FEVER!" : "STREAK!"}
         </div>
       )}
     </div>
@@ -206,12 +265,13 @@ declare global {
   }
 }
 
-const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, heartBreaks }: { 
+const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, heartBreaks, loopCount }: { 
   fallingWords: FallingWord[], 
   avatarPos: { x: number, y: number }, 
   streak: number,
   explosions: Explosion[],
-  heartBreaks: HeartBreak[]
+  heartBreaks: HeartBreak[],
+  loopCount: number
 }) => {
   return (
     <>
@@ -221,7 +281,7 @@ const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, hea
       ))}
 
       {/* Avatar (Chomper) */}
-      <Avatar pos={avatarPos} streak={streak} />
+      <Avatar pos={avatarPos} streak={streak} loopCount={loopCount} />
 
       {/* Effects */}
       <AnimatePresence>
@@ -323,6 +383,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const [startLoops, setStartLoops] = useState<Record<number, number>>({});
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [selectedMusicStyle, setSelectedMusicStyle] = useState<'hymn' | 'retro' | 'epic' | 'pop'>('hymn');
   const [showTutorial, setShowTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isJumbled, setIsJumbled] = useState(false);
@@ -366,6 +427,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   const nextWordIndexRef = useRef(nextWordIndex);
   const loopCountRef = useRef(loopCount);
   const avatarPosRef = useRef(avatarPos);
+  const streakRef = useRef(streak);
 
   // Sync refs with state for the game loop
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -375,6 +437,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   useEffect(() => { nextWordIndexRef.current = nextWordIndex; }, [nextWordIndex]);
   useEffect(() => { loopCountRef.current = loopCount; }, [loopCount]);
   useEffect(() => { avatarPosRef.current = avatarPos; }, [avatarPos]);
+  useEffect(() => { streakRef.current = streak; }, [streak]);
 
   useEffect(() => {
     if (loopCount > prevLoopCount.current && gameState === 'PLAYING' && !showTutorial) {
@@ -474,16 +537,30 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   // Audio playback effect
   useEffect(() => {
     if (gameState === 'PLAYING') {
-      if (!audioUrl) {
-        setAudioUrl(hymnUrls[Math.floor(Math.random() * hymnUrls.length)]);
-        return;
-      }
+      const styleUrls = {
+        hymn: hymnUrls,
+        retro: [
+          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"
+        ],
+        epic: [
+          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3",
+          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"
+        ],
+        pop: [
+          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3",
+          "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3"
+        ]
+      };
+
+      const currentUrls = styleUrls[selectedMusicStyle];
+      const randomUrl = currentUrls[Math.floor(Math.random() * currentUrls.length)];
 
       if (!audioRef.current) {
-        audioRef.current = new Audio(audioUrl);
+        audioRef.current = new Audio(randomUrl);
         audioRef.current.loop = true;
-      } else if (audioRef.current.src !== audioUrl) {
-        audioRef.current.src = audioUrl;
+      } else if (audioRef.current.src !== randomUrl) {
+        audioRef.current.src = randomUrl;
       }
       
       audioRef.current.muted = isMuted;
@@ -504,7 +581,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
     return () => {
       audioRef.current?.pause();
     };
-  }, [audioUrl, gameState, isMuted]);
+  }, [gameState, isMuted, selectedMusicStyle]);
 
   const saveProgress = (levelId: number, newScore: number, currentLoop: number) => {
     const updatedScores = { ...highScores, [levelId]: Math.max(highScores[levelId] || 0, newScore) };
@@ -726,6 +803,8 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       
       let livesLost = 0;
       let scoreGained = 0;
+      const isFever = streakRef.current >= 10;
+      
       let nextWordAdvanced = false;
       let streakReset = false;
       let streakIncrement = 0;
@@ -756,13 +835,14 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
         const dy = newY - currentAvatarPos.y;
         const distSq = dx * dx + dy * dy;
         
-        if (distSq < 81) { // 9^2 = 81
-          if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
-            playChompSound(true);
-            scoreGained += (10 * currentLoop);
-            nextWordAdvanced = true;
-            streakIncrement++;
-          } else {
+          if (distSq < 81) { // 9^2 = 81
+            if (w.isCorrect && w.wordIndex === currentNextWordIdx) {
+              playChompSound(true);
+              // Double points in Fever Mode
+              scoreGained += (10 * currentLoop * (isFever ? 2 : 1));
+              nextWordAdvanced = true;
+              streakIncrement++;
+            } else {
             playChompSound(false);
             livesLost++;
             addHeartBreak(currentAvatarPos.x, currentAvatarPos.y);
@@ -843,6 +923,15 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+      {/* Fever Mode Background Pulse */}
+      {gameState === 'PLAYING' && streak >= 10 && (
+        <motion.div 
+          animate={{ opacity: [0, 0.1, 0] }}
+          transition={{ duration: 1, repeat: Infinity }}
+          className="absolute inset-0 bg-orange-500 pointer-events-none z-0"
+        />
+      )}
+
       {/* Header (Lobby/Level Select Only) */}
       {gameState === 'LEVEL_SELECT' && (
         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
@@ -912,29 +1001,63 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
               </motion.div>
             )}
 
+            {/* Music Selection */}
+            <div className="flex flex-wrap justify-center gap-2 mb-8">
+              {(['hymn', 'retro', 'epic', 'pop'] as const).map((style) => (
+                <button
+                  key={style}
+                  onClick={() => setSelectedMusicStyle(style)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2",
+                    selectedMusicStyle === style 
+                      ? "bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20" 
+                      : "bg-slate-900 text-slate-400 border-white/5 hover:border-white/10"
+                  )}
+                >
+                  {style} VIBE
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {CHOMPER_LEVELS.map((level, idx) => {
                 const isLocked = level.id > unlockedLevels;
                 const highScore = highScores[level.id] || 0;
                 const maxLoop = maxLoops[level.id] || 1;
+                const isPassed = maxLoop >= 8;
                 
                 return (
                   <div key={level.id} className="relative group">
                     <motion.div
-                      whileHover={!isLocked ? { scale: 1.02 } : {}}
+                      whileHover={!isLocked ? { scale: 1.02, rotate: isPassed ? [0, -1, 1, 0] : 0 } : {}}
                       whileTap={!isLocked ? { scale: 0.98 } : {}}
                       onClick={() => !isLocked && startLevel(idx)}
                       className={cn(
-                        "w-full p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden cursor-pointer",
+                        "w-full p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden cursor-pointer h-full flex flex-col",
                         isLocked 
                           ? "bg-slate-900/50 border-white/5 opacity-50 grayscale cursor-not-allowed" 
-                          : "bg-slate-900 border-white/10 hover:border-amber-500/50"
+                          : isPassed
+                            ? "bg-gradient-to-br from-slate-900 to-slate-800 border-yellow-500/50 shadow-xl shadow-yellow-500/10"
+                            : "bg-slate-900 border-white/10 hover:border-amber-500/50"
                       )}
                     >
-                      <div className="flex justify-between items-start mb-4">
+                      {/* Trading Card Background Effect */}
+                      {isPassed && (
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                          <div className="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/10 blur-3xl rounded-full" />
+                          <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-amber-500/10 blur-3xl rounded-full" />
+                          <motion.div 
+                            animate={{ opacity: [0.1, 0.2, 0.1] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,215,0,0.05),transparent)]"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-start mb-4 relative z-10">
                         <div className={cn(
                           "w-10 h-10 rounded-xl flex items-center justify-center font-black",
-                          isLocked ? "bg-slate-800 text-slate-600" : "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
+                          isLocked ? "bg-slate-800 text-slate-600" : isPassed ? "bg-yellow-500 text-slate-950 shadow-lg shadow-yellow-500/40" : "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
                         )}>
                           {level.id}
                         </div>
@@ -991,12 +1114,15 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                         </div>
                       </div>
                       
-                      <div className="mb-8">
-                        <h3 className="font-black text-lg leading-tight mb-1">{level.title}</h3>
+                      <div className="mb-8 relative z-10">
+                        <h3 className={cn(
+                          "font-black text-lg leading-tight mb-1",
+                          isPassed ? "text-yellow-400" : "text-white"
+                        )}>{level.title}</h3>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{level.reference}</p>
                       </div>
 
-                      <div className="flex justify-between items-end mt-auto">
+                      <div className="flex justify-between items-end mt-auto relative z-10">
                         <div className="flex flex-col gap-1">
                           {highScore > 0 && (
                             <div className="flex items-center gap-1 text-amber-400 font-black text-xs">
@@ -1010,18 +1136,24 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
                               Loop {maxLoop}
                             </div>
                           )}
-                          {!isLocked && maxLoop < 8 && (
+                          {!isLocked && !isPassed && (
                             <div className="text-[8px] font-black text-rose-400 uppercase tracking-widest">
                               Goal: Pass Loop 7
                             </div>
                           )}
-                          {!isLocked && maxLoop >= 8 && (
+                          {isPassed && (
                             <div className="flex items-center gap-1 text-emerald-400 font-black text-[8px] uppercase tracking-widest">
-                              <CheckCircle2 size={10} />
-                              Passed
+                              <Star size={10} className="fill-emerald-400" />
+                              MASTERED CARD
                             </div>
                           )}
                         </div>
+                        
+                        {isPassed && (
+                          <div className="absolute -right-2 -bottom-2 opacity-10">
+                            <Trophy size={60} className="text-yellow-500" />
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   </div>
@@ -1114,6 +1246,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
             streak={streak} 
             explosions={explosions}
             heartBreaks={heartBreaks}
+            loopCount={loopCount}
           />
 
           {/* Speed Up Notification */}
