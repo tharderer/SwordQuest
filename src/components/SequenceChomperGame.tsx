@@ -37,12 +37,14 @@ interface Explosion {
   id: number;
   x: number;
   y: number;
+  createdAt: number;
 }
 
 interface HeartBreak {
   id: number;
   x: number;
   y: number;
+  createdAt: number;
 }
 
 interface SavedSession {
@@ -345,20 +347,6 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
 
   const fallingWordsRef = useRef<FallingWord[]>([]);
 
-  useEffect(() => {
-    if (explosions.length > 0) {
-      const timer = setTimeout(() => setExplosions(prev => prev.slice(1)), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [explosions]);
-
-  useEffect(() => {
-    if (heartBreaks.length > 0) {
-      const timer = setTimeout(() => setHeartBreaks(prev => prev.slice(1)), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [heartBreaks]);
-
   const prevLoopCount = useRef(loopCount);
   const sessionRef = useRef<SavedSession | null>(null);
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -646,13 +634,29 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({
     fallingWordsRef.current = next;
     setFallingWords([...next]);
 
+    // Clean up old explosions and heartBreaks
+    const now = Date.now();
+    setExplosions(prevExp => {
+      const filtered = prevExp.filter(e => now - e.createdAt < 800);
+      if (caughtWord) {
+        return [...filtered, { id: now + Math.random(), x: caughtWord!.x, y: caughtWord!.y + (caughtWord!.speed * (dt / 16)), createdAt: now }];
+      }
+      return filtered.length !== prevExp.length ? filtered : prevExp;
+    });
+
+    setHeartBreaks(prevHb => {
+      const filtered = prevHb.filter(h => now - h.createdAt < 1000);
+      if (missedWordPos) {
+        return [...filtered, { id: now + Math.random(), x: missedWordPos!.x, y: missedWordPos!.y, createdAt: now }];
+      }
+      return filtered.length !== prevHb.length ? filtered : prevHb;
+    });
+
     if (caughtWord) {
       playChompSound(true);
-      setExplosions(prevExp => [...prevExp, { id: Date.now() + Math.random(), x: caughtWord!.x, y: caughtWord!.y + (caughtWord!.speed * (dt / 16)) }]);
     }
     if (missedWordPos) {
       playChompSound(false);
-      setHeartBreaks(prevHb => [...prevHb, { id: Date.now() + Math.random(), x: missedWordPos!.x, y: missedWordPos!.y }]);
     }
 
     if (livesLost > 0) {
