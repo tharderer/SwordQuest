@@ -174,7 +174,7 @@ const Avatar = React.memo(({ pos, streak, loopCount }: { pos: { x: number, y: nu
   );
 });
 
-const ExplosionEffect = ({ x, y }: { x: number, y: number }) => {
+const ExplosionEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
   return (
     <motion.div
       initial={{ scale: 0, opacity: 1 }}
@@ -204,7 +204,7 @@ const ExplosionEffect = ({ x, y }: { x: number, y: number }) => {
   );
 };
 
-const HeartBreakEffect = ({ x, y }: { x: number, y: number }) => {
+const HeartBreakEffect = ({ x, y }: { x: number, y: number, key?: any }) => {
   return (
     <div 
       className="absolute pointer-events-none z-50"
@@ -238,9 +238,9 @@ const HeartBreakEffect = ({ x, y }: { x: number, y: number }) => {
 
 const SequenceProgressBar = React.memo(({ items, nextWordIndex, loopCount }: { items: string[], nextWordIndex: number, loopCount: number }) => {
   return (
-    <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
-      <div className="max-w-2xl mx-auto space-y-3">
-        <div className="flex flex-wrap justify-center gap-1.5 max-h-[120px] overflow-y-auto pb-2 custom-scrollbar">
+    <div className="absolute bottom-0 left-0 right-0 p-4 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
+      <div className="max-w-2xl mx-auto space-y-2">
+        <div className="flex flex-wrap justify-center gap-1.5 max-h-[80px] overflow-y-auto pb-2 custom-scrollbar">
           {items.map((item, i) => {
             const isCaught = i < nextWordIndex;
             const isCurrent = i === nextWordIndex;
@@ -665,7 +665,7 @@ export const SequenceChomperGame: React.FC<SequenceChomperProps> = ({ onComplete
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+    <div className="flex flex-col h-dvh bg-slate-950 text-white font-sans overflow-hidden relative select-none">
       {gameState === 'LEVEL_SELECT' && (
         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50 backdrop-blur-md">
           <div className="flex items-center gap-3">

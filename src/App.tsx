@@ -8063,7 +8063,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={cn("flex-1", !isGameView ? "overflow-y-auto" : "overflow-hidden h-screen")}>
+      <main className={cn("flex-1", !isGameView ? "overflow-y-auto" : "overflow-hidden h-dvh")}>
         <AnimatePresence mode="wait">
           {view === 'dashboard' && (
             <motion.div 

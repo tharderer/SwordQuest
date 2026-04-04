@@ -298,9 +298,9 @@ const GameStage = React.memo(({ fallingWords, avatarPos, streak, explosions, hea
 
 const VerseProgressBar = React.memo(({ words, nextWordIndex, loopCount }: { words: string[], nextWordIndex: number, loopCount: number }) => {
   return (
-    <div className="absolute bottom-0 left-0 right-0 p-6 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
-      <div className="max-w-2xl mx-auto space-y-3">
-        <div className="flex flex-wrap justify-center gap-1.5 max-h-[120px] overflow-y-auto pb-2 custom-scrollbar">
+    <div className="absolute bottom-0 left-0 right-0 p-4 z-20 bg-gradient-to-t from-slate-950/90 to-transparent">
+      <div className="max-w-2xl mx-auto space-y-2">
+        <div className="flex flex-wrap justify-center gap-1.5 max-h-[80px] overflow-y-auto pb-2 custom-scrollbar">
           {words.map((word, i) => {
             const isCaught = i < nextWordIndex;
             const isCurrent = i === nextWordIndex;
@@ -924,7 +924,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-white font-sans overflow-hidden relative select-none">
+    <div className="flex flex-col h-dvh bg-slate-950 text-white font-sans overflow-hidden relative select-none">
       {/* Fever Mode Background Pulse */}
       {gameState === 'PLAYING' && streak >= 10 && (
         <motion.div 
