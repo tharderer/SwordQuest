@@ -762,8 +762,7 @@ export const VerseChomperGame: React.FC<VerseChomperProps> = ({ onComplete, onEx
       x: Math.random() * 80 + 10, // 10% to 90%
       y: -10,
       // Speed increases by 3% each quarter of a loop, starting from 0.45 at Loop 1
-      // Capped at 2.0 to maintain readability as requested
-      speed: Math.min(2.0, 0.45 * Math.pow(1.03, totalQuarters)),
+      speed: 0.45 * Math.pow(1.03, totalQuarters),
       isCorrect: isCorrect,
       wordIndex: wordIdx
     };
