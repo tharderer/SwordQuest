@@ -8093,8 +8093,8 @@ export default function App() {
 
   return (
     <div className={cn(
-      "max-w-md mx-auto h-screen flex flex-col font-sans bg-background overflow-hidden",
-      !isGameView && "pb-0"
+      "max-w-md mx-auto w-full flex flex-col font-sans bg-background",
+      !isGameView ? "min-h-screen relative" : "h-screen overflow-hidden"
     )}>
       {/* Header */}
       {!isGameView && (
@@ -8195,7 +8195,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={cn("flex-1", !isGameView ? "overflow-y-auto pb-24" : "overflow-hidden h-dvh")}>
+      <main className={cn("flex-1", !isGameView ? "pb-24" : "overflow-hidden h-screen")}>
         <AnimatePresence mode="wait">
           {view === 'dashboard' && (
             <motion.div 
