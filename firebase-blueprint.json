@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "Score": {
+      "title": "Score",
+      "description": "A user's best score for a specific level.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user." },
+        "userName": { "type": "string", "description": "The display name of the user." },
+        "score": { "type": "number", "description": "The time in milliseconds (lower is better)." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the score was achieved." }
+      },
+      "required": ["userId", "userName", "score", "timestamp"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Public profile information for a user.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["displayName"]
+    }
+  },
+  "firestore": {
+    "/leaderboards/{levelId}/scores/{userId}": {
+      "schema": "Score",
+      "description": "Stores the best score for each user per level."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Public user profile data."
+    }
+  }
+}

@@ -4,6 +4,77 @@ import { Heart, Trophy, Play, RotateCcw, ChevronRight, Pause, ArrowLeft, Timer, 
 import { getVerseByRef, parseReference } from '../lib/bibleDb';
 import { cn } from '../lib/utils';
 
+import { auth, db } from '../firebase';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  limit, 
+  Timestamp,
+  getDocFromServer
+} from 'firebase/firestore';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 const hymnUrls = [
   "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
   "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
@@ -102,7 +173,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [nextWordIndex, setNextWordIndex] = useState(0);
   const [poolIndex, setPoolIndex] = useState(9);
   const [lives, setLives] = useState(5);
-  const [time, setTime] = useState(0);
+  const [time, setTime] = useState(0); // Time in milliseconds
   const [isPaused, setIsPaused] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -111,13 +182,33 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [loop, setLoop] = useState(1);
   const [loopResults, setLoopResults] = useState<Record<number, boolean>>({}); // Track which loops are passed
 
+  const [user, setUser] = useState<User | null>(null);
+  const [showLeaderboard, setShowLeaderboard] = useState<number | null>(null);
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextWordIndexRef = useRef(0);
   const poolIndexRef = useRef(9);
 
   // Load progress
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if(error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration. ");
+        }
+      }
+    };
+    testConnection();
+
     const savedBestTimes = localStorage.getItem('speed_verse_best_times');
     if (savedBestTimes) setBestTimes(JSON.parse(savedBestTimes));
     
@@ -128,14 +219,34 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     if (!skipTutorial) setShowTutorial(true);
   }, []);
 
-  const saveLevelProgress = (levelId: number, finalTime: number, currentLoop: number) => {
+  const saveLevelProgress = async (levelId: number, finalTimeMs: number, currentLoop: number) => {
     // Only save best time if it's a valid completion
-    const updatedBestTimes = { ...bestTimes, [levelId]: bestTimes[levelId] ? Math.min(bestTimes[levelId], finalTime) : finalTime };
+    const updatedBestTimes = { ...bestTimes, [levelId]: bestTimes[levelId] ? Math.min(bestTimes[levelId], finalTimeMs) : finalTimeMs };
     setBestTimes(updatedBestTimes);
     localStorage.setItem('speed_verse_best_times', JSON.stringify(updatedBestTimes));
 
-    // Check if Loop 3 was passed with speed constraint
-    const isLoop3Passed = currentLoop === 3 && finalTime <= words.length * 2;
+    // Save to Firestore if authenticated
+    if (auth.currentUser && currentLoop === 3) {
+      const path = `leaderboards/${levelId}/scores/${auth.currentUser.uid}`;
+      try {
+        const docRef = doc(db, path);
+        const existingDoc = await getDoc(docRef);
+        
+        if (!existingDoc.exists() || existingDoc.data().score > finalTimeMs) {
+          await setDoc(docRef, {
+            userId: auth.currentUser.uid,
+            userName: auth.currentUser.displayName || 'Anonymous',
+            score: finalTimeMs,
+            timestamp: Timestamp.now()
+          });
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      }
+    }
+
+    // Check if Loop 3 was passed with speed constraint (1s per word = words.length * 1000ms)
+    const isLoop3Passed = currentLoop === 3 && finalTimeMs <= words.length * 1000;
     
     if (isLoop3Passed && levelId === unlockedLevels && levelId < SPEED_LEVELS.length) {
       const nextLevel = levelId + 1;
@@ -144,12 +255,46 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     }
   };
 
+  // Leaderboard listener
+  useEffect(() => {
+    if (showLeaderboard !== null) {
+      const path = `leaderboards/${showLeaderboard}/scores`;
+      const q = query(
+        collection(db, path),
+        orderBy('score', 'asc'),
+        limit(10)
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const scores = snapshot.docs.map(doc => doc.data());
+        setLeaderboardData(scores);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [showLeaderboard]);
+
+  const signIn = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Sign in failed", error);
+    }
+  };
+
+  const formatTime = (ms: number) => (ms / 1000).toFixed(3);
+
   // Timer
   useEffect(() => {
     if (gameState === 'PLAYING' && !isPaused) {
+      startTimeRef.current = performance.now() - time;
       timerRef.current = setInterval(() => {
-        setTime(prev => prev + 1);
-      }, 1000);
+        const elapsed = performance.now() - startTimeRef.current;
+        setTime(Math.floor(elapsed));
+      }, 10);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
@@ -362,7 +507,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden select-none touch-none">
+    <div className="h-[100dvh] flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden select-none touch-none pb-safe">
       {/* Level Selector */}
       {gameState === 'LEVEL_SELECT' && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -371,6 +516,19 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
               <ArrowLeft size={24} />
             </button>
             <div className="flex items-center gap-4">
+              {!user ? (
+                <button 
+                  onClick={signIn}
+                  className="px-4 py-2 bg-white text-slate-950 rounded-xl font-black text-xs uppercase tracking-tighter hover:scale-105 active:scale-95 transition-all"
+                >
+                  Sign In for Leaderboards
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border border-white/20" referrerPolicy="no-referrer" />
+                  <span className="text-xs font-black uppercase tracking-tighter text-slate-400">{user.displayName}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 rounded-2xl border border-amber-500/20">
                 <Timer size={16} className="text-amber-500" />
                 <span className="font-black text-amber-500">Speed Verse</span>
@@ -429,8 +587,17 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                               <Timer size={8} />
                               <span>Best Time</span>
                             </div>
-                            <div className="text-sm font-black text-white">{bestTime !== undefined ? `${bestTime}s` : '-'}</div>
+                            <div className="text-sm font-black text-white">{bestTime !== undefined ? `${formatTime(bestTime)}s` : '-'}</div>
                           </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowLeaderboard(level.id);
+                            }}
+                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                          >
+                            <Trophy size={16} className="text-amber-500" />
+                          </button>
                         </div>
                       </motion.div>
                     </div>
@@ -471,7 +638,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 <button onClick={() => setIsPaused(!isPaused)} className="p-2 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
                   {isPaused ? <Play size={20} /> : <Pause size={20} />}
                 </button>
-                <div className="text-3xl font-black text-amber-500 leading-none">{time}s</div>
+                <div className="text-3xl font-black text-amber-500 leading-none">{formatTime(time)}s</div>
               </div>
               <div className="flex gap-1">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -529,7 +696,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
 
           {/* Grid */}
-          <div className="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0 overflow-hidden">
+          <div className="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0 overflow-hidden pb-8 sm:pb-4">
             <div className="aspect-square w-full h-full max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-6 border-4 border-slate-800 shadow-2xl relative flex items-center justify-center">
               <div className="grid grid-cols-3 grid-rows-3 gap-2 sm:gap-4 h-full w-full">
                 {grid.map((row, r) => (
@@ -583,6 +750,56 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
         </>
       )}
+
+      {/* Leaderboard Overlay */}
+      <AnimatePresence>
+        {showLeaderboard !== null && (
+          <div className="fixed inset-0 z-[110] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-slate-900 border-2 border-slate-800 rounded-[2.5rem] p-8 max-w-sm w-full max-h-[90vh] overflow-y-auto shadow-2xl text-white custom-scrollbar flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-black tracking-tight uppercase italic text-amber-400">Level {showLeaderboard} Top 10</h3>
+                <button onClick={() => setShowLeaderboard(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <ArrowLeft size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-2 mb-8">
+                {leaderboardData.length > 0 ? (
+                  leaderboardData.map((score, i) => (
+                    <div key={i} className={cn(
+                      "flex items-center justify-between p-3 rounded-2xl border border-white/5",
+                      score.userId === user?.uid ? "bg-amber-500/10 border-amber-500/30" : "bg-white/5"
+                    )}>
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black",
+                          i === 0 ? "bg-yellow-500 text-slate-950" : i === 1 ? "bg-slate-300 text-slate-950" : i === 2 ? "bg-amber-700 text-white" : "bg-slate-800 text-slate-400"
+                        )}>{i + 1}</span>
+                        <span className="font-bold text-sm truncate max-w-[120px]">{score.userName}</span>
+                      </div>
+                      <span className="font-black text-amber-500">{formatTime(score.score)}s</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-slate-500 font-bold uppercase tracking-widest text-xs">No records yet. Be the first!</div>
+                )}
+              </div>
+
+              <button 
+                onClick={() => setShowLeaderboard(null)}
+                className="w-full py-4 bg-white text-slate-950 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 uppercase italic"
+              >
+                CLOSE
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Tutorial Overlay */}
       <AnimatePresence>
@@ -654,12 +871,12 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 <Trophy size={48} className="text-emerald-500" />
               </motion.div>
               <h2 className="text-4xl font-black text-white mb-2 italic uppercase tracking-tighter">
-                {loop === 3 && time > words.length * 2 ? "TOO SLOW!" : "VICTORY!"}
+                {loop === 3 && time > words.length * 1000 ? "TOO SLOW!" : "VICTORY!"}
               </h2>
-              <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-2">Loop {loop} Completed in {time}s!</p>
+              <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-2">Loop {loop} Completed in {formatTime(time)}s!</p>
               {loop === 3 && (
-                <p className={cn("text-xs font-bold uppercase mb-6", time <= words.length * 2 ? "text-emerald-500" : "text-rose-500")}>
-                  Target: Under {words.length * 2}s ({time <= words.length * 2 ? "PASSED" : "FAILED"})
+                <p className={cn("text-xs font-bold uppercase mb-6", time <= words.length * 1000 ? "text-emerald-500" : "text-rose-500")}>
+                  Target: Under {words.length}.000s ({time <= words.length * 1000 ? "PASSED" : "FAILED"})
                 </p>
               )}
               
@@ -672,7 +889,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                     Next Loop ({loop + 1}/3) <ChevronRight size={24} />
                   </button>
                 ) : (
-                  time <= words.length * 2 ? (
+                  time <= words.length * 1000 ? (
                     <button 
                       onClick={() => {
                         if (currentLevelIdx < SPEED_LEVELS.length - 1) {
