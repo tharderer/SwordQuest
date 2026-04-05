@@ -51,9 +51,11 @@ service cloud.firestore {
 
     function isValidUserProfile(data) {
       return data.keys().hasAll(['displayName']) &&
-             data.keys().hasOnly(['displayName', 'photoURL', 'role']) &&
+             data.keys().hasOnly(['displayName', 'photoURL', 'role', 'totalXp', 'levelsCompleted']) &&
              data.displayName is string && data.displayName.size() <= 50 &&
              (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+             (!('totalXp' in data) || (data.totalXp is number && data.totalXp >= 0)) &&
+             (!('levelsCompleted' in data) || (data.levelsCompleted is number && data.levelsCompleted >= 0)) &&
              (!('role' in data) || isAdmin()); // Only admins can set roles
     }
 

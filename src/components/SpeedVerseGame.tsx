@@ -412,8 +412,6 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       setGrid(prevGrid => {
         const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
         newGrid[r][c].isCorrect = true;
-        // Update wordIndex to match the expected word for consistent coloring in progress bar if needed
-        // but actually it's better to keep the original index for variety
         return newGrid;
       });
       
@@ -425,11 +423,12 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
         return;
       }
 
-      // Refill grid (non-blocking for taps)
+      // Refill grid immediately for better responsiveness
+      // We use a very short delay only for the visual "pop" effect
       setTimeout(() => {
         setGrid(prevGrid => {
           const updatedGrid = prevGrid.map(row => row.map(word => ({ ...word })));
-          let idCounter = Math.max(...updatedGrid.flat().map(w => w.id)) + 1;
+          let idCounter = Date.now() + Math.random(); // Ensure unique IDs for rapid taps
 
           // Determine replacement word
           let replacementIndex = -1;
@@ -440,7 +439,6 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
             setPoolIndex(poolIndexRef.current);
           } else {
             // Short verse or pool exhausted
-            // Find indices that are "under-represented" on the current grid
             const counts: Record<number, number> = {};
             for (let i = 0; i < words.length; i++) counts[i] = 0;
             
@@ -450,13 +448,11 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
               }
             });
             
-            // Find the minimum count
             let minCount = Infinity;
             for (let i = 0; i < words.length; i++) {
               if (counts[i] < minCount) minCount = counts[i];
             }
             
-            // Get all indices with min count
             const candidates = [];
             for (let i = 0; i < words.length; i++) {
               if (counts[i] === minCount) candidates.push(i);
@@ -465,9 +461,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
             replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
           }
 
-          // Directly replace the word at [r][c] instead of sliding
           updatedGrid[r][c] = {
-            id: idCounter++,
+            id: idCounter,
             text: words[replacementIndex],
             row: r,
             col: c,
@@ -479,7 +474,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           
           return updatedGrid;
         });
-      }, 150);
+      }, 60); // Reduced from 150ms to 60ms for snappier feel
     } else {
       // Wrong!
       setGrid(prevGrid => {
@@ -659,16 +654,18 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 {words.map((word, i) => {
                   const isFound = i < nextWordIndex;
                   const isCurrent = i === nextWordIndex;
-                  const isVisible = loop === 1 || isFound || isCurrent;
+                  // In Loop 3, hide the next word and only show found words
+                  const isVisible = loop === 1 || isFound || (loop === 2 && isCurrent);
+                  const shouldHighlight = isCurrent && loop !== 3;
                   
                   return (
                     <motion.span 
                       key={i}
                       initial={false}
-                      animate={isCurrent ? { scale: 1.2, zIndex: 20 } : { scale: 1, zIndex: 10 }}
+                      animate={shouldHighlight ? { scale: 1.2, zIndex: 20 } : { scale: 1, zIndex: 10 }}
                       className={cn(
                         "px-2.5 py-1 rounded-lg text-xs sm:text-sm md:text-base font-black transition-all duration-300 border-2 uppercase tracking-tighter",
-                        isCurrent 
+                        shouldHighlight 
                           ? "bg-white text-slate-950 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] animate-pulse" 
                           : cn(
                               WORD_BG_COLORS[i % WORD_BG_COLORS.length],

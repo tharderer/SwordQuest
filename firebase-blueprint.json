@@ -14,11 +14,13 @@
     },
     "UserProfile": {
       "title": "User Profile",
-      "description": "Public profile information for a user.",
+      "description": "Public profile information for a user including their progress.",
       "type": "object",
       "properties": {
         "displayName": { "type": "string" },
-        "photoURL": { "type": "string" }
+        "photoURL": { "type": "string" },
+        "totalXp": { "type": "number", "description": "Total XP earned." },
+        "levelsCompleted": { "type": "number", "description": "Number of levels fully mastered (Loop 3)." }
       },
       "required": ["displayName"]
     }
