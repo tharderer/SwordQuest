@@ -884,117 +884,181 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 -mr-1 space-y-2 touch-pan-y">
-                {MAT_LAYOUT.map((spot, idx) => {
-                  const isWinning = phase === 'REVEAL' && winningSpotIndex === idx;
-                  const guess = matMapping[idx];
-                  const userBetAmount = userBets[idx] || 0;
-                  const botBets = bets.filter(b => !b.isUser && b.spotIndex === idx);
-                  const isActive = activeBetSpot === idx;
-
-                  return (
-                    <div 
-                      key={idx}
-                      onClick={() => phase === 'BETTING' && placeUserChip(idx)}
-                      className={`
-                        relative flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer min-h-[70px]
-                        ${isWinning ? 'bg-green-100 border-green-500 scale-105 shadow-lg z-10' : 'bg-white/60 border-[#d4af37]/30 hover:border-[#d4af37]'}
-                        ${phase === 'REVEAL' && !isWinning ? 'opacity-50' : ''}
-                        ${!guess && idx !== 0 ? 'bg-gray-100/50 border-dashed border-gray-300 pointer-events-none' : ''}
-                        ${isActive ? 'ring-4 ring-[#d4af37]/40 border-[#d4af37]' : ''}
-                      `}
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 -mr-1 space-y-4 touch-pan-y">
+                {phase === 'REVEAL' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white p-4 sm:p-6 rounded-2xl border-4 border-[#d4af37] text-center space-y-4 relative shrink-0"
+                  >
+                    <button 
+                      onClick={handleDeleteQuestion}
+                      className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                      title="Delete bad question"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-[#d4af37] text-white flex flex-col items-center justify-center font-bold text-[10px] sm:text-xs shrink-0">
-                          <span>{spot.odds}:1</span>
-                          <span className="text-[7px] sm:text-[8px] uppercase">Payout</span>
-                        </div>
-                        <div>
-                          <p className="text-[8px] sm:text-[10px] uppercase font-bold opacity-60">
-                            {idx === 0 ? "All Too High" : !guess ? "Empty Space" : "Guess Spot"}
-                          </p>
-                          <p className="text-base sm:text-lg font-black">
-                            {idx === 0 ? "All Too High" : guess ? guess.value : "---"}
-                          </p>
-                          {guess && (
-                            <div className="flex flex-wrap gap-1 mt-0.5">
-                              {guess.playerNames.map(name => {
-                                const p = scores.find(s => s.name === name);
-                                return (
-                                  <span 
-                                    key={name} 
-                                    className="text-[7px] sm:text-[8px] font-bold italic px-1 rounded bg-white/40 border border-black/5"
-                                    style={{ color: p?.color }}
-                                  >
-                                    {name}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <Trash2 className="w-5 h-5" />
+                    </button>
 
-                      {/* Chips Display & Input */}
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex flex-wrap gap-1 max-w-[80px] sm:max-w-[100px] justify-end">
-                          {userBetAmount > 0 && (
-                            <div 
-                              className="flex items-center gap-1 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold shadow-sm"
-                              style={{ backgroundColor: scores.find(s => s.isUser)?.color }}
-                            >
-                              <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                              <span>{userBetAmount}</span>
-                            </div>
-                          )}
-                          {/* Group bot bets by player */}
-                          {Object.entries(
-                            botBets.reduce((acc, bet) => {
-                              acc[bet.playerName] = (acc[bet.playerName] || 0) + 1;
-                              return acc;
-                            }, {} as Record<string, number>)
-                          ).map(([name, count]) => {
-                            const botPlayer = scores.find(s => s.name === name);
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">The Question Was:</p>
+                      <p className="text-sm font-medium italic leading-tight text-[#2c1e11]">"{currentQuestion.text}"</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-100">
+                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">The Correct Answer is:</p>
+                      <p className="text-5xl font-black text-[#d4af37]">{currentQuestion.answer}</p>
+                    </div>
+                    
+                    {verificationVerse && (
+                      <div className="p-4 bg-[#fdfcf0] border-l-4 border-[#d4af37] text-left italic text-sm rounded-r-lg shadow-inner">
+                        <p className="mb-2 text-[#2c1e11]">"{verificationVerse}"</p>
+                        <p className="text-[10px] font-bold not-italic opacity-60 uppercase tracking-widest">— {currentQuestion.book} {currentQuestion.chapter}:{currentQuestion.verse}</p>
+                      </div>
+                    )}
+
+                    <p className="font-bold text-lg">{roundResult?.message}</p>
+                    {roundResult?.winners && roundResult.winners.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Winning Guess By:</p>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {roundResult.winners.map(name => {
+                            const p = scores.find(s => s.name === name);
                             return (
                               <div 
                                 key={name}
-                                className="flex items-center gap-1 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold shadow-sm"
-                                style={{ backgroundColor: botPlayer?.color }}
+                                className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold text-white shadow-sm"
+                                style={{ backgroundColor: p?.color }}
                               >
-                                <Bot className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                                <span className="text-[7px] sm:text-[8px]">{count}</span>
+                                {p?.isUser ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
+                                <span>{name}</span>
+                                <span className="bg-white/20 px-1 rounded ml-1">+1</span>
                               </div>
                             );
                           })}
                         </div>
-                        
-                        {isActive && phase === 'BETTING' && (
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                            <input 
-                              type="number"
-                              inputMode="numeric"
-                              min="0"
-                              max={totalUserChips - (userChipsPlaced - userBetAmount)}
-                              defaultValue={userBetAmount === 0 ? (totalUserChips - userChipsPlaced) : userBetAmount}
-                              className="w-12 sm:w-16 p-1 text-center font-bold rounded border border-[#d4af37] bg-white text-xs sm:text-sm"
-                              onBlur={(e) => {
-                                setUserBetAmount(idx, parseInt(e.target.value) || 0);
-                                setActiveBetSpot(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  setUserBetAmount(idx, parseInt((e.target as HTMLInputElement).value) || 0);
-                                  setActiveBetSpot(null);
-                                }
-                              }}
-                              autoFocus
-                            />
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
+                    )}
+                    <button 
+                      onClick={startNewRound}
+                      className="w-full py-4 bg-[#d4af37] text-white rounded-xl font-bold text-xl shadow-lg hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      {round < 7 ? "Next Question" : "See Final Results"} <ArrowRight />
+                    </button>
+                  </motion.div>
+                )}
+
+                <div className="space-y-2">
+                  {MAT_LAYOUT.map((spot, idx) => {
+                    const isWinning = phase === 'REVEAL' && winningSpotIndex === idx;
+                    const guess = matMapping[idx];
+                    const userBetAmount = userBets[idx] || 0;
+                    const botBets = bets.filter(b => !b.isUser && b.spotIndex === idx);
+                    const isActive = activeBetSpot === idx;
+
+                    return (
+                      <div 
+                        key={idx}
+                        onClick={() => phase === 'BETTING' && placeUserChip(idx)}
+                        className={`
+                          relative flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer min-h-[70px]
+                          ${isWinning ? 'bg-green-100 border-green-500 scale-105 shadow-lg z-10' : 'bg-white/60 border-[#d4af37]/30 hover:border-[#d4af37]'}
+                          ${phase === 'REVEAL' && !isWinning ? 'opacity-50' : ''}
+                          ${!guess && idx !== 0 ? 'bg-gray-100/50 border-dashed border-gray-300 pointer-events-none' : ''}
+                          ${isActive ? 'ring-4 ring-[#d4af37]/40 border-[#d4af37]' : ''}
+                        `}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-[#d4af37] text-white flex flex-col items-center justify-center font-bold text-[10px] sm:text-xs shrink-0">
+                            <span>{spot.odds}:1</span>
+                            <span className="text-[7px] sm:text-[8px] uppercase">Payout</span>
+                          </div>
+                          <div>
+                            <p className="text-[8px] sm:text-[10px] uppercase font-bold opacity-60">
+                              {idx === 0 ? "All Too High" : !guess ? "Empty Space" : "Guess Spot"}
+                            </p>
+                            <p className="text-base sm:text-lg font-black">
+                              {idx === 0 ? "All Too High" : guess ? guess.value : "---"}
+                            </p>
+                            {guess && (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {guess.playerNames.map(name => {
+                                  const p = scores.find(s => s.name === name);
+                                  return (
+                                    <span 
+                                      key={name} 
+                                      className="text-[7px] sm:text-[8px] font-bold italic px-1 rounded bg-white/40 border border-black/5"
+                                      style={{ color: p?.color }}
+                                    >
+                                      {name}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Chips Display & Input */}
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-wrap gap-1 max-w-[80px] sm:max-w-[100px] justify-end">
+                            {userBetAmount > 0 && (
+                              <div 
+                                className="flex items-center gap-1 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold shadow-sm"
+                                style={{ backgroundColor: scores.find(s => s.isUser)?.color }}
+                              >
+                                <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                <span>{userBetAmount}</span>
+                              </div>
+                            )}
+                            {/* Group bot bets by player */}
+                            {Object.entries(
+                              botBets.reduce((acc, bet) => {
+                                acc[bet.playerName] = (acc[bet.playerName] || 0) + 1;
+                                return acc;
+                              }, {} as Record<string, number>)
+                            ).map(([name, count]) => {
+                              const botPlayer = scores.find(s => s.name === name);
+                              return (
+                                <div 
+                                  key={name}
+                                  className="flex items-center gap-1 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold shadow-sm"
+                                  style={{ backgroundColor: botPlayer?.color }}
+                                >
+                                  <Bot className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                  <span className="text-[7px] sm:text-[8px]">{count}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          {isActive && phase === 'BETTING' && (
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <input 
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                max={totalUserChips - (userChipsPlaced - userBetAmount)}
+                                defaultValue={userBetAmount === 0 ? (totalUserChips - userChipsPlaced) : userBetAmount}
+                                className="w-12 sm:w-16 p-1 text-center font-bold rounded border border-[#d4af37] bg-white text-xs sm:text-sm"
+                                onBlur={(e) => {
+                                  setUserBetAmount(idx, parseInt(e.target.value) || 0);
+                                  setActiveBetSpot(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    setUserBetAmount(idx, parseInt((e.target as HTMLInputElement).value) || 0);
+                                    setActiveBetSpot(null);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {phase === 'BETTING' && userChipsPlaced > 0 && (
@@ -1006,67 +1070,7 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                 </button>
               )}
 
-              {phase === 'REVEAL' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white p-4 sm:p-6 rounded-2xl border-4 border-[#d4af37] text-center space-y-4 relative shrink-0"
-                >
-                  <button 
-                    onClick={handleDeleteQuestion}
-                    className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                    title="Delete bad question"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">The Question Was:</p>
-                    <p className="text-sm font-medium italic leading-tight text-[#2c1e11]">"{currentQuestion.text}"</p>
-                  </div>
-
-                  <div className="pt-2 border-t border-gray-100">
-                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">The Correct Answer is:</p>
-                    <p className="text-5xl font-black text-[#d4af37]">{currentQuestion.answer}</p>
-                  </div>
-                  
-                  {verificationVerse && (
-                    <div className="p-4 bg-[#fdfcf0] border-l-4 border-[#d4af37] text-left italic text-sm rounded-r-lg shadow-inner">
-                      <p className="mb-2 text-[#2c1e11]">"{verificationVerse}"</p>
-                      <p className="text-[10px] font-bold not-italic opacity-60 uppercase tracking-widest">— {currentQuestion.book} {currentQuestion.chapter}:{currentQuestion.verse}</p>
-                    </div>
-                  )}
-
-                  <p className="font-bold text-lg">{roundResult?.message}</p>
-                  {roundResult?.winners && roundResult.winners.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Winning Guess By:</p>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {roundResult.winners.map(name => {
-                          const p = scores.find(s => s.name === name);
-                          return (
-                            <div 
-                              key={name}
-                              className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold text-white shadow-sm"
-                              style={{ backgroundColor: p?.color }}
-                            >
-                              {p?.isUser ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
-                              <span>{name}</span>
-                              <span className="bg-white/20 px-1 rounded ml-1">+1</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  <button 
-                    onClick={startNewRound}
-                    className="w-full py-4 bg-[#d4af37] text-white rounded-xl font-bold text-xl shadow-lg hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    {round < 7 ? "Next Question" : "See Final Results"} <ArrowRight />
-                  </button>
-                </motion.div>
-              )}
+              {/* Reveal card moved inside scrollable container above */}
             </motion.div>
           )}
 
