@@ -582,19 +582,19 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
   const matMapping = getMatMapping();
 
   return (
-    <div className="min-h-screen bg-[#FDFCF0] font-sans text-[#2c1e11] p-4 flex flex-col items-center">
+    <div className="h-[100dvh] bg-[#FDFCF0] font-sans text-[#2c1e11] p-2 sm:p-4 flex flex-col items-center overflow-hidden">
       {/* Header */}
       {phase !== 'LOBBY' && (
-        <div className="w-full max-w-2xl flex justify-between items-center mb-8 bg-[#f4e4bc] p-4 rounded-2xl border-2 border-[#d4af37] shadow-md">
+        <div className="w-full max-w-2xl flex flex-wrap justify-between items-center gap-2 mb-4 sm:mb-8 bg-[#f4e4bc] p-3 sm:p-4 rounded-2xl border-2 border-[#d4af37] shadow-md">
           <div className="flex items-center gap-2 text-[#2c1e11]">
-            <Trophy className="text-[#d4af37]" />
+            <Trophy className="text-[#d4af37] w-5 h-5 sm:w-6 sm:h-6" />
             <div>
-              <h1 className="text-xl font-bold uppercase tracking-tight leading-none">Wits & Wagers</h1>
-              <p className="text-[10px] font-bold opacity-60">Round {round} of 7</p>
+              <h1 className="text-lg sm:text-xl font-bold uppercase tracking-tight leading-none">Wits & Wagers</h1>
+              <p className="text-[8px] sm:text-[10px] font-bold opacity-60">Round {round} of 7</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/50 rounded-xl border border-[#d4af37]/30 backdrop-blur-md">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/50 rounded-xl border border-[#d4af37]/30 backdrop-blur-md">
               <Music className={cn("w-3.5 h-3.5", isMusicEnabled ? "text-[#d4af37]" : "text-[#2c1e11]/20")} />
               <select 
                 value={selectedMusicStyle}
@@ -618,9 +618,9 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                 {isMusicEnabled ? <Volume2 size={14} className="text-[#2c1e11]" /> : <VolumeX size={14} className="text-[#2c1e11]/40" />}
               </button>
             </div>
-            <div className="flex items-center gap-2 bg-white/50 px-4 py-1 rounded-full border border-[#d4af37]">
-              <Coins className="text-[#d4af37] w-5 h-5" />
-              <span className="font-bold">{totalUserChips} Chips</span>
+            <div className="flex items-center gap-1 sm:gap-2 bg-white/50 px-2 sm:px-4 py-1 rounded-full border border-[#d4af37]">
+              <Coins className="text-[#d4af37] w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="font-bold text-xs sm:text-base whitespace-nowrap">{totalUserChips} Chips</span>
             </div>
             <button 
               onClick={onExit}
@@ -634,21 +634,23 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
 
       {/* Scoreboard */}
       {phase !== 'LOBBY' && (phase === 'BETTING' || phase === 'REVEAL') && (
-        <div className="w-full max-w-2xl mb-4 grid grid-cols-4 sm:grid-cols-7 gap-2">
-          {scores.map(s => (
-            <div 
-              key={s.name} 
-              className={`p-2 rounded-lg border text-center transition-all ${s.isUser ? 'border-[#d4af37] shadow-sm' : 'border-[#d4af37]/20'}`}
-              style={{ backgroundColor: s.isUser ? '#d4af37' : `${s.color}15`, color: s.isUser ? 'white' : s.color }}
-            >
-              <p className="text-[8px] font-bold uppercase truncate">{s.name}</p>
-              <p className="text-xs font-black">{s.score + 2}</p>
-            </div>
-          ))}
+        <div className="w-full max-w-2xl mb-4 overflow-x-auto custom-scrollbar pb-2">
+          <div className="flex sm:grid sm:grid-cols-7 gap-2 min-w-max sm:min-w-0">
+            {scores.map(s => (
+              <div 
+                key={s.name} 
+                className={`p-1.5 sm:p-2 rounded-lg border text-center transition-all min-w-[60px] sm:min-w-0 ${s.isUser ? 'border-[#d4af37] shadow-sm' : 'border-[#d4af37]/20'}`}
+                style={{ backgroundColor: s.isUser ? '#d4af37' : `${s.color}15`, color: s.isUser ? 'white' : s.color }}
+              >
+                <p className="text-[7px] sm:text-[8px] font-bold uppercase truncate">{s.name}</p>
+                <p className="text-xs font-black">{s.score + 2}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <main className={`w-full max-w-2xl ${phase === 'LOBBY' ? '' : 'bg-[#f4e4bc] rounded-3xl p-6 border-4 border-[#d4af37] shadow-2xl relative overflow-hidden'}`}>
+      <main className={`w-full max-w-2xl flex-1 flex flex-col min-h-0 ${phase === 'LOBBY' ? '' : 'bg-[#f4e4bc] rounded-3xl p-4 sm:p-6 border-4 border-[#d4af37] shadow-2xl relative overflow-hidden'}`}>
         {phase !== 'LOBBY' && (
           <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/parchment.png')]" />
         )}
@@ -660,79 +662,83 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="flex flex-col items-center justify-center min-h-[600px] space-y-8 text-center"
+              className="flex flex-col items-center justify-center min-h-0 py-4 space-y-6 sm:space-y-8 text-center"
             >
-              <div className="space-y-4">
-                <div className="w-24 h-24 bg-[#d4af37] rounded-full flex items-center justify-center mx-auto shadow-xl">
-                  <HelpCircle className="w-12 h-12 text-white" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="w-16 h-16 sm:w-24 sm:h-24 bg-[#d4af37] rounded-full flex items-center justify-center mx-auto shadow-xl">
+                  <HelpCircle className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
                 </div>
-                <h1 className="text-5xl font-black italic tracking-tighter uppercase">
+                <h1 className="text-3xl sm:text-5xl font-black italic tracking-tighter uppercase">
                   Bible <span className="text-[#d4af37]">Wits</span> & Wagers
                 </h1>
-                <p className="text-sm font-bold opacity-60 uppercase tracking-[0.2em]">The Ultimate Biblical Trivia Challenge</p>
+                <p className="text-[10px] sm:text-sm font-bold opacity-60 uppercase tracking-[0.2em]">The Ultimate Biblical Trivia Challenge</p>
                 
-                <div className="flex items-center justify-center gap-4 px-6 py-3 bg-white/40 rounded-2xl border border-[#d4af37]/20 backdrop-blur-md mx-auto w-fit">
-                  <Music className={cn("w-5 h-5", isMusicEnabled ? "text-[#d4af37]" : "text-[#2c1e11]/20")} />
-                  <select 
-                    value={selectedMusicStyle}
-                    onChange={(e) => setSelectedMusicStyle(e.target.value)}
-                    className="bg-transparent text-[#2c1e11] text-xs font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
-                  >
-                    <option value="hymns" className="bg-[#f4e4bc]">Hymns</option>
-                    <option value="gospel" className="bg-[#f4e4bc]">Gospel</option>
-                    <option value="acoustic" className="bg-[#f4e4bc]">Acoustic</option>
-                    <option value="ambient" className="bg-[#f4e4bc]">Ambient</option>
-                    <option value="lofi" className="bg-[#f4e4bc]">Lo-Fi</option>
-                    <option value="classical" className="bg-[#f4e4bc]">Classical</option>
-                    <option value="retro" className="bg-[#f4e4bc]">Retro</option>
-                    <option value="epic" className="bg-[#f4e4bc]">Epic</option>
-                  </select>
-                  <div className="w-px h-4 bg-[#2c1e11]/10 mx-2" />
-                  <button 
-                    onClick={() => setIsMusicEnabled(!isMusicEnabled)}
-                    className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                  >
-                    {isMusicEnabled ? <Volume2 size={18} className="text-[#2c1e11]" /> : <VolumeX size={18} className="text-[#2c1e11]/40" />}
-                  </button>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="1" 
-                    step="0.1" 
-                    value={volume} 
-                    onChange={(e) => setVolume(parseFloat(e.target.value))}
-                    className="w-24 h-1 bg-[#2c1e11]/20 rounded-full appearance-none cursor-pointer accent-[#d4af37]"
-                  />
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 px-4 sm:px-6 py-2 sm:py-3 bg-white/40 rounded-2xl border border-[#d4af37]/20 backdrop-blur-md mx-auto w-fit">
+                  <div className="flex items-center gap-2">
+                    <Music className={cn("w-4 h-4 sm:w-5 sm:h-5", isMusicEnabled ? "text-[#d4af37]" : "text-[#2c1e11]/20")} />
+                    <select 
+                      value={selectedMusicStyle}
+                      onChange={(e) => setSelectedMusicStyle(e.target.value)}
+                      className="bg-transparent text-[#2c1e11] text-[10px] sm:text-xs font-bold uppercase tracking-widest outline-none border-none cursor-pointer"
+                    >
+                      <option value="hymns" className="bg-[#f4e4bc]">Hymns</option>
+                      <option value="gospel" className="bg-[#f4e4bc]">Gospel</option>
+                      <option value="acoustic" className="bg-[#f4e4bc]">Acoustic</option>
+                      <option value="ambient" className="bg-[#f4e4bc]">Ambient</option>
+                      <option value="lofi" className="bg-[#f4e4bc]">Lo-Fi</option>
+                      <option value="classical" className="bg-[#f4e4bc]">Classical</option>
+                      <option value="retro" className="bg-[#f4e4bc]">Retro</option>
+                      <option value="epic" className="bg-[#f4e4bc]">Epic</option>
+                    </select>
+                  </div>
+                  <div className="w-px h-4 bg-[#2c1e11]/10 mx-1 sm:mx-2" />
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setIsMusicEnabled(!isMusicEnabled)}
+                      className="p-1 sm:p-2 hover:bg-white/20 rounded-xl transition-colors"
+                    >
+                      {isMusicEnabled ? <Volume2 size={16} className="text-[#2c1e11]" /> : <VolumeX size={16} className="text-[#2c1e11]/40" />}
+                    </button>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.1" 
+                      value={volume} 
+                      onChange={(e) => setVolume(parseFloat(e.target.value))}
+                      className="w-16 sm:w-24 h-1 bg-[#2c1e11]/20 rounded-full appearance-none cursor-pointer accent-[#d4af37]"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                <div className="bg-white/40 p-4 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-1">
-                  <Database className="w-5 h-5 text-[#d4af37]" />
-                  <span className="text-[10px] font-bold uppercase opacity-50">Total Bank</span>
-                  <span className="text-xl font-black">{dbQuestionCount}</span>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-sm">
+                <div className="bg-white/40 p-3 sm:p-4 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-1">
+                  <Database className="w-4 h-4 sm:w-5 sm:h-5 text-[#d4af37]" />
+                  <span className="text-[8px] sm:text-[10px] font-bold uppercase opacity-50">Total Bank</span>
+                  <span className="text-lg sm:text-xl font-black">{dbQuestionCount}</span>
                 </div>
-                <div className="bg-white/40 p-4 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-1">
-                  <Sparkles className="w-5 h-5 text-[#d4af37]" />
-                  <span className="text-[10px] font-bold uppercase opacity-50">Unseen</span>
-                  <span className="text-xl font-black text-[#d4af37]">{unseenQuestionCount}</span>
+                <div className="bg-white/40 p-3 sm:p-4 rounded-2xl border border-[#d4af37]/20 flex flex-col items-center space-y-1">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#d4af37]" />
+                  <span className="text-[8px] sm:text-[10px] font-bold uppercase opacity-50">Unseen</span>
+                  <span className="text-lg sm:text-xl font-black text-[#d4af37]">{unseenQuestionCount}</span>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 w-full max-w-xs">
+              <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-xs">
                 <button
                   onClick={startGame}
                   disabled={isGenerating}
-                  className="group relative w-full py-5 bg-[#d4af37] text-white rounded-2xl font-black text-xl shadow-2xl hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-80"
+                  className="group relative w-full py-4 sm:py-5 bg-[#d4af37] text-white rounded-2xl font-black text-lg sm:text-xl shadow-2xl hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-80"
                 >
                   {isGenerating ? (
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
-                        <span className="text-lg uppercase tracking-widest">Generating...</span>
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                        <span className="text-base sm:text-lg uppercase tracking-widest">Generating...</span>
                       </div>
                       {generationProgress.total > 0 && (
-                        <div className="w-48 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                        <div className="w-32 sm:w-48 h-1.5 bg-white/20 rounded-full overflow-hidden">
                           <motion.div 
                             className="h-full bg-white"
                             initial={{ width: 0 }}
@@ -740,13 +746,13 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                           />
                         </div>
                       )}
-                      <span className="text-[10px] font-bold opacity-80 uppercase tracking-tighter">
+                      <span className="text-[8px] sm:text-[10px] font-bold opacity-80 uppercase tracking-tighter">
                         {generationProgress.current}/{generationProgress.total} Questions Found
                       </span>
                     </div>
                   ) : (
                     <>
-                      <Play className="w-6 h-6 fill-current" />
+                      <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
                       START GAME
                     </>
                   )}
@@ -754,13 +760,13 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
               </div>
 
               {generationError && (
-                <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs font-bold flex items-center gap-2 animate-shake">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                <div className="bg-red-50 border border-red-200 text-red-600 p-2 sm:p-3 rounded-xl text-[10px] sm:text-xs font-bold flex items-center gap-2 animate-shake">
+                  <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
                   <span>{generationError}</span>
                 </div>
               )}
 
-              <p className="max-w-xs text-[10px] leading-relaxed opacity-40 uppercase font-bold tracking-widest">
+              <p className="max-w-xs text-[8px] sm:text-[10px] leading-relaxed opacity-40 uppercase font-bold tracking-widest">
                 Questions are generated by AI to be extremely difficult. 
                 Searching across all sections of the Bible.
               </p>
@@ -773,65 +779,68 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6 text-center"
+              className="flex flex-col h-full min-h-0 space-y-4 sm:space-y-6 text-center"
             >
-              <div className="flex justify-center mb-2">
+              <div className="flex justify-center shrink-0">
                 <div className={`
-                  flex items-center gap-3 px-6 py-3 rounded-full border-4 bg-white shadow-xl
+                  flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 rounded-full border-2 sm:border-4 bg-white shadow-xl
                   ${timeLeft <= 5 ? 'border-red-500 text-red-500 animate-pulse' : 'border-[#d4af37] text-[#d4af37]'}
                 `}>
-                  <Timer className="w-8 h-8" />
-                  <span className="text-4xl font-black tabular-nums">{timeLeft}</span>
+                  <Timer className="w-6 h-6 sm:w-8 sm:h-8" />
+                  <span className="text-2xl sm:text-4xl font-black tabular-nums">{timeLeft}</span>
                 </div>
               </div>
 
-              <div className="bg-white/40 p-8 rounded-2xl border-2 border-dashed border-[#d4af37] relative">
-                <HelpCircle className="mx-auto mb-4 text-[#d4af37] w-12 h-12" />
-                <button 
-                  onClick={handleDeleteQuestion}
-                  className="absolute top-4 left-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                  title="Delete bad question"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-                <h2 className="text-2xl font-bold italic leading-tight">
-                  "{currentQuestion.text}"
-                </h2>
-              </div>
-              
-              <div className="space-y-4">
-                <p className="font-bold uppercase text-sm tracking-widest opacity-70">Enter your numeric guess:</p>
-                <input 
-                  type="number"
-                  value={userGuess}
-                  onChange={(e) => setUserGuess(e.target.value)}
-                  className="w-full text-center text-3xl font-bold p-4 rounded-xl border-2 border-[#d4af37] bg-white focus:outline-none focus:ring-4 focus:ring-[#d4af37]/20"
-                  placeholder="0"
-                  autoFocus
-                />
-                <button 
-                  onClick={handleGuessSubmit}
-                  disabled={!userGuess}
-                  className="w-full py-4 bg-[#d4af37] text-white rounded-xl font-bold text-xl shadow-lg hover:bg-[#b8962e] transition-all active:scale-95 disabled:opacity-50"
-                >
-                  Submit Guess
-                </button>
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 -mr-1">
+                <div className="bg-white/40 p-4 sm:p-8 rounded-2xl border-2 border-dashed border-[#d4af37] relative">
+                  <HelpCircle className="mx-auto mb-2 sm:mb-4 text-[#d4af37] w-8 h-8 sm:w-12 sm:h-12" />
+                  <button 
+                    onClick={handleDeleteQuestion}
+                    className="absolute top-2 left-2 sm:top-4 sm:left-4 p-1.5 sm:p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                    title="Delete bad question"
+                  >
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                  <h2 className="text-lg sm:text-2xl font-bold italic leading-tight">
+                    "{currentQuestion.text}"
+                  </h2>
+                </div>
+                
+                <div className="mt-4 sm:mt-6 space-y-4">
+                  <p className="font-bold uppercase text-[10px] sm:text-sm tracking-widest opacity-70">Enter your numeric guess:</p>
+                  <input 
+                    type="number"
+                    inputMode="numeric"
+                    value={userGuess}
+                    onChange={(e) => setUserGuess(e.target.value)}
+                    className="w-full text-center text-2xl sm:text-3xl font-bold p-3 sm:p-4 rounded-xl border-2 border-[#d4af37] bg-white focus:outline-none focus:ring-4 focus:ring-[#d4af37]/20"
+                    placeholder="0"
+                    autoFocus
+                  />
+                  <button 
+                    onClick={handleGuessSubmit}
+                    disabled={!userGuess}
+                    className="w-full py-3 sm:py-4 bg-[#d4af37] text-white rounded-xl font-bold text-lg sm:text-xl shadow-lg hover:bg-[#b8962e] transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    Submit Guess
+                  </button>
 
-                {/* Other Players Waiting */}
-                <div className="pt-4 border-t border-[#d4af37]/20">
-                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3">Other Players are Waiting...</p>
-                  <div className="flex justify-center gap-3">
-                    {scores.filter(s => !s.isUser).map(bot => (
-                      <div key={bot.name} className="flex flex-col items-center gap-1">
-                        <div 
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-md animate-bounce"
-                          style={{ backgroundColor: bot.color, animationDelay: `${Math.random() * 2}s` }}
-                        >
-                          <Bot className="w-4 h-4" />
+                  {/* Other Players Waiting */}
+                  <div className="pt-4 border-t border-[#d4af37]/20">
+                    <p className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3">Other Players are Waiting...</p>
+                    <div className="flex justify-center gap-2 sm:gap-3">
+                      {scores.filter(s => !s.isUser).map(bot => (
+                        <div key={bot.name} className="flex flex-col items-center gap-1">
+                          <div 
+                            className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white shadow-md animate-bounce"
+                            style={{ backgroundColor: bot.color, animationDelay: `${Math.random() * 2}s` }}
+                          >
+                            <Bot className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </div>
+                          <span className="text-[7px] sm:text-[8px] font-bold opacity-60">{bot.name}</span>
                         </div>
-                        <span className="text-[8px] font-bold opacity-60">{bot.name}</span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -843,21 +852,21 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
               key="betting"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="space-y-6"
+              className="flex flex-col h-full min-h-0 space-y-4"
             >
-              <div className="text-center mb-4 relative">
+              <div className="text-center relative shrink-0">
                 {phase === 'BETTING' && (
-                  <div className="flex justify-center mb-6">
+                  <div className="flex justify-center mb-2">
                     <div className={`
-                      flex items-center gap-3 px-6 py-3 rounded-full border-4 bg-white shadow-xl
+                      flex items-center gap-2 px-4 py-2 rounded-full border-2 bg-white shadow-lg
                       ${timeLeft <= 10 ? 'border-red-500 text-red-500 animate-pulse' : 'border-[#d4af37] text-[#d4af37]'}
                     `}>
-                      <Timer className="w-8 h-8" />
-                      <span className="text-4xl font-black tabular-nums">{timeLeft}</span>
+                      <Timer className="w-6 h-6" />
+                      <span className="text-2xl font-black tabular-nums">{timeLeft}</span>
                     </div>
                   </div>
                 )}
-                <h2 className="text-xl font-bold uppercase tracking-widest">
+                <h2 className="text-lg font-bold uppercase tracking-widest">
                   {phase === 'BETTING' ? "Place Your Bets!" : "The Reveal"}
                 </h2>
                 {phase === 'BETTING' && (
@@ -875,7 +884,7 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 -mr-1 space-y-2 touch-pan-y">
                 {MAT_LAYOUT.map((spot, idx) => {
                   const isWinning = phase === 'REVEAL' && winningSpotIndex === idx;
                   const guess = matMapping[idx];
@@ -896,15 +905,15 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                       `}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-[#d4af37] text-white flex flex-col items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-[#d4af37] text-white flex flex-col items-center justify-center font-bold text-[10px] sm:text-xs shrink-0">
                           <span>{spot.odds}:1</span>
-                          <span className="text-[8px] uppercase">Payout</span>
+                          <span className="text-[7px] sm:text-[8px] uppercase">Payout</span>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase font-bold opacity-60">
+                          <p className="text-[8px] sm:text-[10px] uppercase font-bold opacity-60">
                             {idx === 0 ? "All Too High" : !guess ? "Empty Space" : "Guess Spot"}
                           </p>
-                          <p className="text-lg font-black">
+                          <p className="text-base sm:text-lg font-black">
                             {idx === 0 ? "All Too High" : guess ? guess.value : "---"}
                           </p>
                           {guess && (
@@ -914,7 +923,7 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                                 return (
                                   <span 
                                     key={name} 
-                                    className="text-[8px] font-bold italic px-1 rounded bg-white/40 border border-black/5"
+                                    className="text-[7px] sm:text-[8px] font-bold italic px-1 rounded bg-white/40 border border-black/5"
                                     style={{ color: p?.color }}
                                   >
                                     {name}
@@ -928,13 +937,13 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
 
                       {/* Chips Display & Input */}
                       <div className="flex flex-col items-end gap-2">
-                        <div className="flex flex-wrap gap-1 max-w-[100px] justify-end">
+                        <div className="flex flex-wrap gap-1 max-w-[80px] sm:max-w-[100px] justify-end">
                           {userBetAmount > 0 && (
                             <div 
-                              className="flex items-center gap-1 text-white px-2 py-1 rounded-full text-[10px] font-bold shadow-sm"
+                              className="flex items-center gap-1 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold shadow-sm"
                               style={{ backgroundColor: scores.find(s => s.isUser)?.color }}
                             >
-                              <User className="w-3 h-3" />
+                              <User className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                               <span>{userBetAmount}</span>
                             </div>
                           )}
@@ -949,11 +958,11 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                             return (
                               <div 
                                 key={name}
-                                className="flex items-center gap-1 text-white px-2 py-1 rounded-full text-[10px] font-bold shadow-sm"
+                                className="flex items-center gap-1 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold shadow-sm"
                                 style={{ backgroundColor: botPlayer?.color }}
                               >
-                                <Bot className="w-3 h-3" />
-                                <span className="text-[8px]">{count}</span>
+                                <Bot className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                <span className="text-[7px] sm:text-[8px]">{count}</span>
                               </div>
                             );
                           })}
@@ -963,10 +972,11 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <input 
                               type="number"
+                              inputMode="numeric"
                               min="0"
                               max={totalUserChips - (userChipsPlaced - userBetAmount)}
                               defaultValue={userBetAmount === 0 ? (totalUserChips - userChipsPlaced) : userBetAmount}
-                              className="w-16 p-1 text-center font-bold rounded border border-[#d4af37] bg-white text-sm"
+                              className="w-12 sm:w-16 p-1 text-center font-bold rounded border border-[#d4af37] bg-white text-xs sm:text-sm"
                               onBlur={(e) => {
                                 setUserBetAmount(idx, parseInt(e.target.value) || 0);
                                 setActiveBetSpot(null);
@@ -990,7 +1000,7 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
               {phase === 'BETTING' && userChipsPlaced > 0 && (
                 <button 
                   onClick={handleReveal}
-                  className="w-full py-4 bg-[#2c1e11] text-white rounded-xl font-bold text-xl shadow-lg hover:bg-black transition-all active:scale-95"
+                  className="w-full py-3 sm:py-4 bg-[#2c1e11] text-white rounded-xl font-bold text-lg sm:text-xl shadow-lg hover:bg-black transition-all active:scale-95 shrink-0"
                 >
                   Reveal Answer
                 </button>
@@ -1000,7 +1010,7 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white p-6 rounded-2xl border-4 border-[#d4af37] text-center space-y-4 relative"
+                  className="bg-white p-4 sm:p-6 rounded-2xl border-4 border-[#d4af37] text-center space-y-4 relative shrink-0"
                 >
                   <button 
                     onClick={handleDeleteQuestion}
@@ -1065,93 +1075,95 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
               key="gameover"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-8 pb-12"
+              className="flex flex-col h-full min-h-0 space-y-6 sm:space-y-8 pb-4"
             >
-              <div className="bg-white/40 p-8 rounded-3xl border-4 border-[#d4af37] shadow-xl">
-                <Trophy className="w-20 h-20 text-[#d4af37] mx-auto mb-4" />
-                <h2 className="text-3xl font-black uppercase tracking-tighter">Game Over</h2>
-                <p className="text-[#b8962e] font-bold">Final Leaderboard</p>
-              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 -mr-1 space-y-6 sm:space-y-8">
+                <div className="bg-white/40 p-6 sm:p-8 rounded-3xl border-4 border-[#d4af37] shadow-xl text-center">
+                  <Trophy className="w-16 h-16 sm:w-20 sm:h-20 text-[#d4af37] mx-auto mb-4" />
+                  <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">Game Over</h2>
+                  <p className="text-[#b8962e] font-bold">Final Leaderboard</p>
+                </div>
 
-              <div className="space-y-2">
-                {[...scores].sort((a, b) => b.score - a.score).map((s, i) => (
-                  <div 
-                    key={s.name}
-                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all`}
-                    style={{ 
-                      backgroundColor: s.isUser ? '#d4af37' : 'white',
-                      borderColor: s.isUser ? '#b8962e' : `${s.color}40`,
-                      color: s.isUser ? 'white' : '#2c1e11'
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-black text-xl opacity-50">#{i + 1}</span>
+                <div className="space-y-2">
+                  {[...scores].sort((a, b) => b.score - a.score).map((s, i) => (
+                    <div 
+                      key={s.name}
+                      className={`flex items-center justify-between p-3 sm:p-4 rounded-xl border-2 transition-all`}
+                      style={{ 
+                        backgroundColor: s.isUser ? '#d4af37' : 'white',
+                        borderColor: s.isUser ? '#b8962e' : `${s.color}40`,
+                        color: s.isUser ? 'white' : '#2c1e11'
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-black text-lg sm:text-xl opacity-50">#{i + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full" style={{ backgroundColor: s.color }} />
+                          <span className="font-bold text-sm sm:text-base">{s.name} {s.isUser && "(You)"}</span>
+                        </div>
+                      </div>
+                      <span className="font-black text-xl sm:text-2xl">{s.score} pts</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Game Review Section */}
+                <div className="bg-white/60 p-4 sm:p-6 rounded-3xl border-2 border-[#d4af37]/30 text-left space-y-6">
+                  <h3 className="text-lg sm:text-xl font-black uppercase tracking-widest text-center border-b border-[#d4af37]/20 pb-4">Game Review</h3>
+                  {gameHistory.map((h, i) => (
+                    <div key={i} className="space-y-3 border-b border-[#d4af37]/10 pb-6 last:border-0">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
-                        <span className="font-bold">{s.name} {s.isUser && "(You)"}</span>
+                        <span className="bg-[#d4af37] text-white text-[8px] sm:text-[10px] font-black px-2 py-0.5 rounded">ROUND {h.round}</span>
+                        <span className="text-[10px] sm:text-xs font-bold opacity-60 uppercase tracking-widest">Question</span>
                       </div>
-                    </div>
-                    <span className="font-black text-2xl">{s.score} pts</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Game Review Section */}
-              <div className="bg-white/60 p-6 rounded-3xl border-2 border-[#d4af37]/30 text-left space-y-6">
-                <h3 className="text-xl font-black uppercase tracking-widest text-center border-b border-[#d4af37]/20 pb-4">Game Review</h3>
-                {gameHistory.map((h, i) => (
-                  <div key={i} className="space-y-3 border-b border-[#d4af37]/10 pb-6 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-[#d4af37] text-white text-[10px] font-black px-2 py-0.5 rounded">ROUND {h.round}</span>
-                      <span className="text-xs font-bold opacity-60 uppercase tracking-widest">Question</span>
-                    </div>
-                    <p className="text-sm italic font-medium leading-tight">"{h.question}"</p>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase opacity-40">Correct Answer</p>
-                        <p className="text-2xl font-black text-[#d4af37]">{h.answer}</p>
+                      <p className="text-xs sm:text-sm italic font-medium leading-tight">"{h.question}"</p>
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <p className="text-[8px] sm:text-[10px] font-bold uppercase opacity-40">Correct Answer</p>
+                          <p className="text-xl sm:text-2xl font-black text-[#d4af37]">{h.answer}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[8px] sm:text-[10px] font-bold uppercase opacity-40">Winning Guess</p>
+                          <p className="text-base sm:text-lg font-black">{h.winningGuess === -1 ? "All Too High" : h.winningGuess}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase opacity-40">Winning Guess</p>
-                        <p className="text-lg font-black">{h.winningGuess === -1 ? "All Too High" : h.winningGuess}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-bold uppercase opacity-40">Bets Placed</p>
-                      <div className="grid grid-cols-1 gap-1">
-                        {h.bets.length === 0 ? (
-                          <p className="text-[10px] italic opacity-50">No bets placed this round.</p>
-                        ) : (
-                          h.bets.map((bet, bi) => {
-                            const p = scores.find(s => s.name === bet.playerName);
-                            return (
-                              <div key={bi} className={`flex items-center justify-between p-2 rounded-lg text-[10px] ${bet.isWinning ? 'bg-green-50 border border-green-200' : 'bg-white/40 border border-black/5'}`}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p?.color }} />
-                                  <span className="font-bold">{bet.playerName}</span>
-                                  <span className="opacity-50">bet</span>
-                                  <span className="font-black">{bet.amount} chips</span>
-                                  <span className="opacity-50">on</span>
-                                  <span className="font-bold">{bet.guessValue}</span>
+                      
+                      <div className="space-y-2">
+                        <p className="text-[8px] sm:text-[10px] font-bold uppercase opacity-40">Bets Placed</p>
+                        <div className="grid grid-cols-1 gap-1">
+                          {h.bets.length === 0 ? (
+                            <p className="text-[8px] sm:text-[10px] italic opacity-50">No bets placed this round.</p>
+                          ) : (
+                            h.bets.map((bet, bi) => {
+                              const p = scores.find(s => s.name === bet.playerName);
+                              return (
+                                <div key={bi} className={`flex items-center justify-between p-2 rounded-lg text-[8px] sm:text-[10px] ${bet.isWinning ? 'bg-green-50 border border-green-200' : 'bg-white/40 border border-black/5'}`}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full" style={{ backgroundColor: p?.color }} />
+                                    <span className="font-bold">{bet.playerName}</span>
+                                    <span className="opacity-50">bet</span>
+                                    <span className="font-black">{bet.amount} chips</span>
+                                    <span className="opacity-50">on</span>
+                                    <span className="font-bold">{bet.guessValue}</span>
+                                  </div>
+                                  {bet.isWinning && <span className="text-green-600 font-black uppercase tracking-tighter">Winner!</span>}
                                 </div>
-                                {bet.isWinning && <span className="text-green-600 font-black uppercase tracking-tighter">Winner!</span>}
-                              </div>
-                            );
-                          })
-                        )}
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 sm:gap-4 shrink-0">
                 <button 
                   onClick={startGame}
-                  className="w-full py-5 bg-[#d4af37] text-white rounded-2xl font-black text-xl shadow-2xl hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-3"
+                  className="w-full py-4 sm:py-5 bg-[#d4af37] text-white rounded-2xl font-black text-lg sm:text-xl shadow-2xl hover:bg-[#b8962e] transition-all active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <RotateCcw className="w-6 h-6" />
+                  <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
                   PLAY AGAIN
                 </button>
                 <button 
@@ -1160,7 +1172,7 @@ export const BibleWitsAndWagersGame: React.FC<BibleWitsAndWagersGameProps> = ({
                     setDbQuestionCount(count);
                     setPhase('LOBBY');
                   }}
-                  className="w-full py-4 bg-white border-2 border-[#d4af37] text-[#d4af37] rounded-2xl font-bold text-sm hover:bg-[#d4af37]/5 transition-all"
+                  className="w-full py-3 sm:py-4 bg-white border-2 border-[#d4af37] text-[#d4af37] rounded-2xl font-bold text-xs sm:text-sm hover:bg-[#d4af37]/5 transition-all"
                 >
                   BACK TO LOBBY
                 </button>

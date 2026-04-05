@@ -178,6 +178,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [showTutorial, setShowTutorial] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
+  const [unlockedRounds, setUnlockedRounds] = useState<Record<number, number>>({});
   const [bestTimes, setBestTimes] = useState<Record<number, number>>({});
   const [round, setRound] = useState(1);
 
@@ -215,6 +216,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     const savedProgress = localStorage.getItem('speed_verse_progress');
     if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
 
+    const savedRounds = localStorage.getItem('speed_verse_rounds');
+    if (savedRounds) setUnlockedRounds(JSON.parse(savedRounds));
+
     const skipTutorial = localStorage.getItem('speed_verse_skip_tutorial');
     if (!skipTutorial) setShowTutorial(true);
   }, []);
@@ -248,10 +252,31 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     // Check if Round was passed with speed constraint (1s per word = words.length * 1000ms)
     const isRoundPassed = finalTimeMs <= words.length * 1000;
     
-    if (isRoundPassed && currentRound === 3 && levelId === unlockedLevels && levelId < SPEED_LEVELS.length) {
-      const nextLevel = levelId + 1;
-      setUnlockedLevels(nextLevel);
-      localStorage.setItem('speed_verse_progress', nextLevel.toString());
+    if (isRoundPassed) {
+      const nextRound = currentRound + 1;
+      if (nextRound <= 3) {
+        setUnlockedRounds(prev => {
+          const updated = { ...prev, [levelId]: Math.max(prev[levelId] || 1, nextRound) };
+          localStorage.setItem('speed_verse_rounds', JSON.stringify(updated));
+          return updated;
+        });
+      } else if (currentRound === 3 && levelId === unlockedLevels && levelId < SPEED_LEVELS.length) {
+        const nextLevel = levelId + 1;
+        setUnlockedLevels(nextLevel);
+        localStorage.setItem('speed_verse_progress', nextLevel.toString());
+        
+        setUnlockedRounds(prev => {
+          const updated = { ...prev, [levelId]: 3, [nextLevel]: 1 };
+          localStorage.setItem('speed_verse_rounds', JSON.stringify(updated));
+          return updated;
+        });
+      } else if (currentRound === 3) {
+        setUnlockedRounds(prev => {
+          const updated = { ...prev, [levelId]: 3 };
+          localStorage.setItem('speed_verse_rounds', JSON.stringify(updated));
+          return updated;
+        });
+      }
     }
   };
 
@@ -542,7 +567,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       <motion.div
                         whileHover={!isLocked ? { scale: 1.02 } : {}}
                         whileTap={!isLocked ? { scale: 0.98 } : {}}
-                        onClick={() => !isLocked && loadLevel(idx)}
+                        onClick={() => !isLocked && loadLevel(idx, unlockedRounds[level.id] || 1)}
                         className={cn(
                           "w-full p-6 rounded-3xl border-2 transition-all text-left relative overflow-hidden cursor-pointer h-full flex flex-col",
                           isLocked 
