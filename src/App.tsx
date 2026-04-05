@@ -65,7 +65,8 @@ import {
   Layout,
   Compass,
   Coins,
-  RefreshCw
+  RefreshCw,
+  Target
 } from 'lucide-react';
 import { 
   initBibleQuestionDB, 
@@ -93,6 +94,9 @@ import { MissionaryJourneysGame } from './components/MissionaryJourneysGame';
 import { BibleWitsAndWagersGame } from './components/BibleWitsAndWagersGame';
 import { VerseChomperGame } from './components/VerseChomperGame';
 import { SequenceChomperGame } from './components/SequenceChomperGame';
+import { VerseDartsGame } from './components/VerseDartsGame';
+import { VerseTetrisGame } from './components/VerseTetrisGame';
+import { VerseCrushGame } from './components/VerseCrushGame';
 import { BibleReader } from './components/BibleReader';
 import { cn } from './lib/utils';
 import { Verse, UserProgress, VerseSet } from './types';
@@ -7758,8 +7762,8 @@ export default function App() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showMasteredVerses, setShowMasteredVerses] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper'>('dashboard');
-  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper';
+  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush'>('dashboard');
+  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper' || view === 'verse_darts' || view === 'verse_tetris' || view === 'verse_crush';
   const [boggleDifficulty, setBoggleDifficulty] = useState<Difficulty>('easy');
   const [referenceTowerDifficulty, setReferenceTowerDifficulty] = useState<ReferenceTowerDifficulty>('easy');
   const [showReward, setShowReward] = useState(false);
@@ -8275,6 +8279,45 @@ export default function App() {
                 SEQUENCE CHOMPER
               </motion.button>
 
+              {/* Verse Darts Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('verse_darts')}
+                className="w-full py-6 bg-rose-500 text-white rounded-3xl font-black text-2xl shadow-xl shadow-rose-500/20 flex items-center justify-center gap-4 group border-b-8 border-rose-700"
+              >
+                <div className="w-12 h-12 bg-slate-950 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Target size={28} className="text-rose-500" />
+                </div>
+                VERSE DARTS
+              </motion.button>
+
+              {/* Verse Tetris Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('verse_tetris')}
+                className="w-full py-6 bg-slate-900 text-amber-500 rounded-3xl font-black text-2xl shadow-xl shadow-amber-500/10 flex items-center justify-center gap-4 group border-b-8 border-slate-950"
+              >
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <LayoutGrid size={28} className="text-slate-950" />
+                </div>
+                VERSE TETRIS
+              </motion.button>
+
+              {/* Verse Crush Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('verse_crush')}
+                className="w-full py-6 bg-slate-900 text-amber-500 rounded-3xl font-black text-2xl shadow-xl shadow-amber-500/10 flex items-center justify-center gap-4 group border-b-8 border-slate-950"
+              >
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <LayoutGrid size={28} className="text-slate-950" />
+                </div>
+                VERSE CRUSH
+              </motion.button>
+
               {/* Verse Boggle Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8581,6 +8624,92 @@ export default function App() {
                   setProgress({ ...progress, xp: progress.xp + xp });
                 }
                 setView('dashboard');
+              }}
+              onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
+            />
+          </motion.div>
+        )}
+
+        {view === 'verse_darts' && (
+          <motion.div 
+            key="verse_darts"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full flex flex-col bg-slate-950"
+          >
+            <VerseDartsGame 
+              onComplete={(xp) => {
+                if (progress) {
+                  setProgress({ ...progress, xp: progress.xp + xp });
+                }
+                setView('dashboard');
+              }}
+              onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
+            />
+          </motion.div>
+        )}
+
+        {view === 'verse_tetris' && (
+          <motion.div 
+            key="verse_tetris"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full flex flex-col bg-slate-950"
+          >
+            <VerseTetrisGame 
+              onComplete={(xp) => {
+                if (progress) {
+                  const newProgress = updateXP(xp);
+                  setProgress(newProgress);
+                }
+                setView('dashboard');
+              }}
+              onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
+            />
+          </motion.div>
+        )}
+
+        {view === 'verse_crush' && (
+          <motion.div 
+            key="verse_crush"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full flex flex-col bg-slate-950"
+          >
+            <VerseCrushGame 
+              onComplete={(xp) => {
+                if (progress) {
+                  const newProgress = updateXP(xp);
+                  setProgress(newProgress);
+                }
+                setView('dashboard');
+              }}
+              onUpdateXP={(xp) => {
+                if (progress) {
+                  const newProgress = updateXP(xp);
+                  setProgress(newProgress);
+                }
               }}
               onExit={() => setView('dashboard')}
               isMusicEnabled={isMusicEnabled}
