@@ -181,3 +181,37 @@ export const generateBibleSequences = async (
     throw error;
   }
 };
+
+export const generateSynonyms = async (words: string[]): Promise<Record<string, string[]>> => {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `JSON only. For each of the following words from a Bible verse, provide 3-5 synonyms or closely related words that could be used as distractors in a game. 
+      Words: ${words.join(', ')}
+      Format: {"synonyms": {"word1": ["synonym1", "synonym2"], "word2": ["synonym1", "synonym2"]}}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            synonyms: {
+              type: Type.OBJECT,
+              additionalProperties: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            }
+          },
+          required: ["synonyms"]
+        }
+      }
+    });
+
+    const data = JSON.parse(response.text || '{"synonyms": {}}');
+    return data.synonyms;
+  } catch (error) {
+    console.error("Error generating synonyms:", error);
+    return {};
+  }
+};

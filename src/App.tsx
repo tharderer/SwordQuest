@@ -66,7 +66,8 @@ import {
   Compass,
   Coins,
   RefreshCw,
-  Target
+  Target,
+  Timer
 } from 'lucide-react';
 import { 
   initBibleQuestionDB, 
@@ -97,6 +98,7 @@ import { SequenceChomperGame } from './components/SequenceChomperGame';
 import { VerseDartsGame } from './components/VerseDartsGame';
 import { VerseTetrisGame } from './components/VerseTetrisGame';
 import { VerseCrushGame } from './components/VerseCrushGame';
+import { SpeedVerseGame } from './components/SpeedVerseGame';
 import { BibleReader } from './components/BibleReader';
 import { cn } from './lib/utils';
 import { Verse, UserProgress, VerseSet } from './types';
@@ -7762,8 +7764,8 @@ export default function App() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showMasteredVerses, setShowMasteredVerses] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush'>('dashboard');
-  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper' || view === 'verse_darts' || view === 'verse_tetris' || view === 'verse_crush';
+  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush' | 'speed_verse'>('dashboard');
+  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper' || view === 'verse_darts' || view === 'verse_tetris' || view === 'verse_crush' || view === 'speed_verse';
   const [boggleDifficulty, setBoggleDifficulty] = useState<Difficulty>('easy');
   const [referenceTowerDifficulty, setReferenceTowerDifficulty] = useState<ReferenceTowerDifficulty>('easy');
   const [showReward, setShowReward] = useState(false);
@@ -8318,6 +8320,19 @@ export default function App() {
                 VERSE CRUSH
               </motion.button>
 
+              {/* Speed Verse Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setView('speed_verse')}
+                className="w-full py-6 bg-slate-950 text-amber-400 rounded-3xl font-black text-2xl shadow-xl shadow-amber-500/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <Timer size={28} className="text-slate-950" />
+                </div>
+                SPEED VERSE
+              </motion.button>
+
               {/* Verse Boggle Action Button */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -8698,6 +8713,39 @@ export default function App() {
             className="h-full flex flex-col bg-slate-950"
           >
             <VerseCrushGame 
+              onComplete={(xp) => {
+                if (progress) {
+                  const newProgress = updateXP(xp);
+                  setProgress(newProgress);
+                }
+                setView('dashboard');
+              }}
+              onUpdateXP={(xp) => {
+                if (progress) {
+                  const newProgress = updateXP(xp);
+                  setProgress(newProgress);
+                }
+              }}
+              onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
+            />
+          </motion.div>
+        )}
+
+        {view === 'speed_verse' && (
+          <motion.div 
+            key="speed_verse"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full flex flex-col bg-slate-950"
+          >
+            <SpeedVerseGame 
               onComplete={(xp) => {
                 if (progress) {
                   const newProgress = updateXP(xp);
