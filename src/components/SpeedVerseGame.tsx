@@ -191,6 +191,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextWordIndexRef = useRef(0);
   const poolIndexRef = useRef(9);
+  const gridRef = useRef<SpeedVerseWord[][]>([]);
 
   // Load progress
   useEffect(() => {
@@ -349,7 +350,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
       // Create initial grid
       const newGrid: SpeedVerseWord[][] = [];
-      let idCounter = 0;
+      let idCounter = Date.now();
       
       const gridItems: { text: string, wordIndex: number }[] = [];
       const totalSlots = GRID_SIZE * GRID_SIZE;
@@ -389,6 +390,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           };
         }
       }
+      gridRef.current = newGrid;
       setGrid(newGrid);
       setGameState('PLAYING');
     }
@@ -397,7 +399,11 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const handleWordClick = (r: number, c: number) => {
     if (isPaused || gameState !== 'PLAYING') return;
 
-    const clickedWord = grid[r][c];
+    // Use ref to avoid stale state in rapid taps
+    const currentGrid = gridRef.current;
+    if (!currentGrid[r] || !currentGrid[r][c]) return;
+    
+    const clickedWord = currentGrid[r][c];
     if (clickedWord.isMatched || clickedWord.isCorrect || clickedWord.isWrong) return;
     
     // Check if it's the correct next word by text comparison
@@ -408,53 +414,51 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       nextWordIndexRef.current = newNextIndex;
       setNextWordIndex(newNextIndex);
       
-      // Mark as correct and refill grid immediately in one state update
-      setGrid(prevGrid => {
-        const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
-        const clicked = newGrid[r][c];
+      // Update ref immediately so next tap sees it
+      const updatedGrid = currentGrid.map(row => row.map(word => ({ ...word })));
+      
+      // Determine replacement word
+      let replacementIndex = -1;
+      const totalSlots = GRID_SIZE * GRID_SIZE;
+      if (words.length > totalSlots && poolIndexRef.current < words.length) {
+        replacementIndex = poolIndexRef.current;
+        poolIndexRef.current++;
+        setPoolIndex(poolIndexRef.current);
+      } else {
+        const counts: Record<number, number> = {};
+        for (let i = 0; i < words.length; i++) counts[i] = 0;
         
-        // Determine replacement word
-        let replacementIndex = -1;
-        const totalSlots = GRID_SIZE * GRID_SIZE;
-        if (words.length > totalSlots && poolIndexRef.current < words.length) {
-          replacementIndex = poolIndexRef.current;
-          poolIndexRef.current++;
-          setPoolIndex(poolIndexRef.current);
-        } else {
-          const counts: Record<number, number> = {};
-          for (let i = 0; i < words.length; i++) counts[i] = 0;
-          
-          newGrid.flat().forEach(w => {
-            counts[w.wordIndex] = (counts[w.wordIndex] || 0) + 1;
-          });
-          
-          let minCount = Infinity;
-          for (let i = 0; i < words.length; i++) {
-            if (counts[i] < minCount) minCount = counts[i];
-          }
-          
-          const candidates = [];
-          for (let i = 0; i < words.length; i++) {
-            if (counts[i] === minCount) candidates.push(i);
-          }
-          
-          replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
+        updatedGrid.flat().forEach(w => {
+          counts[w.wordIndex] = (counts[w.wordIndex] || 0) + 1;
+        });
+        
+        let minCount = Infinity;
+        for (let i = 0; i < words.length; i++) {
+          if (counts[i] < minCount) minCount = counts[i];
         }
-
-        // Replace immediately
-        newGrid[r][c] = {
-          id: Date.now() + Math.random(),
-          text: words[replacementIndex],
-          row: r,
-          col: c,
-          wordIndex: replacementIndex,
-          isMatched: false,
-          isCorrect: false,
-          isWrong: false
-        };
         
-        return newGrid;
-      });
+        const candidates = [];
+        for (let i = 0; i < words.length; i++) {
+          if (counts[i] === minCount) candidates.push(i);
+        }
+        
+        replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
+      }
+
+      // Replace immediately in ref
+      updatedGrid[r][c] = {
+        id: Date.now() + Math.random(),
+        text: words[replacementIndex],
+        row: r,
+        col: c,
+        wordIndex: replacementIndex,
+        isMatched: false,
+        isCorrect: false,
+        isWrong: false
+      };
+      
+      gridRef.current = updatedGrid;
+      setGrid(updatedGrid);
       
       // Check victory
       if (newNextIndex === words.length) {
@@ -465,11 +469,10 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       }
     } else {
       // Wrong!
-      setGrid(prevGrid => {
-        const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
-        newGrid[r][c].isWrong = true;
-        return newGrid;
-      });
+      const updatedGrid = currentGrid.map(row => row.map(word => ({ ...word })));
+      updatedGrid[r][c].isWrong = true;
+      gridRef.current = updatedGrid;
+      setGrid(updatedGrid);
       
       setLives(prev => {
         const next = prev - 1;
@@ -483,6 +486,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           if (resetGrid[r] && resetGrid[r][c]) {
             resetGrid[r][c].isWrong = false;
           }
+          gridRef.current = resetGrid;
           return resetGrid;
         });
       }, 500);
@@ -688,9 +692,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                   row.map((word, c) => (
                     <motion.button
                       key={word.id}
-                      onClick={() => handleWordClick(r, c)}
+                      onPointerDown={() => handleWordClick(r, c)}
                       className={cn(
-                        "relative rounded-xl sm:rounded-3xl flex items-center justify-center p-2 sm:p-4 text-sm sm:text-2xl md:text-4xl font-black uppercase tracking-tighter transition-all border-2 sm:border-4",
+                        "relative rounded-xl sm:rounded-3xl flex items-center justify-center p-2 sm:p-4 text-sm sm:text-2xl md:text-4xl font-black uppercase tracking-tighter transition-all border-2 sm:border-4 touch-none",
                         word.isWrong ? "bg-rose-500 border-rose-400 text-white scale-95 shadow-[0_0_40px_rgba(244,63,94,0.8)]" :
                         cn(
                           WORD_BG_COLORS[word.wordIndex % WORD_BG_COLORS.length],
