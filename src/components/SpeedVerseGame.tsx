@@ -320,36 +320,17 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
             replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
           }
 
-          // Slide down the column 'c'
-          const columnWords = [];
-          for (let row = GRID_SIZE - 1; row >= 0; row--) {
-            // Skip the word that was just matched (isCorrect)
-            if (row === r && updatedGrid[row][c].isCorrect) {
-              continue;
-            }
-            columnWords.push(updatedGrid[row][c]);
-          }
-          
-          // Fill the column from bottom to top
-          for (let row = GRID_SIZE - 1; row >= 0; row--) {
-            if (columnWords.length > 0) {
-              const word = columnWords.shift()!;
-              word.row = row;
-              word.isCorrect = false;
-              word.isWrong = false;
-              updatedGrid[row][c] = word;
-            } else {
-              // New word falling in at the top
-              updatedGrid[row][c] = {
-                id: idCounter++,
-                text: words[replacementIndex],
-                row: row,
-                col: c,
-                wordIndex: replacementIndex,
-                isMatched: false
-              };
-            }
-          }
+          // Directly replace the word at [r][c] instead of sliding
+          updatedGrid[r][c] = {
+            id: idCounter++,
+            text: words[replacementIndex],
+            row: r,
+            col: c,
+            wordIndex: replacementIndex,
+            isMatched: false,
+            isCorrect: false,
+            isWrong: false
+          };
           
           return updatedGrid;
         });
@@ -505,9 +486,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
 
           {/* Verse Progress Display */}
-          <div className="flex-shrink-0 px-2 sm:px-4 mb-2">
-            <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl border-2 border-slate-800 shadow-2xl max-h-[25vh] overflow-y-auto custom-scrollbar">
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
+          <div className="flex-shrink-0 px-2 sm:px-4 mb-1">
+            <div className="bg-slate-900/90 p-2 sm:p-3 rounded-2xl border-2 border-slate-800 shadow-2xl max-h-[20vh] overflow-y-auto custom-scrollbar">
+              <div className="flex flex-wrap gap-1 sm:gap-1.5 justify-center">
                 {words.map((word, i) => {
                   const isFound = i < nextWordIndex;
                   const isCurrent = i === nextWordIndex;
@@ -548,8 +529,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
 
           {/* Grid */}
-          <div className="flex-1 flex items-center justify-center p-1 sm:p-4 min-h-0 overflow-hidden">
-            <div className="aspect-square h-full max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-6 border-4 border-slate-800 shadow-2xl relative flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0 overflow-hidden">
+            <div className="aspect-square w-full h-full max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-6 border-4 border-slate-800 shadow-2xl relative flex items-center justify-center">
               <div className="grid grid-cols-3 grid-rows-3 gap-2 sm:gap-4 h-full w-full">
                 {grid.map((row, r) => (
                   row.map((word, c) => (
