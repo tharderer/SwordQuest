@@ -55,7 +55,7 @@ const SCHEMA = {
 const MAX_RETRIES = 5;
 const INITIAL_RETRY_DELAY = 2000;
 
-export type JeopardyDifficulty = 'easy' | 'medium' | 'hard';
+export type JeopardyDifficulty = 'extreme-easy' | 'easy' | 'medium' | 'hard';
 export type JeopardyMode = 'bible' | 'history' | 'geography' | 'science' | 'mixed';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -105,6 +105,7 @@ export async function generateJeopardyBoard(
   };
 
   const difficultyInstructions = {
+    'extreme-easy': "The overall game should be EXTREMELY EASY, suitable for young children. Clues should focus on the most basic, famous, and simple facts (e.g., 'Who was in the ark?', 'What did David use to kill Goliath?').",
     easy: "The overall game should be EASY. Clues should focus on extremely well-known facts and figures.",
     medium: "The overall game should be MEDIUM difficulty. A balanced mix of general knowledge and more specific facts.",
     hard: "The overall game should be HARD. Clues should focus on obscure details and advanced concepts."

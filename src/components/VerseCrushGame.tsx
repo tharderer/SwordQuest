@@ -648,13 +648,13 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
 
       {/* Verse Progress Display */}
       <div className="flex-shrink-0 px-4 mb-2">
-        <div className="bg-slate-900/80 p-3 rounded-2xl border-2 border-slate-800 shadow-xl max-h-[20vh] overflow-y-auto custom-scrollbar">
-          <div className="flex flex-wrap gap-1.5 justify-center">
+        <div className="bg-slate-900/80 p-2 rounded-2xl border-2 border-slate-800 shadow-xl max-h-[15vh] overflow-y-auto custom-scrollbar">
+          <div className="flex flex-wrap gap-1 justify-center">
             {words.map((word, i) => (
               <span 
                 key={i}
                 className={cn(
-                  "px-2 py-1 rounded-lg text-xs sm:text-sm font-black transition-all duration-500 border-2 uppercase tracking-tighter",
+                  "px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black transition-all duration-500 border-2 uppercase tracking-tighter",
                   WORD_BG_COLORS[i % WORD_BG_COLORS.length],
                   WORD_TEXT_COLORS[i % WORD_TEXT_COLORS.length],
                   collectedWordIndices.has(i) 
@@ -666,7 +666,7 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
               </span>
             ))}
           </div>
-          <div className="mt-2 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div className="mt-2 h-1 bg-slate-800 rounded-full overflow-hidden">
             <motion.div 
               className="h-full bg-amber-500"
               initial={{ width: 0 }}
@@ -677,8 +677,8 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
       </div>
 
       {/* Grid */}
-      <div className="flex-1 flex items-center justify-center p-2 min-h-0">
-        <div className="aspect-square h-full max-h-[60vh] max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-4 border-4 border-slate-800 shadow-2xl relative">
+      <div className="flex-1 flex items-center justify-center p-2 min-h-0 overflow-hidden">
+        <div className="aspect-square max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-4 border-4 border-slate-800 shadow-2xl relative">
           <div className="grid grid-cols-5 grid-rows-5 gap-1 sm:gap-2 h-full w-full">
             {grid.map((row, r) => (
               row.map((word, c) => (

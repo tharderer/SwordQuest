@@ -4900,8 +4900,8 @@ const BibleJeopardyGame = ({
 
                       <div>
                         <p className="text-blue-200 font-bold uppercase tracking-widest text-[10px] mb-3">Difficulty Level</p>
-                        <div className="flex gap-2">
-                          {(['easy', 'medium', 'hard'] as JeopardyDifficulty[]).map(d => (
+                        <div className="flex flex-wrap gap-2">
+                          {(['extreme-easy', 'easy', 'medium', 'hard'] as JeopardyDifficulty[]).map(d => (
                             <button
                               key={d}
                               onClick={() => onDifficultyChange?.(d)}
@@ -4912,7 +4912,7 @@ const BibleJeopardyGame = ({
                                   : "bg-white/5 text-white border-white/10 hover:bg-white/10"
                               )}
                             >
-                              {d}
+                              {d.replace('-', ' ')}
                             </button>
                           ))}
                         </div>
