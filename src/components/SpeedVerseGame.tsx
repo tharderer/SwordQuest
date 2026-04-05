@@ -408,10 +408,51 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       nextWordIndexRef.current = newNextIndex;
       setNextWordIndex(newNextIndex);
       
-      // Mark as correct for animation
+      // Mark as correct and refill grid immediately in one state update
       setGrid(prevGrid => {
         const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
-        newGrid[r][c].isCorrect = true;
+        const clicked = newGrid[r][c];
+        
+        // Determine replacement word
+        let replacementIndex = -1;
+        const totalSlots = GRID_SIZE * GRID_SIZE;
+        if (words.length > totalSlots && poolIndexRef.current < words.length) {
+          replacementIndex = poolIndexRef.current;
+          poolIndexRef.current++;
+          setPoolIndex(poolIndexRef.current);
+        } else {
+          const counts: Record<number, number> = {};
+          for (let i = 0; i < words.length; i++) counts[i] = 0;
+          
+          newGrid.flat().forEach(w => {
+            counts[w.wordIndex] = (counts[w.wordIndex] || 0) + 1;
+          });
+          
+          let minCount = Infinity;
+          for (let i = 0; i < words.length; i++) {
+            if (counts[i] < minCount) minCount = counts[i];
+          }
+          
+          const candidates = [];
+          for (let i = 0; i < words.length; i++) {
+            if (counts[i] === minCount) candidates.push(i);
+          }
+          
+          replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+
+        // Replace immediately
+        newGrid[r][c] = {
+          id: Date.now() + Math.random(),
+          text: words[replacementIndex],
+          row: r,
+          col: c,
+          wordIndex: replacementIndex,
+          isMatched: false,
+          isCorrect: false,
+          isWrong: false
+        };
+        
         return newGrid;
       });
       
@@ -422,59 +463,6 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
         setGameState('VICTORY');
         return;
       }
-
-      // Refill grid immediately for better responsiveness
-      // We use a very short delay only for the visual "pop" effect
-      setTimeout(() => {
-        setGrid(prevGrid => {
-          const updatedGrid = prevGrid.map(row => row.map(word => ({ ...word })));
-          let idCounter = Date.now() + Math.random(); // Ensure unique IDs for rapid taps
-
-          // Determine replacement word
-          let replacementIndex = -1;
-          const totalSlots = GRID_SIZE * GRID_SIZE;
-          if (words.length > totalSlots && poolIndexRef.current < words.length) {
-            replacementIndex = poolIndexRef.current;
-            poolIndexRef.current++;
-            setPoolIndex(poolIndexRef.current);
-          } else {
-            // Short verse or pool exhausted
-            const counts: Record<number, number> = {};
-            for (let i = 0; i < words.length; i++) counts[i] = 0;
-            
-            updatedGrid.flat().forEach(w => {
-              if (!w.isCorrect) {
-                counts[w.wordIndex] = (counts[w.wordIndex] || 0) + 1;
-              }
-            });
-            
-            let minCount = Infinity;
-            for (let i = 0; i < words.length; i++) {
-              if (counts[i] < minCount) minCount = counts[i];
-            }
-            
-            const candidates = [];
-            for (let i = 0; i < words.length; i++) {
-              if (counts[i] === minCount) candidates.push(i);
-            }
-            
-            replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
-          }
-
-          updatedGrid[r][c] = {
-            id: idCounter,
-            text: words[replacementIndex],
-            row: r,
-            col: c,
-            wordIndex: replacementIndex,
-            isMatched: false,
-            isCorrect: false,
-            isWrong: false
-          };
-          
-          return updatedGrid;
-        });
-      }, 60); // Reduced from 150ms to 60ms for snappier feel
     } else {
       // Wrong!
       setGrid(prevGrid => {
@@ -700,11 +688,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                   row.map((word, c) => (
                     <motion.button
                       key={word.id}
-                      layoutId={`word-${word.id}`}
                       onClick={() => handleWordClick(r, c)}
                       className={cn(
                         "relative rounded-xl sm:rounded-3xl flex items-center justify-center p-2 sm:p-4 text-sm sm:text-2xl md:text-4xl font-black uppercase tracking-tighter transition-all border-2 sm:border-4",
-                        word.isCorrect ? "bg-emerald-500 border-emerald-400 text-white scale-110 z-10 shadow-[0_0_40px_rgba(16,185,129,0.8)]" :
                         word.isWrong ? "bg-rose-500 border-rose-400 text-white scale-95 shadow-[0_0_40px_rgba(244,63,94,0.8)]" :
                         cn(
                           WORD_BG_COLORS[word.wordIndex % WORD_BG_COLORS.length],
@@ -714,8 +700,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       )}
                       initial={false}
                       animate={{
-                        scale: word.isMatched ? 0 : 1,
-                        opacity: word.isMatched ? 0 : 1,
+                        scale: 1,
+                        opacity: 1,
                       }}
                     >
                       <span className="text-center break-words line-clamp-3 leading-tight drop-shadow-sm">{word.text}</span>
