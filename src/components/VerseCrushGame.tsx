@@ -498,7 +498,7 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden select-none touch-none">
+    <div className="h-screen flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden select-none touch-none">
       {/* Level Selector */}
       {gameState === 'LEVEL_SELECT' && (
         <div className="flex-1 flex flex-col min-h-0">
@@ -623,7 +623,7 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
       {gameState !== 'LEVEL_SELECT' && (
         <>
           {/* HUD */}
-          <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent">
+          <div className="flex-shrink-0 p-4 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <button onClick={() => setGameState('LEVEL_SELECT')} className="p-2 bg-white/10 rounded-full text-white transition-colors hover:bg-white/20">
@@ -647,28 +647,26 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
           </div>
 
       {/* Verse Progress Display */}
-      <div className="mt-24 px-4 mb-4">
-        <div className="bg-slate-900/80 p-4 rounded-2xl border-2 border-slate-800 shadow-xl">
+      <div className="flex-shrink-0 px-4 mb-2">
+        <div className="bg-slate-900/80 p-3 rounded-2xl border-2 border-slate-800 shadow-xl max-h-[20vh] overflow-y-auto custom-scrollbar">
           <div className="flex flex-wrap gap-1.5 justify-center">
             {words.map((word, i) => (
               <span 
                 key={i}
                 className={cn(
-                  "px-3 py-1.5 rounded-xl text-base font-black transition-all duration-500 border-2 uppercase tracking-tighter",
+                  "px-2 py-1 rounded-lg text-xs sm:text-sm font-black transition-all duration-500 border-2 uppercase tracking-tighter",
+                  WORD_BG_COLORS[i % WORD_BG_COLORS.length],
+                  WORD_TEXT_COLORS[i % WORD_TEXT_COLORS.length],
                   collectedWordIndices.has(i) 
-                    ? cn(
-                        WORD_BG_COLORS[i % WORD_BG_COLORS.length],
-                        WORD_TEXT_COLORS[i % WORD_TEXT_COLORS.length],
-                        "border-current shadow-[0_0_15px_rgba(255,255,255,0.2)] scale-110 z-10"
-                      )
-                    : "bg-slate-800/50 text-slate-600 border-transparent opacity-50"
+                    ? "border-current shadow-[0_0_15px_rgba(255,255,255,0.2)] scale-110 z-10"
+                    : "border-transparent opacity-30 grayscale-[0.5]"
                 )}
               >
                 {word}
               </span>
             ))}
           </div>
-          <div className="mt-3 h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div className="mt-2 h-1.5 bg-slate-800 rounded-full overflow-hidden">
             <motion.div 
               className="h-full bg-amber-500"
               initial={{ width: 0 }}
@@ -679,9 +677,9 @@ export const VerseCrushGame: React.FC<VerseCrushProps> = ({
       </div>
 
       {/* Grid */}
-      <div className="flex-1 flex items-center justify-center p-2 sm:p-4">
-        <div className="aspect-square w-full max-w-2xl bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-4 border-4 border-slate-800 shadow-2xl relative">
-          <div className="grid grid-cols-5 grid-rows-5 gap-1.5 sm:gap-3 h-full w-full">
+      <div className="flex-1 flex items-center justify-center p-2 min-h-0">
+        <div className="aspect-square h-full max-h-[60vh] max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-4 border-4 border-slate-800 shadow-2xl relative">
+          <div className="grid grid-cols-5 grid-rows-5 gap-1 sm:gap-2 h-full w-full">
             {grid.map((row, r) => (
               row.map((word, c) => (
                 <motion.button
