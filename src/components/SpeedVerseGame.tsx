@@ -54,7 +54,7 @@ const SPEED_LEVELS: SpeedVerseLevel[] = [
   { id: 10, reference: "Jeremiah 29:11", title: "A Future and a Hope" }
 ];
 
-const GRID_SIZE = 5;
+const GRID_SIZE = 3;
 
 const WORD_BG_COLORS = [
   'bg-red-500/20 border-red-500/40',
@@ -100,7 +100,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [words, setWords] = useState<string[]>([]);
   const [grid, setGrid] = useState<SpeedVerseWord[][]>([]);
   const [nextWordIndex, setNextWordIndex] = useState(0);
-  const [poolIndex, setPoolIndex] = useState(25);
+  const [poolIndex, setPoolIndex] = useState(9);
   const [lives, setLives] = useState(5);
   const [time, setTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -114,7 +114,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextWordIndexRef = useRef(0);
-  const poolIndexRef = useRef(25);
+  const poolIndexRef = useRef(9);
 
   // Load progress
   useEffect(() => {
@@ -198,8 +198,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       setLives(5);
       setTime(0);
       setLoop(currentLoop);
-      setPoolIndex(25);
-      poolIndexRef.current = 25;
+      setPoolIndex(GRID_SIZE * GRID_SIZE);
+      poolIndexRef.current = GRID_SIZE * GRID_SIZE;
       setIsProcessing(false);
 
       // Create initial grid
@@ -207,10 +207,11 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       let idCounter = 0;
       
       const gridItems: { text: string, wordIndex: number }[] = [];
+      const totalSlots = GRID_SIZE * GRID_SIZE;
       
-      if (verseWords.length >= 25) {
-        // Long verse: take first 25
-        for (let i = 0; i < 25; i++) {
+      if (verseWords.length >= totalSlots) {
+        // Long verse: take first slots
+        for (let i = 0; i < totalSlots; i++) {
           gridItems.push({ text: verseWords[i], wordIndex: i });
         }
       } else {
@@ -218,9 +219,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
         for (let i = 0; i < verseWords.length; i++) {
           gridItems.push({ text: verseWords[i], wordIndex: i });
         }
-        // Repeat words until 25 (put 2 of as many as possible)
+        // Repeat words until full
         let repeatIdx = 0;
-        while (gridItems.length < 25) {
+        while (gridItems.length < totalSlots) {
           gridItems.push({ text: verseWords[repeatIdx % verseWords.length], wordIndex: repeatIdx % verseWords.length });
           repeatIdx++;
         }
@@ -254,8 +255,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     const clickedWord = grid[r][c];
     if (clickedWord.isMatched || clickedWord.isCorrect || clickedWord.isWrong) return;
     
-    // Check if it's the correct next word
-    if (clickedWord.wordIndex === nextWordIndexRef.current) {
+    // Check if it's the correct next word by text comparison
+    const expectedText = words[nextWordIndexRef.current];
+    if (clickedWord.text.toLowerCase().replace(/[^\w]/g, '') === expectedText.toLowerCase().replace(/[^\w]/g, '')) {
       // Correct!
       const newNextIndex = nextWordIndexRef.current + 1;
       nextWordIndexRef.current = newNextIndex;
@@ -265,6 +267,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       setGrid(prevGrid => {
         const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
         newGrid[r][c].isCorrect = true;
+        // Update wordIndex to match the expected word for consistent coloring in progress bar if needed
+        // but actually it's better to keep the original index for variety
         return newGrid;
       });
       
@@ -284,7 +288,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
           // Determine replacement word
           let replacementIndex = -1;
-          if (words.length > 25 && poolIndexRef.current < words.length) {
+          const totalSlots = GRID_SIZE * GRID_SIZE;
+          if (words.length > totalSlots && poolIndexRef.current < words.length) {
             replacementIndex = poolIndexRef.current;
             poolIndexRef.current++;
             setPoolIndex(poolIndexRef.current);
@@ -500,34 +505,41 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
 
           {/* Verse Progress Display */}
-          <div className="flex-shrink-0 px-4 mb-2">
-            <div className="bg-slate-900/80 p-2 rounded-2xl border-2 border-slate-800 shadow-xl max-h-[15vh] overflow-y-auto custom-scrollbar">
-              <div className="flex flex-wrap gap-1 justify-center">
+          <div className="flex-shrink-0 px-2 sm:px-4 mb-2">
+            <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl border-2 border-slate-800 shadow-2xl max-h-[25vh] overflow-y-auto custom-scrollbar">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
                 {words.map((word, i) => {
                   const isFound = i < nextWordIndex;
-                  const isVisible = loop === 1 || isFound;
+                  const isCurrent = i === nextWordIndex;
+                  const isVisible = loop === 1 || isFound || isCurrent;
                   
                   return (
-                    <span 
+                    <motion.span 
                       key={i}
+                      initial={false}
+                      animate={isCurrent ? { scale: 1.2, zIndex: 20 } : { scale: 1, zIndex: 10 }}
                       className={cn(
-                        "px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black transition-all duration-500 border-2 uppercase tracking-tighter",
-                        WORD_BG_COLORS[i % WORD_BG_COLORS.length],
-                        WORD_TEXT_COLORS[i % WORD_TEXT_COLORS.length],
-                        isFound 
-                          ? "border-current shadow-[0_0_15px_rgba(255,255,255,0.2)] scale-110 z-10"
-                          : "border-transparent opacity-30 grayscale-[0.5]",
+                        "px-2.5 py-1 rounded-lg text-xs sm:text-sm md:text-base font-black transition-all duration-300 border-2 uppercase tracking-tighter",
+                        isCurrent 
+                          ? "bg-white text-slate-950 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] animate-pulse" 
+                          : cn(
+                              WORD_BG_COLORS[i % WORD_BG_COLORS.length],
+                              WORD_TEXT_COLORS[i % WORD_TEXT_COLORS.length],
+                              isFound 
+                                ? "border-current opacity-100 shadow-[0_0_10px_rgba(255,255,255,0.1)]"
+                                : "border-transparent opacity-20 grayscale-[0.5]"
+                            ),
                         !isVisible && "opacity-0 pointer-events-none"
                       )}
                     >
                       {word}
-                    </span>
+                    </motion.span>
                   );
                 })}
               </div>
-              <div className="mt-2 h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div className="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <motion.div 
-                  className="h-full bg-amber-500"
+                  className="h-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
                   initial={{ width: 0 }}
                   animate={{ width: `${(nextWordIndex / words.length) * 100}%` }}
                 />
@@ -536,9 +548,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
 
           {/* Grid */}
-          <div className="flex-1 flex items-center justify-center p-2 min-h-0 overflow-hidden">
-            <div className="aspect-square max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-4 border-4 border-slate-800 shadow-2xl relative">
-              <div className="grid grid-cols-5 grid-rows-5 gap-1 sm:gap-2 h-full w-full">
+          <div className="flex-1 flex items-center justify-center p-1 sm:p-4 min-h-0 overflow-hidden">
+            <div className="aspect-square h-full max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-6 border-4 border-slate-800 shadow-2xl relative flex items-center justify-center">
+              <div className="grid grid-cols-3 grid-rows-3 gap-2 sm:gap-4 h-full w-full">
                 {grid.map((row, r) => (
                   row.map((word, c) => (
                     <motion.button
@@ -546,13 +558,13 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       layoutId={`word-${word.id}`}
                       onClick={() => handleWordClick(r, c)}
                       className={cn(
-                        "relative rounded-xl sm:rounded-2xl flex items-center justify-center p-1 sm:p-2 text-xs sm:text-lg md:text-2xl font-black uppercase tracking-tighter transition-all border-2",
-                        word.isCorrect ? "bg-emerald-500 border-emerald-400 text-white scale-110 z-10 shadow-[0_0_30px_rgba(16,185,129,0.8)]" :
-                        word.isWrong ? "bg-rose-500 border-rose-400 text-white scale-95 shadow-[0_0_30px_rgba(244,63,94,0.8)]" :
+                        "relative rounded-xl sm:rounded-3xl flex items-center justify-center p-2 sm:p-4 text-sm sm:text-2xl md:text-4xl font-black uppercase tracking-tighter transition-all border-2 sm:border-4",
+                        word.isCorrect ? "bg-emerald-500 border-emerald-400 text-white scale-110 z-10 shadow-[0_0_40px_rgba(16,185,129,0.8)]" :
+                        word.isWrong ? "bg-rose-500 border-rose-400 text-white scale-95 shadow-[0_0_40px_rgba(244,63,94,0.8)]" :
                         cn(
                           WORD_BG_COLORS[word.wordIndex % WORD_BG_COLORS.length],
                           WORD_TEXT_COLORS[word.wordIndex % WORD_TEXT_COLORS.length],
-                          "hover:brightness-125"
+                          "hover:brightness-125 active:scale-90"
                         )
                       )}
                       initial={false}
