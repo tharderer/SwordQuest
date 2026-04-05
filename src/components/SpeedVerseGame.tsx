@@ -114,6 +114,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextWordIndexRef = useRef(0);
+  const poolIndexRef = useRef(25);
 
   // Load progress
   useEffect(() => {
@@ -198,6 +199,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       setTime(0);
       setLoop(currentLoop);
       setPoolIndex(25);
+      poolIndexRef.current = 25;
       setIsProcessing(false);
 
       // Create initial grid
@@ -260,9 +262,11 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       setNextWordIndex(newNextIndex);
       
       // Mark as correct for animation
-      const newGrid = [...grid];
-      newGrid[r][c] = { ...clickedWord, isCorrect: true };
-      setGrid(newGrid);
+      setGrid(prevGrid => {
+        const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
+        newGrid[r][c].isCorrect = true;
+        return newGrid;
+      });
       
       // Check victory
       if (newNextIndex === words.length) {
@@ -275,70 +279,83 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       // Refill grid (non-blocking for taps)
       setTimeout(() => {
         setGrid(prevGrid => {
-          const updatedGrid = JSON.parse(JSON.stringify(prevGrid)) as SpeedVerseWord[][];
+          const updatedGrid = prevGrid.map(row => row.map(word => ({ ...word })));
           let idCounter = Math.max(...updatedGrid.flat().map(w => w.id)) + 1;
 
-          // Slide down
-          for (let col = 0; col < GRID_SIZE; col++) {
-            const columnWords = [];
-            for (let row = GRID_SIZE - 1; row >= 0; row--) {
-              // If this is the cell we just matched, skip it
-              if (row === r && col === col && updatedGrid[row][col].isCorrect) {
-                continue;
+          // Determine replacement word
+          let replacementIndex = -1;
+          if (words.length > 25 && poolIndexRef.current < words.length) {
+            replacementIndex = poolIndexRef.current;
+            poolIndexRef.current++;
+            setPoolIndex(poolIndexRef.current);
+          } else {
+            // Short verse or pool exhausted
+            // Find indices that are "under-represented" on the current grid
+            const counts: Record<number, number> = {};
+            for (let i = 0; i < words.length; i++) counts[i] = 0;
+            
+            updatedGrid.flat().forEach(w => {
+              if (!w.isCorrect) {
+                counts[w.wordIndex] = (counts[w.wordIndex] || 0) + 1;
               }
-              columnWords.push(updatedGrid[row][col]);
+            });
+            
+            // Find the minimum count
+            let minCount = Infinity;
+            for (let i = 0; i < words.length; i++) {
+              if (counts[i] < minCount) minCount = counts[i];
             }
             
-            // Fill from bottom
-            for (let row = GRID_SIZE - 1; row >= 0; row--) {
-              if (columnWords.length > 0) {
-                const word = columnWords.shift()!;
-                word.row = row;
-                word.col = col;
-                // Reset animation states for reused words
-                word.isCorrect = false;
-                word.isWrong = false;
-                updatedGrid[row][col] = word;
-              } else {
-                // New word falling in
-                let text = "";
-                let wordIndex = -1;
+            // Get all indices with min count
+            const candidates = [];
+            for (let i = 0; i < words.length; i++) {
+              if (counts[i] === minCount) candidates.push(i);
+            }
+            
+            replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
+          }
 
-                // We need to use the latest poolIndex. Since this is inside setGrid, 
-                // we might have a stale poolIndex if we use the state directly.
-                // However, poolIndex is only updated here.
-                
-                setPoolIndex(currentPool => {
-                  if (words.length > 25 && currentPool < words.length) {
-                    wordIndex = currentPool;
-                    text = words[wordIndex];
-                    return currentPool + 1;
-                  } else {
-                    wordIndex = Math.floor(Math.random() * words.length);
-                    text = words[wordIndex];
-                    return currentPool;
-                  }
-                });
-
-                updatedGrid[row][col] = {
-                  id: idCounter++,
-                  text,
-                  row,
-                  col,
-                  wordIndex,
-                  isMatched: false
-                };
-              }
+          // Slide down the column 'c'
+          const columnWords = [];
+          for (let row = GRID_SIZE - 1; row >= 0; row--) {
+            // Skip the word that was just matched (isCorrect)
+            if (row === r && updatedGrid[row][c].isCorrect) {
+              continue;
+            }
+            columnWords.push(updatedGrid[row][c]);
+          }
+          
+          // Fill the column from bottom to top
+          for (let row = GRID_SIZE - 1; row >= 0; row--) {
+            if (columnWords.length > 0) {
+              const word = columnWords.shift()!;
+              word.row = row;
+              word.isCorrect = false;
+              word.isWrong = false;
+              updatedGrid[row][c] = word;
+            } else {
+              // New word falling in at the top
+              updatedGrid[row][c] = {
+                id: idCounter++,
+                text: words[replacementIndex],
+                row: row,
+                col: c,
+                wordIndex: replacementIndex,
+                isMatched: false
+              };
             }
           }
+          
           return updatedGrid;
         });
-      }, 100);
+      }, 150);
     } else {
-      // Wrong! (Already found word or out of order)
-      const newGrid = [...grid];
-      newGrid[r][c] = { ...clickedWord, isWrong: true };
-      setGrid(newGrid);
+      // Wrong!
+      setGrid(prevGrid => {
+        const newGrid = prevGrid.map(row => row.map(word => ({ ...word })));
+        newGrid[r][c].isWrong = true;
+        return newGrid;
+      });
       
       setLives(prev => {
         const next = prev - 1;
@@ -348,9 +365,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
       setTimeout(() => {
         setGrid(prevGrid => {
-          const resetGrid = [...prevGrid];
+          const resetGrid = prevGrid.map(row => row.map(word => ({ ...word })));
           if (resetGrid[r] && resetGrid[r][c]) {
-            resetGrid[r][c] = { ...resetGrid[r][c], isWrong: false };
+            resetGrid[r][c].isWrong = false;
           }
           return resetGrid;
         });
