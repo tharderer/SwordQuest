@@ -179,8 +179,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [unlockedLevels, setUnlockedLevels] = useState<number>(1);
   const [bestTimes, setBestTimes] = useState<Record<number, number>>({});
-  const [loop, setLoop] = useState(1);
-  const [loopResults, setLoopResults] = useState<Record<number, boolean>>({}); // Track which loops are passed
+  const [round, setRound] = useState(1);
 
   const [user, setUser] = useState<User | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState<number | null>(null);
@@ -220,14 +219,14 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     if (!skipTutorial) setShowTutorial(true);
   }, []);
 
-  const saveLevelProgress = async (levelId: number, finalTimeMs: number, currentLoop: number) => {
+  const saveLevelProgress = async (levelId: number, finalTimeMs: number, currentRound: number) => {
     // Only save best time if it's a valid completion
     const updatedBestTimes = { ...bestTimes, [levelId]: bestTimes[levelId] ? Math.min(bestTimes[levelId], finalTimeMs) : finalTimeMs };
     setBestTimes(updatedBestTimes);
     localStorage.setItem('speed_verse_best_times', JSON.stringify(updatedBestTimes));
 
     // Save to Firestore if authenticated
-    if (auth.currentUser && currentLoop === 3) {
+    if (auth.currentUser && currentRound === 3) {
       const path = `leaderboards/${levelId}/scores/${auth.currentUser.uid}`;
       try {
         const docRef = doc(db, path);
@@ -246,10 +245,10 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       }
     }
 
-    // Check if Loop 3 was passed with speed constraint (1s per word = words.length * 1000ms)
-    const isLoop3Passed = currentLoop === 3 && finalTimeMs <= words.length * 1000;
+    // Check if Round was passed with speed constraint (1s per word = words.length * 1000ms)
+    const isRoundPassed = finalTimeMs <= words.length * 1000;
     
-    if (isLoop3Passed && levelId === unlockedLevels && levelId < SPEED_LEVELS.length) {
+    if (isRoundPassed && currentRound === 3 && levelId === unlockedLevels && levelId < SPEED_LEVELS.length) {
       const nextLevel = levelId + 1;
       setUnlockedLevels(nextLevel);
       localStorage.setItem('speed_verse_progress', nextLevel.toString());
@@ -328,8 +327,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   }, [volume]);
 
   // Load Level
-  const loadLevel = useCallback(async (idx: number, currentLoop: number = 1) => {
+  const loadLevel = useCallback(async (idx: number, currentRound: number = 1) => {
     setGameState('LOADING');
+    setCurrentLevelIdx(idx); // Fix: Update currentLevelIdx state
     const level = SPEED_LEVELS[idx];
     const parsed = parseReference(level.reference);
     if (!parsed) return;
@@ -343,7 +343,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       nextWordIndexRef.current = 0;
       setLives(5);
       setTime(0);
-      setLoop(currentLoop);
+      setRound(currentRound);
       setPoolIndex(GRID_SIZE * GRID_SIZE);
       poolIndexRef.current = GRID_SIZE * GRID_SIZE;
       setIsProcessing(false);
@@ -463,7 +463,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       // Check victory
       if (newNextIndex === words.length) {
         const level = SPEED_LEVELS[currentLevelIdx];
-        saveLevelProgress(level.id, time, loop);
+        saveLevelProgress(level.id, time, round);
         setGameState('VICTORY');
         return;
       }
@@ -533,6 +533,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {SPEED_LEVELS.map((level, idx) => {
                   const isLocked = level.id > unlockedLevels;
+                  const isCurrent = level.id === unlockedLevels;
                   const bestTime = bestTimes[level.id];
                   const isPassed = bestTime !== undefined;
                   
@@ -548,16 +549,23 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                             ? "bg-slate-900/50 border-white/5 opacity-50 grayscale cursor-not-allowed" 
                             : isPassed
                               ? "bg-gradient-to-br from-slate-900 to-slate-800 border-yellow-500/50 shadow-xl shadow-yellow-500/10"
-                              : "bg-slate-900 border-white/10 hover:border-amber-500/50"
+                              : isCurrent
+                                ? "bg-slate-900 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-2 ring-amber-500/20"
+                                : "bg-slate-900 border-white/10 hover:border-amber-500/50"
                         )}
                       >
                         <div className="flex justify-between items-start mb-4 relative z-10">
                           <div className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center font-black",
-                            isLocked ? "bg-slate-800 text-slate-600" : isPassed ? "bg-yellow-500 text-slate-950 shadow-lg shadow-yellow-500/40" : "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
+                            isLocked ? "bg-slate-800 text-slate-600" : isPassed ? "bg-yellow-500 text-slate-950 shadow-lg shadow-yellow-500/40" : isCurrent ? "bg-amber-500 text-white shadow-lg shadow-amber-500/40 animate-pulse" : "bg-amber-500/50 text-white shadow-lg shadow-amber-500/10"
                           )}>
                             {level.id}
                           </div>
+                          {isCurrent && !isPassed && (
+                            <div className="px-2 py-1 bg-amber-500/20 rounded-lg border border-amber-500/30">
+                              <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">Current</span>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="mb-8 relative z-10">
@@ -625,7 +633,15 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 <button onClick={() => setIsPaused(!isPaused)} className="p-2 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
                   {isPaused ? <Play size={20} /> : <Pause size={20} />}
                 </button>
-                <div className="text-3xl font-black text-amber-500 leading-none">{formatTime(time)}s</div>
+                <div className="flex flex-col items-end">
+                  <div className="text-3xl font-black text-amber-500 leading-none">{formatTime(time)}s</div>
+                  <div className={cn(
+                    "text-[10px] font-black uppercase tracking-tighter",
+                    time > words.length * 1000 ? "text-rose-500" : "text-emerald-500"
+                  )}>
+                    Target: {words.length}.000s
+                  </div>
+                </div>
               </div>
               <div className="flex gap-1">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -646,9 +662,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 {words.map((word, i) => {
                   const isFound = i < nextWordIndex;
                   const isCurrent = i === nextWordIndex;
-                  // In Loop 3, hide the next word and only show found words
-                  const isVisible = loop === 1 || isFound || (loop === 2 && isCurrent);
-                  const shouldHighlight = isCurrent && loop !== 3;
+                  // In Round 3, hide the next word and only show found words
+                  const isVisible = round === 1 || isFound || (round === 2 && isCurrent);
+                  const shouldHighlight = isCurrent && round !== 3;
                   
                   return (
                     <motion.span 
@@ -822,7 +838,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 <div className="flex gap-4">
                   <div className="w-8 h-8 shrink-0 bg-slate-800 rounded-lg flex items-center justify-center text-blue-400 font-bold">3</div>
                   <p className="text-slate-300 text-sm leading-relaxed">
-                    <span className="text-white font-bold">Master the Verse.</span> Complete 3 loops to unlock the next level. Loop 3 requires speed!
+                    <span className="text-white font-bold">Master the Verse.</span> Complete 3 rounds to unlock the next level. All rounds require speed!
                   </p>
                 </div>
               </div>
@@ -858,30 +874,28 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 <Trophy size={48} className="text-emerald-500" />
               </motion.div>
               <h2 className="text-4xl font-black text-white mb-2 italic uppercase tracking-tighter">
-                {loop === 3 && time > words.length * 1000 ? "TOO SLOW!" : "VICTORY!"}
+                {time > words.length * 1000 ? "TOO SLOW!" : "VICTORY!"}
               </h2>
-              <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-2">Loop {loop} Completed in {formatTime(time)}s!</p>
-              {loop === 3 && (
-                <p className={cn("text-xs font-bold uppercase mb-6", time <= words.length * 1000 ? "text-emerald-500" : "text-rose-500")}>
-                  Target: Under {words.length}.000s ({time <= words.length * 1000 ? "PASSED" : "FAILED"})
-                </p>
-              )}
+              <p className="text-emerald-400 font-bold uppercase tracking-widest text-sm mb-2">Round {round} Completed in {formatTime(time)}s!</p>
+              <p className={cn("text-xs font-bold uppercase mb-6", time <= words.length * 1000 ? "text-emerald-500" : "text-rose-500")}>
+                Target: Under {words.length}.000s ({time <= words.length * 1000 ? "PASSED" : "FAILED"})
+              </p>
               
               <div className="space-y-3">
-                {loop < 3 ? (
-                  <button 
-                    onClick={() => loadLevel(currentLevelIdx, loop + 1)}
-                    className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
-                  >
-                    Next Loop ({loop + 1}/3) <ChevronRight size={24} />
-                  </button>
-                ) : (
-                  time <= words.length * 1000 ? (
+                {time <= words.length * 1000 ? (
+                  round < 3 ? (
+                    <button 
+                      onClick={() => loadLevel(currentLevelIdx, round + 1)}
+                      className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
+                    >
+                      Next Round ({round + 1}/3) <ChevronRight size={24} />
+                    </button>
+                  ) : (
                     <button 
                       onClick={() => {
                         if (currentLevelIdx < SPEED_LEVELS.length - 1) {
-                          setCurrentLevelIdx(prev => prev + 1);
-                          loadLevel(currentLevelIdx + 1, 1);
+                          const nextIdx = currentLevelIdx + 1;
+                          loadLevel(nextIdx, 1);
                         } else {
                           setGameState('LEVEL_SELECT');
                         }
@@ -890,14 +904,14 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                     >
                       Next Level <ChevronRight size={24} />
                     </button>
-                  ) : (
-                    <button 
-                      onClick={() => loadLevel(currentLevelIdx, 3)}
-                      className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
-                    >
-                      Retry Loop 3 <RotateCcw size={24} />
-                    </button>
                   )
+                ) : (
+                  <button 
+                    onClick={() => loadLevel(currentLevelIdx, round)}
+                    className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
+                  >
+                    Retry Round {round} <RotateCcw size={24} />
+                  </button>
                 )}
                 <button 
                   onClick={() => setGameState('LEVEL_SELECT')}
@@ -926,7 +940,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
               
               <div className="space-y-3">
                 <button 
-                  onClick={() => loadLevel(currentLevelIdx, loop)}
+                  onClick={() => loadLevel(currentLevelIdx, round)}
                   className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
                 >
                   <RotateCcw size={24} /> Try Again
