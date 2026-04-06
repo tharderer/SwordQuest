@@ -675,7 +675,16 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           <div className="flex-shrink-0 p-4 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <button onClick={() => setGameState('LEVEL_SELECT')} className="p-2 bg-white/10 rounded-full text-white transition-colors hover:bg-white/20">
+                <button 
+                  onClick={() => {
+                    if (customReference) {
+                      onExit?.();
+                    } else {
+                      setGameState('LEVEL_SELECT');
+                    }
+                  }} 
+                  className="p-2 bg-white/10 rounded-full text-white transition-colors hover:bg-white/20"
+                >
                   <ArrowLeft size={20} />
                 </button>
                 <div className="px-3 py-1 bg-amber-500 rounded-full text-slate-950 font-black text-xs uppercase italic">Level {currentLevelIdx + 1}</div>
@@ -1002,7 +1011,13 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                   <RotateCcw size={24} /> Try Again
                 </button>
                 <button 
-                  onClick={() => setGameState('LEVEL_SELECT')}
+                  onClick={() => {
+                    if (customReference) {
+                      onExit?.();
+                    } else {
+                      setGameState('LEVEL_SELECT');
+                    }
+                  }}
                   className="w-full py-4 bg-transparent text-slate-500 rounded-2xl font-black text-lg hover:text-white transition-all uppercase italic"
                 >
                   Menu

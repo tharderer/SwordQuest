@@ -68,8 +68,12 @@ export const generateDailyJourneyDay = async (dateStr: string): Promise<DailyJou
       references
     };
 
-    // Save to global collection
-    await setDoc(doc(db, 'daily_journey_2026', dateStr), dayData);
+    // Save to global collection (might fail for guests, that's okay)
+    try {
+      await setDoc(doc(db, 'daily_journey_2026', dateStr), dayData);
+    } catch (e) {
+      console.warn("Could not save daily journey day (likely guest user):", e);
+    }
     
     return dayData;
   } catch (error) {

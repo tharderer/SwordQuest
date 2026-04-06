@@ -7850,11 +7850,25 @@ export default function App() {
 
   useEffect(() => {
     const fetchDaily = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const day = await getDailyJourneyDay(today);
-      setDailyDay(day);
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const day = await getDailyJourneyDay(today);
+        setDailyDay(day);
+      } catch (error) {
+        console.error("Failed to fetch daily journey:", error);
+        // Retry once after a short delay if it failed
+        setTimeout(async () => {
+          try {
+            const today = new Date().toISOString().split('T')[0];
+            const day = await getDailyJourneyDay(today);
+            setDailyDay(day);
+          } catch (retryError) {
+            console.error("Retry failed:", retryError);
+          }
+        }, 3000);
+      }
     };
-    if (user) fetchDaily();
+    fetchDaily();
   }, [user]);
 
   const startDailyJourney = (day: DailyJourneyDay, startIdx: number = 0) => {
@@ -8368,7 +8382,20 @@ export default function App() {
               </div>
 
               {/* Daily Journey Section */}
-              {dailyDay && (
+              {!dailyDay ? (
+                <div className="bg-slate-100 animate-pulse rounded-[2.5rem] p-8 mb-8 flex flex-col gap-4 border-2 border-slate-200">
+                  <div className="flex gap-3">
+                    <div className="h-6 w-32 bg-slate-200 rounded-full" />
+                    <div className="h-6 w-32 bg-slate-200 rounded-full" />
+                  </div>
+                  <div className="h-12 w-48 bg-slate-200 rounded-xl" />
+                  <div className="h-4 w-64 bg-slate-200 rounded-full" />
+                  <div className="flex gap-4 mt-4">
+                    <div className="h-14 w-40 bg-slate-200 rounded-2xl" />
+                    <div className="h-14 w-40 bg-slate-200 rounded-2xl" />
+                  </div>
+                </div>
+              ) : (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

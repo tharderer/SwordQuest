@@ -46,12 +46,13 @@ service cloud.firestore {
     }
 
     match /daily_journey_2026/{date} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only automated/admin population
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if false;
     }
 
     match /daily_leaderboards_2026/{period}/rankings/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isOwner(userId);
     }
   }
