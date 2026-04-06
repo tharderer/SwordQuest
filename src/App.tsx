@@ -7780,7 +7780,7 @@ export default function App() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showMasteredVerses, setShowMasteredVerses] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush' | 'speed_verse' | 'daily_journey'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush' | 'speed_verse' | 'daily_journey' | 'admin'>('dashboard');
   const [dailyDay, setDailyDay] = useState<DailyJourneyDay | null>(null);
   const [dailyVerseIdx, setDailyVerseIdx] = useState(0);
   const [dailyTimes, setDailyTimes] = useState<number[]>([]);
@@ -8432,24 +8432,6 @@ export default function App() {
                         <span className="text-sm font-bold uppercase tracking-tight">View Leaderboards</span>
                       </div>
                     </div>
-
-                    {user?.email === 'Tharderer@gmail.com' && (
-                      <button 
-                        onClick={async () => {
-                          if (window.confirm("Populate entire year 2026? This will take a few minutes.")) {
-                            setIsPopulating(true);
-                            await populateYear2026((p) => setPopulateProgress(p));
-                            setIsPopulating(false);
-                            alert("2026 Population Complete!");
-                          }
-                        }}
-                        disabled={isPopulating}
-                        className="mt-8 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
-                      >
-                        <Database size={16} />
-                        {isPopulating ? `Populating... ${populateProgress}%` : "Populate Year 2026 (Admin Only)"}
-                      </button>
-                    )}
                   </div>
                 </motion.div>
               )}
@@ -9216,6 +9198,69 @@ export default function App() {
               </div>
             </motion.div>
           )}
+
+          {view === 'admin' && user?.email === 'Tharderer@gmail.com' && (
+            <motion.div 
+              key="admin"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-6 space-y-8"
+            >
+              <h2 className="text-3xl font-bold font-display">Admin Dashboard</h2>
+              
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border-2 border-gray-100 space-y-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-3xl flex items-center justify-center text-indigo-600">
+                    <Database size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black italic uppercase tracking-tight">Data Population</h3>
+                    <p className="text-sm text-gray-500">Generate and save daily journey content for 2026.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-sm font-bold uppercase tracking-widest text-gray-400">
+                    <span>Progress</span>
+                    <span>{populateProgress}%</span>
+                  </div>
+                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${populateProgress}%` }}
+                      className="h-full bg-indigo-600"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={async () => {
+                    if (window.confirm("Populate entire year 2026? This will take a few minutes.")) {
+                      setIsPopulating(true);
+                      await populateYear2026((p) => setPopulateProgress(p));
+                      setIsPopulating(false);
+                      alert("2026 Population Complete!");
+                    }
+                  }}
+                  disabled={isPopulating}
+                  className="w-full py-4 bg-slate-950 text-white rounded-2xl font-black text-lg shadow-lg hover:scale-[1.02] active:scale-95 transition-all uppercase italic flex items-center justify-center gap-3 disabled:opacity-50"
+                >
+                  <Database size={24} />
+                  {isPopulating ? `Populating...` : "Populate Year 2026"}
+                </button>
+              </div>
+
+              <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-100">
+                <div className="flex items-center gap-3 text-amber-600 mb-2">
+                  <AlertCircle size={20} />
+                  <h4 className="font-bold uppercase tracking-tight">Warning</h4>
+                </div>
+                <p className="text-sm text-amber-700 leading-relaxed">
+                  This process will overwrite existing daily journey data in Firestore. Use with caution.
+                </p>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -9290,6 +9335,15 @@ export default function App() {
             <User size={24} />
             <span className="text-[10px] font-bold uppercase tracking-widest">Profile</span>
           </button>
+          {user?.email === 'Tharderer@gmail.com' && (
+            <button 
+              onClick={() => setView('admin')}
+              className={cn("flex flex-col items-center gap-1 transition-all", view === 'admin' ? "text-primary" : "text-gray-400")}
+            >
+              <Database size={24} />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Admin</span>
+            </button>
+          )}
         </nav>
       )}
 
