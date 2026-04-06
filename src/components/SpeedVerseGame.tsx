@@ -377,13 +377,20 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
   // Load Level
   const loadLevel = useCallback(async (idx: number, currentRound: number = 1, customRef?: string) => {
-    setGameState('LOADING');
-    setCurrentLevelIdx(idx); 
     const level = customRef ? { id: -1, reference: customRef, title: "Daily Challenge" } : SPEED_LEVELS[idx];
+    
+    // If we already have the verse and it's a retry/same level, skip the loading state for a smoother transition
+    const isRetry = verse && (customRef === verse.reference || (idx !== -1 && SPEED_LEVELS[idx]?.reference === verse.reference));
+    
+    if (!isRetry) {
+      setGameState('LOADING');
+    }
+
+    setCurrentLevelIdx(idx); 
     const parsed = parseReference(level.reference);
     if (!parsed) return;
     
-    const v = await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
+    const v = isRetry ? verse : await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
     if (v) {
       setVerse(v);
       const verseWords = v.text.split(/\s+/).filter(w => w.length > 0);
@@ -665,7 +672,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full"
           />
-          <p className="text-amber-500 font-black uppercase tracking-widest animate-pulse">Consulting the Scribes...</p>
+          <p className="text-amber-500 font-black uppercase tracking-widest animate-pulse">Preparing the Scroll...</p>
         </div>
       )}
 

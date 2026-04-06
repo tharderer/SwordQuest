@@ -38,47 +38,85 @@ export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyD
   return await generateDailyJourneyDay(dateStr);
 };
 
-export const generateDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
-  const date = new Date(dateStr);
-  const monthName = date.toLocaleString('default', { month: 'long' });
+export const generateDailyJourneyBatch = async (dates: string[]): Promise<void> => {
+  if (dates.length === 0) return;
+  
+  const monthName = new Date(dates[0]).toLocaleString('default', { month: 'long' });
   const theme = MONTHLY_THEMES[monthName] || "Faith";
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Generate 2 unique and meaningful Bible references (KJV) for the date ${dateStr}. 
+      contents: `Generate 2 unique and meaningful Bible references (KJV) for each of the following dates: ${dates.join(', ')}. 
       The theme for this month (${monthName}) is "${theme}". 
-      Return the references as a JSON array of strings. 
-      Example: ["John 3:16", "Psalm 23:1"]`,
+      Return the result as a JSON object where the keys are the dates and the values are arrays of 2 strings (references).
+      Example: {"2026-01-01": ["John 3:16", "Psalm 23:1"], "2026-01-02": ["Genesis 1:1", "John 1:1"]}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
+          type: Type.OBJECT,
+          additionalProperties: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
         }
       }
     });
 
-    const references = JSON.parse(response.text);
+    const data = JSON.parse(response.text);
     
-    const dayData: DailyJourneyDay = {
-      date: dateStr,
-      month: monthName,
-      theme,
-      references
-    };
-
-    // Save to global collection (might fail for guests, that's okay)
-    try {
-      await setDoc(doc(db, 'daily_journey_2026', dateStr), dayData);
-    } catch (e) {
-      console.warn("Could not save daily journey day (likely guest user):", e);
+    for (const dateStr of dates) {
+      if (data[dateStr]) {
+        const dayData: DailyJourneyDay = {
+          date: dateStr,
+          month: monthName,
+          theme,
+          references: data[dateStr]
+        };
+        await setDoc(doc(db, 'daily_journey_2026', dateStr), dayData);
+      }
     }
-    
-    return dayData;
   } catch (error) {
-    console.error("Failed to generate daily journey day:", error);
-    return null;
+    console.error(`Failed to generate batch for ${monthName}:`, error);
+  }
+};
+
+export const generateDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
+  await generateDailyJourneyBatch([dateStr]);
+  const docRef = doc(db, 'daily_journey_2026', dateStr);
+  const docSnap = await getDoc(docRef);
+  return docSnap.exists() ? docSnap.data() as DailyJourneyDay : null;
+};
+
+export const populateYear2026 = async (onProgress?: (progress: number) => void): Promise<void> => {
+  const months = [
+    "January", "February", "March", "April", "May", "June", 
+    "July", "August", "September", "October", "November", "December"
+  ];
+  
+  let totalDays = 0;
+  for (let m = 0; m < 12; m++) {
+    const daysInMonth = new Date(2026, m + 1, 0).getDate();
+    totalDays += daysInMonth;
+  }
+
+  let processedDays = 0;
+  for (let m = 0; m < 12; m++) {
+    const daysInMonth = new Date(2026, m + 1, 0).getDate();
+    const monthDates: string[] = [];
+    
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `2026-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      monthDates.push(dateStr);
+    }
+
+    // Generate in batches of 5 to avoid long Gemini responses or timeouts
+    for (let i = 0; i < monthDates.length; i += 5) {
+      const batch = monthDates.slice(i, i + 5);
+      await generateDailyJourneyBatch(batch);
+      processedDays += batch.length;
+      onProgress?.(Math.round((processedDays / totalDays) * 100));
+    }
   }
 };
 

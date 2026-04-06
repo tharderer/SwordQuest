@@ -113,7 +113,7 @@ import { SequenceChomperGame } from './components/SequenceChomperGame';
 import { VerseDartsGame } from './components/VerseDartsGame';
 import { VerseTetrisGame } from './components/VerseTetrisGame';
 import { VerseCrushGame } from './components/VerseCrushGame';
-import { getDailyJourneyDay, updateDailyLeaderboard, DailyJourneyDay } from './services/dailyJourneyService';
+import { getDailyJourneyDay, updateDailyLeaderboard, DailyJourneyDay, populateYear2026 } from './services/dailyJourneyService';
 import { SpeedVerseGame } from './components/SpeedVerseGame';
 import { BibleReader } from './components/BibleReader';
 import { cn } from './lib/utils';
@@ -7932,6 +7932,8 @@ export default function App() {
   const [bankStore, setBankStore] = useState(JEOPARDY_STORE);
   const [volume, setVolume] = useState(0.5);
   const [isMusicEnabled, setIsMusicEnabled] = useState(true);
+  const [isPopulating, setIsPopulating] = useState(false);
+  const [populateProgress, setPopulateProgress] = useState(0);
   const [selectedMusicStyle, setSelectedMusicStyle] = useState('hymns');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -8430,6 +8432,24 @@ export default function App() {
                         <span className="text-sm font-bold uppercase tracking-tight">View Leaderboards</span>
                       </div>
                     </div>
+
+                    {user?.email === 'Tharderer@gmail.com' && (
+                      <button 
+                        onClick={async () => {
+                          if (window.confirm("Populate entire year 2026? This will take a few minutes.")) {
+                            setIsPopulating(true);
+                            await populateYear2026((p) => setPopulateProgress(p));
+                            setIsPopulating(false);
+                            alert("2026 Population Complete!");
+                          }
+                        }}
+                        disabled={isPopulating}
+                        className="mt-8 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                      >
+                        <Database size={16} />
+                        {isPopulating ? `Populating... ${populateProgress}%` : "Populate Year 2026 (Admin Only)"}
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}
