@@ -101,6 +101,9 @@ export const bibleQuestionService = {
     const db = await getDB();
     let allQuestions = await db.getAll(WITS_STORE);
     
+    // Filter out questions with answers less than 10
+    allQuestions = allQuestions.filter(q => q.answer >= 10);
+    
     if (excludeIds.length > 0) {
       allQuestions = allQuestions.filter(q => q.id && !excludeIds.includes(q.id));
     }
@@ -191,6 +194,7 @@ export const bibleQuestionService = {
         IMPORTANT: Start as close to the beginning of the requested range as possible. Do not skip the early chapters (like Genesis 1-10) if they are within the range.
         Extract specific numbers mentioned in the text (ages, years, cubits, shekels, etc.). 
         Each fact must be a number mentioned in the narrative.
+        CRITICAL: Only include questions where the answer is 10 or greater. Do not include questions with small answers (1-9).
         Format: {
           "questions": [{"text": "Question?", "answer": 123, "book": "...", "chapter": 1, "verse": 1}],
           "nextBook": "The next book to start from", 

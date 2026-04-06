@@ -91,6 +91,21 @@ import {
 } from './services/bibleQuestionService';
 import { generateBibleQuestionsBatch } from './services/geminiService';
 import confetti from 'canvas-confetti';
+import { 
+  auth, 
+  db, 
+  googleProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  onSnapshot, 
+  serverTimestamp,
+  User as FirebaseUser
+} from './firebase';
 import { MissionaryJourneysGame } from './components/MissionaryJourneysGame';
 import { BibleWitsAndWagersGame } from './components/BibleWitsAndWagersGame';
 import { VerseChomperGame } from './components/VerseChomperGame';
@@ -7780,6 +7795,70 @@ export default function App() {
   const [isVerseSetOpen, setIsVerseSetOpen] = useState(false);
   const [selectedGameSetId, setSelectedGameSetId] = useState<string | null>(null);
   const [isStarTowerSelectionOpen, setIsStarTowerSelectionOpen] = useState(false);
+  
+  // Firebase Auth State
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setIsAuthLoading(false);
+      
+      if (currentUser) {
+        // Fetch or create user profile
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (!userDoc.exists()) {
+          const newProfile = {
+            uid: currentUser.uid,
+            displayName: currentUser.displayName || 'Anonymous',
+            photoURL: currentUser.photoURL || '',
+            email: currentUser.email || '',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            speedVerseProgress: {
+              unlockedLevels: ['1'],
+              completedRounds: {}
+            }
+          };
+          await setDoc(userDocRef, newProfile);
+          setUserProfile(newProfile);
+        } else {
+          setUserProfile(userDoc.data());
+          
+          // Listen for real-time updates
+          onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+              setUserProfile(doc.data());
+            }
+          });
+        }
+      } else {
+        setUserProfile(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Sign in failed:", error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    }
+  };
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBankOpen, setIsBankOpen] = useState(false);
   const [bankStore, setBankStore] = useState(JEOPARDY_STORE);
@@ -8107,8 +8186,22 @@ export default function App() {
       {!isGameView && (
         <header className="p-4 flex items-center justify-between bg-white border-b-2 border-gray-100 sticky top-0 z-30">
           <div className="flex items-center gap-2">
-            <Flame className="w-6 h-6 text-accent fill-accent" />
-            <span className="font-bold text-lg">{progress.streak}</span>
+            {user ? (
+              <div className="flex items-center gap-2">
+                <img 
+                  src={user.photoURL || ''} 
+                  alt={user.displayName || ''} 
+                  className="w-8 h-8 rounded-full border-2 border-primary shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+                <span className="font-bold text-xs truncate max-w-[80px]">{user.displayName?.split(' ')[0]}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Flame className="w-6 h-6 text-accent fill-accent" />
+                <span className="font-bold text-lg">{progress.streak}</span>
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-3">
@@ -8218,6 +8311,51 @@ export default function App() {
                   <p className="text-gray-500">Welcome back, Sword Bearer!</p>
                 </div>
                 <Character mood="excited" />
+              </div>
+
+              {/* Auth Section */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border-2 border-gray-100 space-y-4">
+                {user ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        src={user.photoURL || ''} 
+                        alt={user.displayName || ''} 
+                        className="w-12 h-12 rounded-full border-2 border-primary shadow-sm"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div>
+                        <h3 className="font-bold text-gray-800">{user.displayName}</h3>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Cloud Sync Active</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleSignOut}
+                      className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
+                        <Users size={20} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-800">Sign in to Save Progress</h3>
+                        <p className="text-xs text-gray-500 leading-relaxed">Guests cannot see leaderboards or sync progress across devices.</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleSignIn}
+                      className="w-full py-4 bg-primary text-white rounded-2xl font-black tracking-widest uppercase shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Database size={20} />
+                      Sign In with Google
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Verse Progress Summary */}
@@ -8766,6 +8904,8 @@ export default function App() {
               setSelectedMusicStyle={setSelectedMusicStyle}
               volume={volume}
               setVolume={setVolume}
+              user={user}
+              userProfile={userProfile}
             />
           </motion.div>
         )}

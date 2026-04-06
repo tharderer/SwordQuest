@@ -1,31 +1,28 @@
-// ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// Collection: leaderboards/{levelId}/scores
-// Document ID: {userId}
-// Fields:
-//   - userId: string (required, immutable) - The UID of the user
-//   - userName: string (required, max 50 chars) - The display name
-//   - score: number (required, positive) - The time in milliseconds
-//   - timestamp: timestamp (required) - When the score was achieved
-//
-// Collection: users
-// Document ID: {userId}
-// Fields:
-//   - displayName: string (required, max 50 chars)
-//   - photoURL: string (optional, valid URL)
-//
-// ===============================================================
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches request.auth.uid)
+    // Fields:
+    //   - uid: string (required) - The unique identifier for the user.
+    //   - displayName: string (required) - The user's display name.
+    //   - photoURL: string (optional) - The user's profile photo URL.
+    //   - email: string (optional) - The user's email address.
+    //   - speedVerseProgress: map (optional) - Progress in the Speed Verse game.
+    //     - unlockedLevels: list (optional) - List of unlocked level IDs.
+    //     - completedRounds: map (optional) - Map of level IDs to the highest completed round.
+    //   - createdAt: timestamp (optional) - When the profile was created.
+    //   - updatedAt: timestamp (optional) - When the profile was last updated.
+    //
+    // ===============================================================
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
-
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -34,55 +31,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "Tharderer@gmail.com" && request.auth.token.email_verified == true));
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName']) &&
+             data.uid is string &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             (!('email' in data) || (data.email is string && data.email.size() < 255)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000));
     }
-
-    function isValidScore(data) {
-      return data.keys().hasAll(['userId', 'userName', 'score', 'timestamp']) &&
-             data.keys().hasOnly(['userId', 'userName', 'score', 'timestamp']) &&
-             data.userId == request.auth.uid &&
-             data.userName is string && data.userName.size() <= 50 &&
-             data.score is number && data.score > 0 &&
-             data.timestamp is timestamp;
-    }
-
-    function isValidUserProfile(data) {
-      return data.keys().hasAll(['displayName']) &&
-             data.keys().hasOnly(['displayName', 'photoURL', 'role', 'totalXp', 'levelsCompleted']) &&
-             data.displayName is string && data.displayName.size() <= 50 &&
-             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
-             (!('totalXp' in data) || (data.totalXp is number && data.totalXp >= 0)) &&
-             (!('levelsCompleted' in data) || (data.levelsCompleted is number && data.levelsCompleted >= 0)) &&
-             (!('role' in data) || isAdmin()); // Only admins can set roles
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
 
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isOwner(userId) && isValidUserProfile(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /leaderboards/{levelId}/scores/{userId} {
-      // Allow anyone to read the leaderboard (top 10)
-      allow read: if true;
-      
-      // Only the owner can create or update their own score
-      // We also ensure they can't "hack" the score by making it negative or missing fields
-      allow create, update: if isOwner(userId) && isValidScore(request.resource.data);
-      
-      allow delete: if isAdmin();
-    }
-
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
     }
   }
 }

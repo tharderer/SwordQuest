@@ -1,38 +1,32 @@
 {
   "entities": {
-    "Score": {
-      "title": "Score",
-      "description": "A user's best score for a specific level.",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string", "description": "The UID of the user." },
-        "userName": { "type": "string", "description": "The display name of the user." },
-        "score": { "type": "number", "description": "The time in milliseconds (lower is better)." },
-        "timestamp": { "type": "string", "format": "date-time", "description": "When the score was achieved." }
-      },
-      "required": ["userId", "userName", "score", "timestamp"]
-    },
     "UserProfile": {
       "title": "User Profile",
-      "description": "Public profile information for a user including their progress.",
+      "description": "Stores user profile information and game progress.",
       "type": "object",
       "properties": {
-        "displayName": { "type": "string" },
-        "photoURL": { "type": "string" },
-        "totalXp": { "type": "number", "description": "Total XP earned." },
-        "levelsCompleted": { "type": "number", "description": "Number of levels fully mastered (Loop 3)." }
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "displayName": { "type": "string", "description": "The user's display name." },
+        "photoURL": { "type": "string", "description": "The user's profile photo URL." },
+        "email": { "type": "string", "description": "The user's email address." },
+        "speedVerseProgress": {
+          "type": "object",
+          "description": "Progress in the Speed Verse game.",
+          "properties": {
+            "unlockedLevels": { "type": "array", "items": { "type": "string" }, "description": "List of unlocked level IDs." },
+            "completedRounds": { "type": "object", "description": "Map of level IDs to the highest completed round." }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the profile was last updated." }
       },
-      "required": ["displayName"]
+      "required": ["uid", "displayName"]
     }
   },
   "firestore": {
-    "/leaderboards/{levelId}/scores/{userId}": {
-      "schema": "Score",
-      "description": "Stores the best score for each user per level."
-    },
     "/users/{userId}": {
       "schema": "UserProfile",
-      "description": "Public user profile data."
+      "description": "The user's profile and progress data."
     }
   }
 }

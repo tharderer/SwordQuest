@@ -12,15 +12,12 @@ interface Question {
 
 const DEFAULT_QUESTIONS: Question[] = [
   { text: "How many years did the Israelites wander in the wilderness?", answer: 40 },
-  { text: "How many people were on Noah's Ark?", answer: 8 },
   { text: "How many chapters are in the Book of Psalms?", answer: 150 },
   { text: "How many disciples did Jesus have?", answer: 12 },
   { text: "How many days and nights did it rain during the Great Flood?", answer: 40 },
-  { text: "How many stones did David pick up to fight Goliath?", answer: 5 },
   { text: "How many books are in the New Testament?", answer: 27 },
   { text: "How many years did Jacob work for Laban to marry Rachel?", answer: 14 },
-  { text: "How many plagues did God send upon Egypt?", answer: 10 },
-  { text: "How many times did Peter deny Jesus?", answer: 3 }
+  { text: "How many plagues did God send upon Egypt?", answer: 10 }
 ];
 
 const BOT_NAMES = ["Peter", "Martha", "Silas", "Lydia", "Barnabas", "Tabitha"];

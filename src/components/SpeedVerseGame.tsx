@@ -10,11 +10,13 @@ import {
   doc, 
   setDoc, 
   getDoc, 
+  updateDoc,
   onSnapshot, 
   query, 
   orderBy, 
   limit, 
   Timestamp,
+  serverTimestamp,
   getDocFromServer
 } from 'firebase/firestore';
 import { 
@@ -93,6 +95,8 @@ interface SpeedVerseProps {
   setSelectedMusicStyle: (style: string) => void;
   volume: number;
   setVolume: (volume: number) => void;
+  user: User | null;
+  userProfile: any;
 }
 
 interface SpeedVerseWord {
@@ -163,7 +167,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   selectedMusicStyle, 
   setSelectedMusicStyle, 
   volume, 
-  setVolume 
+  setVolume,
+  user,
+  userProfile
 }) => {
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'VICTORY' | 'GAMEOVER' | 'LOADING'>('LEVEL_SELECT');
@@ -182,7 +188,6 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [bestTimes, setBestTimes] = useState<Record<number, number>>({});
   const [round, setRound] = useState(1);
 
-  const [user, setUser] = useState<User | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState<number | null>(null);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
 
@@ -195,10 +200,6 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
   // Load progress
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-
     const testConnection = async () => {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
@@ -210,18 +211,33 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     };
     testConnection();
 
+    if (userProfile?.speedVerseProgress) {
+      const progress = userProfile.speedVerseProgress;
+      if (progress.unlockedLevels) {
+        const maxLevel = Math.max(...progress.unlockedLevels.map((l: string) => parseInt(l)), 1);
+        setUnlockedLevels(maxLevel);
+      }
+      if (progress.completedRounds) {
+        const rounds: Record<number, number> = {};
+        Object.entries(progress.completedRounds).forEach(([lvl, rnd]) => {
+          rounds[parseInt(lvl)] = rnd as number;
+        });
+        setUnlockedRounds(rounds);
+      }
+    } else {
+      const savedProgress = localStorage.getItem('speed_verse_progress');
+      if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
+
+      const savedRounds = localStorage.getItem('speed_verse_rounds');
+      if (savedRounds) setUnlockedRounds(JSON.parse(savedRounds));
+    }
+
     const savedBestTimes = localStorage.getItem('speed_verse_best_times');
     if (savedBestTimes) setBestTimes(JSON.parse(savedBestTimes));
-    
-    const savedProgress = localStorage.getItem('speed_verse_progress');
-    if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
-
-    const savedRounds = localStorage.getItem('speed_verse_rounds');
-    if (savedRounds) setUnlockedRounds(JSON.parse(savedRounds));
 
     const skipTutorial = localStorage.getItem('speed_verse_skip_tutorial');
     if (!skipTutorial) setShowTutorial(true);
-  }, []);
+  }, [userProfile]);
 
   const saveLevelProgress = async (levelId: number, finalTimeMs: number, currentRound: number) => {
     // Only save best time if it's a valid completion
@@ -230,16 +246,16 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     localStorage.setItem('speed_verse_best_times', JSON.stringify(updatedBestTimes));
 
     // Save to Firestore if authenticated
-    if (auth.currentUser && currentRound === 3) {
-      const path = `leaderboards/${levelId}/scores/${auth.currentUser.uid}`;
+    if (user && currentRound === 3) {
+      const path = `leaderboards/${levelId}/scores/${user.uid}`;
       try {
         const docRef = doc(db, path);
         const existingDoc = await getDoc(docRef);
         
         if (!existingDoc.exists() || existingDoc.data().score > finalTimeMs) {
           await setDoc(docRef, {
-            userId: auth.currentUser.uid,
-            userName: auth.currentUser.displayName || 'Anonymous',
+            userId: user.uid,
+            userName: user.displayName || 'Anonymous',
             score: finalTimeMs,
             timestamp: Timestamp.now()
           });
@@ -254,28 +270,39 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     
     if (isRoundPassed) {
       const nextRound = currentRound + 1;
+      let newUnlockedLevels = unlockedLevels;
+      let newUnlockedRounds = { ...unlockedRounds };
+
       if (nextRound <= 3) {
-        setUnlockedRounds(prev => {
-          const updated = { ...prev, [levelId]: Math.max(prev[levelId] || 1, nextRound) };
-          localStorage.setItem('speed_verse_rounds', JSON.stringify(updated));
-          return updated;
-        });
+        newUnlockedRounds[levelId] = Math.max(unlockedRounds[levelId] || 1, nextRound);
       } else if (currentRound === 3 && levelId === unlockedLevels && levelId < SPEED_LEVELS.length) {
         const nextLevel = levelId + 1;
-        setUnlockedLevels(nextLevel);
-        localStorage.setItem('speed_verse_progress', nextLevel.toString());
-        
-        setUnlockedRounds(prev => {
-          const updated = { ...prev, [levelId]: 3, [nextLevel]: 1 };
-          localStorage.setItem('speed_verse_rounds', JSON.stringify(updated));
-          return updated;
-        });
+        newUnlockedLevels = nextLevel;
+        newUnlockedRounds[levelId] = 3;
+        newUnlockedRounds[nextLevel] = 1;
       } else if (currentRound === 3) {
-        setUnlockedRounds(prev => {
-          const updated = { ...prev, [levelId]: 3 };
-          localStorage.setItem('speed_verse_rounds', JSON.stringify(updated));
-          return updated;
-        });
+        newUnlockedRounds[levelId] = 3;
+      }
+
+      setUnlockedLevels(newUnlockedLevels);
+      setUnlockedRounds(newUnlockedRounds);
+      
+      // Save locally
+      localStorage.setItem('speed_verse_progress', newUnlockedLevels.toString());
+      localStorage.setItem('speed_verse_rounds', JSON.stringify(newUnlockedRounds));
+
+      // Save to Firestore if authenticated
+      if (user) {
+        const userDocRef = doc(db, 'users', user.uid);
+        try {
+          await updateDoc(userDocRef, {
+            'speedVerseProgress.unlockedLevels': Array.from(new Set([...(userProfile?.speedVerseProgress?.unlockedLevels || []), newUnlockedLevels.toString()])),
+            [`speedVerseProgress.completedRounds.${levelId}`]: newUnlockedRounds[levelId],
+            updatedAt: serverTimestamp()
+          });
+        } catch (error) {
+          console.error("Failed to sync progress to Firestore:", error);
+        }
       }
     }
   };
@@ -300,15 +327,6 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       return () => unsubscribe();
     }
   }, [showLeaderboard]);
-
-  const signIn = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Sign in failed", error);
-    }
-  };
 
   const formatTime = (ms: number) => (ms / 1000).toFixed(3);
 
@@ -528,14 +546,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
               <ArrowLeft size={24} />
             </button>
             <div className="flex items-center gap-4">
-              {!user ? (
-                <button 
-                  onClick={signIn}
-                  className="px-4 py-2 bg-white text-slate-950 rounded-xl font-black text-xs uppercase tracking-tighter hover:scale-105 active:scale-95 transition-all"
-                >
-                  Sign In for Leaderboards
-                </button>
-              ) : (
+              {user && (
                 <div className="flex items-center gap-2">
                   <img src={user.photoURL || ''} className="w-8 h-8 rounded-full border border-white/20" referrerPolicy="no-referrer" />
                   <span className="text-xs font-black uppercase tracking-tighter text-slate-400">{user.displayName}</span>
