@@ -17,16 +17,68 @@
             "completedRounds": { "type": "object", "description": "Map of level IDs to the highest completed round." }
           }
         },
+        "dailyJourneyProgress": {
+          "type": "object",
+          "description": "Progress in the Daily Journey 2026.",
+          "properties": {
+            "completedDays": { 
+              "type": "object", 
+              "description": "Map of date strings (YYYY-MM-DD) to an object containing times for the 2 verses.",
+              "properties": {
+                "verse1Time": { "type": "number" },
+                "verse2Time": { "type": "number" },
+                "completedAt": { "type": "string", "format": "date-time" }
+              }
+            },
+            "lastCompletedDate": { "type": "string", "description": "The last date the user completed (YYYY-MM-DD)." }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "When the profile was last updated." }
       },
       "required": ["uid", "displayName"]
+    },
+    "DailyJourneyDay": {
+      "title": "Daily Journey Day",
+      "description": "Defines the 2 references for a specific day in the 2026 journey.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "description": "The date (YYYY-MM-DD)." },
+        "month": { "type": "string", "description": "The month name." },
+        "theme": { "type": "string", "description": "The monthly theme." },
+        "references": { 
+          "type": "array", 
+          "items": { "type": "string" }, 
+          "minItems": 2, 
+          "maxItems": 2,
+          "description": "The two Bible references for the day."
+        }
+      },
+      "required": ["date", "month", "theme", "references"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "The user's profile and progress data."
+    },
+    "/daily_journey_2026/{date}": {
+      "schema": "DailyJourneyDay",
+      "description": "The references for a specific day in the 2026 journey."
+    },
+    "/daily_leaderboards_2026/{period}/rankings/{userId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "photoURL": { "type": "string" },
+          "averageTime": { "type": "number" },
+          "versesCompleted": { "type": "number" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "description": "Monthly and yearly rankings for the daily journey."
     }
   }
 }

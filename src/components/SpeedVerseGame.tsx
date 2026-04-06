@@ -86,7 +86,7 @@ const hymnUrls = [
 ];
 
 interface SpeedVerseProps {
-  onComplete: (xp: number) => void;
+  onComplete: (xp: number, timeMs?: number) => void;
   onUpdateXP: (xp: number) => void;
   onExit: () => void;
   isMusicEnabled: boolean;
@@ -97,6 +97,9 @@ interface SpeedVerseProps {
   setVolume: (volume: number) => void;
   user: User | null;
   userProfile: any;
+  initialLevelIdx?: number;
+  initialRound?: number;
+  customReference?: string;
 }
 
 interface SpeedVerseWord {
@@ -169,7 +172,10 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   volume, 
   setVolume,
   user,
-  userProfile
+  userProfile,
+  initialLevelIdx,
+  initialRound,
+  customReference
 }) => {
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'VICTORY' | 'GAMEOVER' | 'LOADING'>('LEVEL_SELECT');
@@ -370,10 +376,10 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   }, [volume]);
 
   // Load Level
-  const loadLevel = useCallback(async (idx: number, currentRound: number = 1) => {
+  const loadLevel = useCallback(async (idx: number, currentRound: number = 1, customRef?: string) => {
     setGameState('LOADING');
-    setCurrentLevelIdx(idx); // Fix: Update currentLevelIdx state
-    const level = SPEED_LEVELS[idx];
+    setCurrentLevelIdx(idx); 
+    const level = customRef ? { id: -1, reference: customRef, title: "Daily Challenge" } : SPEED_LEVELS[idx];
     const parsed = parseReference(level.reference);
     if (!parsed) return;
     
@@ -438,6 +444,16 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       setGameState('PLAYING');
     }
   }, []);
+
+  useEffect(() => {
+    if (gameState === 'LEVEL_SELECT') {
+      if (customReference) {
+        loadLevel(-1, 1, customReference);
+      } else if (initialLevelIdx !== undefined) {
+        loadLevel(initialLevelIdx, initialRound || 1);
+      }
+    }
+  }, [gameState, initialLevelIdx, initialRound, customReference, loadLevel]);
 
   const handleWordClick = (r: number, c: number) => {
     if (isPaused || gameState !== 'PLAYING') return;
@@ -506,7 +522,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       // Check victory
       if (newNextIndex === words.length) {
         const level = SPEED_LEVELS[currentLevelIdx];
-        saveLevelProgress(level.id, time, round);
+        if (level && level.id !== -1) {
+          saveLevelProgress(level.id, time, round);
+        }
         setGameState('VICTORY');
         return;
       }
@@ -919,7 +937,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
               
               <div className="space-y-3">
                 {time <= words.length * 1000 ? (
-                  round < 3 ? (
+                  (round < 3 && !customReference) ? (
                     <button 
                       onClick={() => loadLevel(currentLevelIdx, round + 1)}
                       className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
@@ -929,7 +947,9 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                   ) : (
                     <button 
                       onClick={() => {
-                        if (currentLevelIdx < SPEED_LEVELS.length - 1) {
+                        if (customReference) {
+                          onComplete(words.length * 10, time);
+                        } else if (currentLevelIdx < SPEED_LEVELS.length - 1) {
                           const nextIdx = currentLevelIdx + 1;
                           loadLevel(nextIdx, 1);
                         } else {
@@ -938,7 +958,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       }}
                       className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
                     >
-                      Next Level <ChevronRight size={24} />
+                      {customReference ? "Finish Verse" : "Next Level"} <ChevronRight size={24} />
                     </button>
                   )
                 ) : (

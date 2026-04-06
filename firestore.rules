@@ -44,5 +44,15 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
       allow update: if isOwner(userId) && isValidUser(request.resource.data);
     }
+
+    match /daily_journey_2026/{date} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only automated/admin population
+    }
+
+    match /daily_leaderboards_2026/{period}/rankings/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
   }
 }

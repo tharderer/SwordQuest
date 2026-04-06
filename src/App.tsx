@@ -113,6 +113,7 @@ import { SequenceChomperGame } from './components/SequenceChomperGame';
 import { VerseDartsGame } from './components/VerseDartsGame';
 import { VerseTetrisGame } from './components/VerseTetrisGame';
 import { VerseCrushGame } from './components/VerseCrushGame';
+import { getDailyJourneyDay, updateDailyLeaderboard, DailyJourneyDay } from './services/dailyJourneyService';
 import { SpeedVerseGame } from './components/SpeedVerseGame';
 import { BibleReader } from './components/BibleReader';
 import { cn } from './lib/utils';
@@ -7779,8 +7780,11 @@ export default function App() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showMasteredVerses, setShowMasteredVerses] = useState(false);
-  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush' | 'speed_verse'>('dashboard');
-  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper' || view === 'verse_darts' || view === 'verse_tetris' || view === 'verse_crush' || view === 'speed_verse';
+  const [view, setView] = useState<'dashboard' | 'game' | 'shop' | 'leagues' | 'profile' | 'boggle' | 'math_tower' | 'tower_games' | 'bible_reader' | 'bible_jeopardy' | 'missionary_journeys' | 'verse_chomper' | 'sequence_chomper' | 'verse_darts' | 'verse_tetris' | 'verse_crush' | 'speed_verse' | 'daily_journey'>('dashboard');
+  const [dailyDay, setDailyDay] = useState<DailyJourneyDay | null>(null);
+  const [dailyVerseIdx, setDailyVerseIdx] = useState(0);
+  const [dailyTimes, setDailyTimes] = useState<number[]>([]);
+  const isGameView = view === 'game' || view === 'boggle' || view === 'math_tower' || view === 'tower_games' || view === 'bible_reader' || view === 'bible_jeopardy' || view === 'missionary_journeys' || view === 'wits_and_wagers' || view === 'verse_chomper' || view === 'sequence_chomper' || view === 'verse_darts' || view === 'verse_tetris' || view === 'verse_crush' || view === 'speed_verse' || view === 'daily_journey';
   const [boggleDifficulty, setBoggleDifficulty] = useState<Difficulty>('easy');
   const [referenceTowerDifficulty, setReferenceTowerDifficulty] = useState<ReferenceTowerDifficulty>('easy');
   const [showReward, setShowReward] = useState(false);
@@ -7843,6 +7847,56 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const fetchDaily = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const day = await getDailyJourneyDay(today);
+      setDailyDay(day);
+    };
+    if (user) fetchDaily();
+  }, [user]);
+
+  const startDailyJourney = (day: DailyJourneyDay, startIdx: number = 0) => {
+    setDailyDay(day);
+    setDailyVerseIdx(startIdx);
+    setDailyTimes([]);
+    setView('daily_journey');
+  };
+
+  const handleDailyComplete = async (xp: number, timeMs?: number) => {
+    if (timeMs !== undefined) {
+      const newTimes = [...dailyTimes, timeMs];
+      setDailyTimes(newTimes);
+      
+      if (dailyVerseIdx === 0) {
+        setDailyVerseIdx(1);
+      } else {
+        // Day complete!
+        if (user && dailyDay) {
+          const userDocRef = doc(db, 'users', user.uid);
+          const dateStr = dailyDay.date;
+          
+          await updateDoc(userDocRef, {
+            [`dailyJourneyProgress.completedDays.${dateStr}`]: {
+              verse1Time: newTimes[0],
+              verse2Time: newTimes[1],
+              completedAt: new Date().toISOString()
+            },
+            'dailyJourneyProgress.lastCompletedDate': dateStr,
+            updatedAt: serverTimestamp()
+          });
+
+          // Update leaderboards
+          const avgTime = (newTimes[0] + newTimes[1]) / 2;
+          await updateDailyLeaderboard(user.uid, user.displayName || 'Anonymous', user.photoURL || '', avgTime, dailyDay.month);
+        }
+        setView('dashboard');
+      }
+    } else {
+      setView('dashboard');
+    }
+  };
 
   const handleSignIn = async () => {
     try {
@@ -8312,6 +8366,46 @@ export default function App() {
                 </div>
                 <Character mood="excited" />
               </div>
+
+              {/* Daily Journey Section */}
+              {dailyDay && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] p-8 mb-8 text-white shadow-2xl relative overflow-hidden group"
+                >
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-110 transition-transform duration-700" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="px-4 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest">
+                        Daily Journey 2026
+                      </div>
+                      <div className="px-4 py-1 bg-amber-400 text-slate-950 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {dailyDay.month}: {dailyDay.theme}
+                      </div>
+                    </div>
+                    
+                    <h2 className="text-4xl font-black mb-2 italic uppercase tracking-tighter">Day {new Date(dailyDay.date).getDate()}</h2>
+                    <p className="text-indigo-100 mb-8 font-medium max-w-md">
+                      Complete today's 2 verses to climb the {dailyDay.month} leaderboard!
+                    </p>
+
+                    <div className="flex flex-wrap gap-4">
+                      <button 
+                        onClick={() => startDailyJourney(dailyDay)}
+                        className="px-8 py-4 bg-white text-indigo-600 rounded-2xl font-black text-lg shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 uppercase italic"
+                      >
+                        <Play size={24} fill="currentColor" /> Start Today
+                      </button>
+                      
+                      <div className="flex items-center gap-2 px-6 py-4 bg-black/20 backdrop-blur-md rounded-2xl border border-white/10">
+                        <Trophy size={20} className="text-amber-400" />
+                        <span className="text-sm font-bold uppercase tracking-tight">View Leaderboards</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Auth Section */}
               <div className="bg-white p-6 rounded-3xl shadow-sm border-2 border-gray-100 space-y-4">
@@ -8875,6 +8969,43 @@ export default function App() {
           </motion.div>
         )}
 
+        {view === 'daily_journey' && dailyDay && (
+          <motion.div 
+            key="daily_journey"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            className="fixed inset-0 z-50 bg-slate-950"
+          >
+            <SpeedVerseGame 
+              onComplete={handleDailyComplete}
+              onUpdateXP={(xp) => {
+                if (progress) {
+                  const newProgress = updateXP(xp);
+                  setProgress(newProgress);
+                }
+              }}
+              onExit={() => setView('dashboard')}
+              isMusicEnabled={isMusicEnabled}
+              setIsMusicEnabled={setIsMusicEnabled}
+              selectedMusicStyle={selectedMusicStyle}
+              setSelectedMusicStyle={setSelectedMusicStyle}
+              volume={volume}
+              setVolume={setVolume}
+              user={user}
+              userProfile={userProfile}
+              customReference={dailyDay.references[dailyVerseIdx]}
+            />
+            {/* Overlay for daily reference */}
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] pointer-events-none">
+              <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full">
+                <span className="text-amber-400 font-black uppercase italic tracking-tighter">
+                  Verse {dailyVerseIdx + 1}: {dailyDay.references[dailyVerseIdx]}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
         {view === 'speed_verse' && (
           <motion.div 
             key="speed_verse"
