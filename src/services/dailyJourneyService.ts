@@ -1,8 +1,5 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { db, doc, auth } from '../firebase';
-import { getDoc, setDoc, collection, query, where, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+import { db, doc } from '../firebase';
+import { getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 export interface DailyJourneyDay {
   date: string;
@@ -26,6 +23,70 @@ const MONTHLY_THEMES: Record<string, string> = {
   "December": "Hope & Incarnation"
 };
 
+// Curated Topical Library (Open Bible Inspired)
+const TOPICAL_LIBRARY: Record<string, string[]> = {
+  "January": [
+    "Lamentations 3:22-23", "Isaiah 43:19", "2 Corinthians 5:17", "Ezekiel 36:26", 
+    "Philippians 3:13-14", "Revelation 21:5", "Psalm 98:1", "Isaiah 40:31",
+    "Psalm 51:10", "Job 8:7", "Proverbs 3:5-6", "Matthew 6:33"
+  ],
+  "February": [
+    "1 Corinthians 13:4-7", "1 John 4:7-8", "John 15:13", "Romans 5:8", 
+    "1 John 3:18", "Ephesians 5:2", "Proverbs 17:17", "1 John 4:19",
+    "John 13:34", "Colossians 3:14", "1 Peter 4:8", "Psalm 143:8"
+  ],
+  "March": [
+    "Psalm 51:10", "Romans 12:2", "2 Peter 3:18", "Colossians 2:6-7", 
+    "Galatians 5:22-23", "Isaiah 40:31", "2 Corinthians 4:16", "Philippians 1:6",
+    "John 15:5", "Ephesians 4:23-24", "Psalm 1:3", "Jeremiah 17:7-8"
+  ],
+  "April": [
+    "John 3:16", "Romans 5:8", "Ephesians 1:7", "Galatians 3:13", 
+    "1 Peter 2:24", "Hebrews 9:12", "Romans 6:23", "Isaiah 53:5",
+    "Colossians 1:14", "2 Corinthians 5:21", "Titus 2:14", "1 John 1:9"
+  ],
+  "May": [
+    "Hebrews 11:1", "Proverbs 3:5-6", "Matthew 17:20", "Romans 10:17", 
+    "2 Corinthians 5:7", "James 1:6", "Mark 11:24", "Ephesians 2:8-9",
+    "Matthew 21:22", "Hebrews 11:6", "Psalm 37:5", "Isaiah 26:3"
+  ],
+  "June": [
+    "James 1:5", "Psalm 119:105", "Proverbs 2:6", "Proverbs 16:9", 
+    "Psalm 32:8", "Isaiah 30:21", "Proverbs 3:13", "Colossians 1:9",
+    "Proverbs 4:7", "Psalm 25:4-5", "James 3:17", "Proverbs 19:21"
+  ],
+  "July": [
+    "John 8:32", "Galatians 5:1", "2 Corinthians 3:17", "John 14:6", 
+    "Psalm 119:45", "Romans 6:22", "John 17:17", "Psalm 25:5",
+    "1 Peter 2:16", "John 16:13", "Psalm 86:11", "Ephesians 4:21"
+  ],
+  "August": [
+    "Joshua 1:9", "Philippians 4:13", "Isaiah 41:10", "Psalm 27:1", 
+    "2 Timothy 1:7", "Ephesians 6:10", "Psalm 18:2", "Isaiah 40:29",
+    "Psalm 46:1", "2 Corinthians 12:9", "Exodus 15:2", "Habakkuk 3:19"
+  ],
+  "September": [
+    "Galatians 5:13", "1 Peter 4:10", "Matthew 20:28", "Colossians 3:23", 
+    "Ephesians 2:10", "Romans 12:1", "Matthew 5:16", "Hebrews 6:10",
+    "1 Corinthians 15:58", "Mark 10:45", "Joshua 24:15", "Psalm 100:2"
+  ],
+  "October": [
+    "Psalm 27:1", "Matthew 5:14", "Psalm 91:1-2", "2 Thessalonians 3:3", 
+    "Psalm 121:7-8", "John 8:12", "Isaiah 54:17", "Proverbs 18:10",
+    "Psalm 34:7", "Deuteronomy 31:6", "Psalm 46:1", "Isaiah 43:2"
+  ],
+  "November": [
+    "1 Thessalonians 5:18", "Psalm 107:1", "Philippians 4:6", "Psalm 100:4", 
+    "Colossians 3:17", "Psalm 95:2", "Psalm 118:1", "1 Chronicles 16:34",
+    "Psalm 136:1", "Ephesians 5:20", "Psalm 106:1", "2 Corinthians 9:15"
+  ],
+  "December": [
+    "Romans 15:13", "Isaiah 9:6", "Luke 2:10-11", "Nehemiah 8:10", 
+    "Psalm 16:11", "Matthew 2:10", "John 15:11", "Psalm 30:5",
+    "Isaiah 12:2", "Galatians 5:22", "Psalm 118:24", "1 Peter 1:8"
+  ]
+};
+
 export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
   const docRef = doc(db, 'daily_journey_2026', dateStr);
   const docSnap = await getDoc(docRef);
@@ -34,90 +95,36 @@ export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyD
     return docSnap.data() as DailyJourneyDay;
   }
   
-  // If not exists, generate it on the fly (for demo/initial population)
-  return await generateDailyJourneyDay(dateStr);
-};
-
-export const generateDailyJourneyBatch = async (dates: string[]): Promise<void> => {
-  if (dates.length === 0) return;
-  
-  const monthName = new Date(dates[0]).toLocaleString('default', { month: 'long' });
+  // If not exists, generate it deterministically based on the date
+  const date = new Date(dateStr);
+  const monthName = date.toLocaleString('default', { month: 'long' });
   const theme = MONTHLY_THEMES[monthName] || "Faith";
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Generate 2 unique and meaningful Bible references (KJV) for each of the following dates: ${dates.join(', ')}. 
-      The theme for this month (${monthName}) is "${theme}". 
-      Return the result as a JSON object where the keys are the dates and the values are arrays of 2 strings (references).
-      Example: {"2026-01-01": ["John 3:16", "Psalm 23:1"], "2026-01-02": ["Genesis 1:1", "John 1:1"]}`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          additionalProperties: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-          }
-        }
-      }
-    });
-
-    const data = JSON.parse(response.text);
-    
-    for (const dateStr of dates) {
-      if (data[dateStr]) {
-        const dayData: DailyJourneyDay = {
-          date: dateStr,
-          month: monthName,
-          theme,
-          references: data[dateStr]
-        };
-        await setDoc(doc(db, 'daily_journey_2026', dateStr), dayData);
-      }
-    }
-  } catch (error) {
-    console.error(`Failed to generate batch for ${monthName}:`, error);
-  }
-};
-
-export const generateDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
-  await generateDailyJourneyBatch([dateStr]);
-  const docRef = doc(db, 'daily_journey_2026', dateStr);
-  const docSnap = await getDoc(docRef);
-  return docSnap.exists() ? docSnap.data() as DailyJourneyDay : null;
-};
-
-export const populateYear2026 = async (onProgress?: (progress: number) => void): Promise<void> => {
-  const months = [
-    "January", "February", "March", "April", "May", "June", 
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const dayOfMonth = date.getDate();
   
-  let totalDays = 0;
-  for (let m = 0; m < 12; m++) {
-    const daysInMonth = new Date(2026, m + 1, 0).getDate();
-    totalDays += daysInMonth;
-  }
+  const monthVerses = TOPICAL_LIBRARY[monthName] || TOPICAL_LIBRARY["January"];
+  
+  // Deterministically pick 2 verses based on the day of the month
+  // We use modulo to wrap around if the library is smaller than the day
+  const idx1 = (dayOfMonth * 2) % monthVerses.length;
+  const idx2 = (dayOfMonth * 2 + 1) % monthVerses.length;
+  
+  const references = [monthVerses[idx1], monthVerses[idx2]];
+  
+  const dayData: DailyJourneyDay = {
+    date: dateStr,
+    month: monthName,
+    theme,
+    references
+  };
 
-  let processedDays = 0;
-  for (let m = 0; m < 12; m++) {
-    const daysInMonth = new Date(2026, m + 1, 0).getDate();
-    const monthDates: string[] = [];
-    
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `2026-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      monthDates.push(dateStr);
-    }
-
-    // Generate in batches of 5 to avoid long Gemini responses or timeouts
-    for (let i = 0; i < monthDates.length; i += 5) {
-      const batch = monthDates.slice(i, i + 5);
-      await generateDailyJourneyBatch(batch);
-      processedDays += batch.length;
-      onProgress?.(Math.round((processedDays / totalDays) * 100));
-    }
+  // Save to global collection so others can see the same verses
+  try {
+    await setDoc(docRef, dayData);
+  } catch (e) {
+    console.warn("Could not save daily journey day:", e);
   }
+  
+  return dayData;
 };
 
 export const updateDailyLeaderboard = async (
