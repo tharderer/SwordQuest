@@ -5,6 +5,7 @@ import { KJV_LIBRARY } from './bibleData';
 const DB_NAME = 'bible_db';
 const STORE_NAME = 'verses';
 const SCHEDULE_STORE = 'daily_schedule';
+const PROGRESS_STORE = 'daily_progress';
 
 export const BIBLE_BOOKS = [
   'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
@@ -90,7 +91,7 @@ export async function initBibleDB() {
   if (useFallback) throw new Error('Using local library fallback');
 
   try {
-    dbPromise = openDB(DB_NAME, 2, {
+    dbPromise = openDB(DB_NAME, 3, {
       upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, {
@@ -102,6 +103,9 @@ export async function initBibleDB() {
         }
         if (!db.objectStoreNames.contains(SCHEDULE_STORE)) {
           db.createObjectStore(SCHEDULE_STORE, { keyPath: 'date' });
+        }
+        if (!db.objectStoreNames.contains(PROGRESS_STORE)) {
+          db.createObjectStore(PROGRESS_STORE, { keyPath: 'id' });
         }
       },
       blocked() {
@@ -443,6 +447,29 @@ export async function isScheduleSeeded(): Promise<boolean> {
     return count >= 365;
   } catch (e) {
     return false;
+  }
+}
+
+export async function saveDailyProgress(progress: any) {
+  const db = await initBibleDB();
+  await db.put(PROGRESS_STORE, progress);
+}
+
+export async function getDailyProgress(id: string) {
+  try {
+    const db = await initBibleDB();
+    return await db.get(PROGRESS_STORE, id);
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function getAllDailyProgress() {
+  try {
+    const db = await initBibleDB();
+    return await db.getAll(PROGRESS_STORE);
+  } catch (e) {
+    return [];
   }
 }
 

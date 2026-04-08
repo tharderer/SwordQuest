@@ -86,7 +86,7 @@ const hymnUrls = [
 ];
 
 interface SpeedVerseProps {
-  onComplete: (xp: number, timeMs?: number) => void;
+  onComplete: (xp: number, timeMs?: number, timePerWord?: number) => void;
   onUpdateXP: (xp: number) => void;
   onExit: () => void;
   isMusicEnabled: boolean;
@@ -132,7 +132,7 @@ const SPEED_LEVELS: SpeedVerseLevel[] = [
   { id: 10, reference: "Jeremiah 29:11", title: "A Future and a Hope" }
 ];
 
-const GRID_SIZE = 3;
+const GRID_SIZE = 2;
 
 const WORD_BG_COLORS = [
   'bg-red-500/20 border-red-500/40',
@@ -178,12 +178,14 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   customReference
 }) => {
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
-  const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'VICTORY' | 'GAMEOVER' | 'LOADING'>('LEVEL_SELECT');
+  const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'VICTORY' | 'GAMEOVER' | 'LOADING'>(
+    (customReference || initialLevelIdx !== undefined) ? 'LOADING' : 'LEVEL_SELECT'
+  );
   const [verse, setVerse] = useState<{ reference: string, text: string } | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [grid, setGrid] = useState<SpeedVerseWord[][]>([]);
   const [nextWordIndex, setNextWordIndex] = useState(0);
-  const [poolIndex, setPoolIndex] = useState(9);
+  const [poolIndex, setPoolIndex] = useState(GRID_SIZE * GRID_SIZE);
   const [lives, setLives] = useState(5);
   const [time, setTime] = useState(0); // Time in milliseconds
   const [isPaused, setIsPaused] = useState(false);
@@ -193,16 +195,17 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [unlockedRounds, setUnlockedRounds] = useState<Record<number, number>>({});
   const [bestTimes, setBestTimes] = useState<Record<number, number>>({});
   const [round, setRound] = useState(1);
-
   const [showLeaderboard, setShowLeaderboard] = useState<number | null>(null);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
-
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const nextWordIndexRef = useRef(0);
-  const poolIndexRef = useRef(9);
+  const poolIndexRef = useRef(GRID_SIZE * GRID_SIZE);
   const gridRef = useRef<SpeedVerseWord[][]>([]);
+  const verseRef = useRef<{ reference: string, text: string } | null>(null);
+  const loadingRef = useRef<string | null>(null);
+  const didInitialLoad = useRef(false);
 
   // Load progress
   useEffect(() => {
@@ -221,25 +224,41 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       const progress = userProfile.speedVerseProgress;
       if (progress.unlockedLevels) {
         const maxLevel = Math.max(...progress.unlockedLevels.map((l: string) => parseInt(l)), 1);
-        setUnlockedLevels(maxLevel);
+        setUnlockedLevels(prev => prev !== maxLevel ? maxLevel : prev);
       }
       if (progress.completedRounds) {
         const rounds: Record<number, number> = {};
         Object.entries(progress.completedRounds).forEach(([lvl, rnd]) => {
           rounds[parseInt(lvl)] = rnd as number;
         });
-        setUnlockedRounds(rounds);
+        
+        setUnlockedRounds(prev => {
+          const isSame = Object.keys(rounds).length === Object.keys(prev).length &&
+                        Object.keys(rounds).every(k => rounds[parseInt(k)] === prev[parseInt(k)]);
+          return isSame ? prev : rounds;
+        });
       }
     } else {
       const savedProgress = localStorage.getItem('speed_verse_progress');
-      if (savedProgress) setUnlockedLevels(parseInt(savedProgress));
+      if (savedProgress) setUnlockedLevels(prev => {
+        const val = parseInt(savedProgress);
+        return prev !== val ? val : prev;
+      });
 
       const savedRounds = localStorage.getItem('speed_verse_rounds');
-      if (savedRounds) setUnlockedRounds(JSON.parse(savedRounds));
+      if (savedRounds) setUnlockedRounds(prev => {
+        const val = JSON.parse(savedRounds);
+        const isSame = JSON.stringify(val) === JSON.stringify(prev);
+        return isSame ? prev : val;
+      });
     }
 
     const savedBestTimes = localStorage.getItem('speed_verse_best_times');
-    if (savedBestTimes) setBestTimes(JSON.parse(savedBestTimes));
+    if (savedBestTimes) setBestTimes(prev => {
+      const val = JSON.parse(savedBestTimes);
+      const isSame = JSON.stringify(val) === JSON.stringify(prev);
+      return isSame ? prev : val;
+    });
 
     const skipTutorial = localStorage.getItem('speed_verse_skip_tutorial');
     if (!skipTutorial) setShowTutorial(true);
@@ -377,10 +396,21 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
   // Load Level
   const loadLevel = useCallback(async (idx: number, currentRound: number = 1, customRef?: string) => {
-    const level = customRef ? { id: -1, reference: customRef, title: "Daily Challenge" } : SPEED_LEVELS[idx];
+    const effectiveRef = customRef || (idx === -1 ? customReference : undefined);
+    const level = effectiveRef ? { id: -1, reference: effectiveRef, title: "Daily Challenge" } : SPEED_LEVELS[idx];
     
+    if (!level) {
+      console.error("Level not found for index:", idx);
+      setGameState('LEVEL_SELECT');
+      return;
+    }
+
+    // Prevent duplicate loading of the same reference
+    if (loadingRef.current === level.reference) return;
+    loadingRef.current = level.reference;
+
     // If we already have the verse and it's a retry/same level, skip the loading state for a smoother transition
-    const isRetry = verse && (customRef === verse.reference || (idx !== -1 && SPEED_LEVELS[idx]?.reference === verse.reference));
+    const isRetry = verseRef.current && (level.reference === verseRef.current.reference);
     
     if (!isRetry) {
       setGameState('LOADING');
@@ -388,77 +418,113 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
     setCurrentLevelIdx(idx); 
     const parsed = parseReference(level.reference);
-    if (!parsed) return;
+    if (!parsed) {
+      loadingRef.current = null;
+      return;
+    }
     
-    const v = isRetry ? verse : await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
-    if (v) {
-      setVerse(v);
-      const verseWords = v.text.split(/\s+/).filter(w => w.length > 0);
-      setWords(verseWords);
-      setNextWordIndex(0);
-      nextWordIndexRef.current = 0;
-      setLives(5);
-      setTime(0);
-      setRound(currentRound);
-      setPoolIndex(GRID_SIZE * GRID_SIZE);
-      poolIndexRef.current = GRID_SIZE * GRID_SIZE;
-      setIsProcessing(false);
+    try {
+      const v = isRetry ? verseRef.current : await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
+      if (v) {
+        setVerse(v);
+        verseRef.current = v;
+        const verseWords = v.text.split(/\s+/).filter(w => w.length > 0);
+        setWords(verseWords);
+        setNextWordIndex(0);
+        nextWordIndexRef.current = 0;
+        setLives(5);
+        setTime(0);
+        setRound(currentRound);
+        setPoolIndex(GRID_SIZE * GRID_SIZE);
+        poolIndexRef.current = GRID_SIZE * GRID_SIZE;
+        setIsProcessing(false);
 
-      // Create initial grid
-      const newGrid: SpeedVerseWord[][] = [];
-      let idCounter = Date.now();
-      
-      const gridItems: { text: string, wordIndex: number }[] = [];
-      const totalSlots = GRID_SIZE * GRID_SIZE;
-      
-      if (verseWords.length >= totalSlots) {
-        // Long verse: take first slots
-        for (let i = 0; i < totalSlots; i++) {
-          gridItems.push({ text: verseWords[i], wordIndex: i });
+        // Create initial grid
+        const newGrid: SpeedVerseWord[][] = [];
+        let idCounter = Date.now();
+        
+        const totalSlots = GRID_SIZE * GRID_SIZE;
+        const gridItems: { text: string, wordIndex: number }[] = [];
+        
+        // Always include the first word
+        gridItems.push({ text: verseWords[0], wordIndex: 0 });
+        
+        // Fill remaining slots with random words from the verse
+        const remainingIndices = Array.from({ length: verseWords.length }, (_, i) => i).filter(i => i !== 0);
+        
+        // Shuffle remaining indices to pick random distractors
+        for (let i = remainingIndices.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [remainingIndices[i], remainingIndices[j]] = [remainingIndices[j], remainingIndices[i]];
         }
-      } else {
-        // Short verse: fill with all words, then repeat
-        for (let i = 0; i < verseWords.length; i++) {
-          gridItems.push({ text: verseWords[i], wordIndex: i });
+        
+        for (let i = 0; i < totalSlots - 1; i++) {
+          const wordIdx = remainingIndices.length > 0 
+            ? remainingIndices[i % remainingIndices.length] 
+            : 0; // Fallback if verse is extremely short
+          gridItems.push({ text: verseWords[wordIdx], wordIndex: wordIdx });
         }
-        // Repeat words until full
-        let repeatIdx = 0;
-        while (gridItems.length < totalSlots) {
-          gridItems.push({ text: verseWords[repeatIdx % verseWords.length], wordIndex: repeatIdx % verseWords.length });
-          repeatIdx++;
+
+        // Fisher-Yates Shuffle for the grid items
+        for (let i = gridItems.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [gridItems[i], gridItems[j]] = [gridItems[j], gridItems[i]];
         }
+
+        for (let r = 0; r < GRID_SIZE; r++) {
+          newGrid[r] = [];
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const item = gridItems.pop()!;
+            newGrid[r][c] = {
+              id: idCounter++,
+              text: item.text,
+              row: r,
+              col: c,
+              wordIndex: item.wordIndex,
+              isMatched: false,
+              isCorrect: false,
+              isWrong: false
+            };
+          }
+        }
+        gridRef.current = newGrid;
+        setGrid(newGrid);
+        setGameState('PLAYING');
       }
-
-      // Shuffle
-      gridItems.sort(() => Math.random() - 0.5);
-
-      for (let r = 0; r < GRID_SIZE; r++) {
-        newGrid[r] = [];
-        for (let c = 0; c < GRID_SIZE; c++) {
-          const item = gridItems.pop()!;
-          newGrid[r][c] = {
-            id: idCounter++,
-            text: item.text,
-            row: r,
-            col: c,
-            wordIndex: item.wordIndex,
-            isMatched: false
-          };
-        }
-      }
-      gridRef.current = newGrid;
-      setGrid(newGrid);
-      setGameState('PLAYING');
+    } catch (err) {
+      console.error("Error loading level:", err);
+      setGameState('LEVEL_SELECT');
+    } finally {
+      loadingRef.current = null;
     }
   }, []);
 
   useEffect(() => {
+    // Skip if already loading
+    if (gameState === 'LOADING' && loadingRef.current) return;
+
+    // Initial load
+    if (!didInitialLoad.current) {
+      if (customReference || initialLevelIdx !== undefined) {
+        loadLevel(customReference ? -1 : initialLevelIdx!, initialRound || 1, customReference);
+        didInitialLoad.current = true;
+      }
+      return;
+    }
+
+    // Level select state
     if (gameState === 'LEVEL_SELECT') {
       if (customReference) {
         loadLevel(-1, 1, customReference);
       } else if (initialLevelIdx !== undefined) {
         loadLevel(initialLevelIdx, initialRound || 1);
       }
+      return;
+    }
+
+    // Handle prop changes for Daily Verse (Next button)
+    if (customReference && verseRef.current && customReference !== verseRef.current.reference) {
+      loadLevel(-1, 1, customReference);
     }
   }, [gameState, initialLevelIdx, initialRound, customReference, loadLevel]);
 
@@ -483,45 +549,73 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       // Update ref immediately so next tap sees it
       const updatedGrid = currentGrid.map(row => row.map(word => ({ ...word })));
       
-      // Determine replacement word
-      let replacementIndex = -1;
-      const totalSlots = GRID_SIZE * GRID_SIZE;
-      if (words.length > totalSlots && poolIndexRef.current < words.length) {
-        replacementIndex = poolIndexRef.current;
-        poolIndexRef.current++;
-        setPoolIndex(poolIndexRef.current);
-      } else {
-        const counts: Record<number, number> = {};
-        for (let i = 0; i < words.length; i++) counts[i] = 0;
-        
-        updatedGrid.flat().forEach(w => {
-          counts[w.wordIndex] = (counts[w.wordIndex] || 0) + 1;
-        });
-        
-        let minCount = Infinity;
-        for (let i = 0; i < words.length; i++) {
-          if (counts[i] < minCount) minCount = counts[i];
-        }
-        
-        const candidates = [];
-        for (let i = 0; i < words.length; i++) {
-          if (counts[i] === minCount) candidates.push(i);
-        }
-        
-        replacementIndex = candidates[Math.floor(Math.random() * candidates.length)];
-      }
+      const nextRequiredIdx = newNextIndex;
+      const otherSlots = updatedGrid.flat().filter(w => w.row !== r || w.col !== c);
+      const isNextOnOtherSlot = otherSlots.some(w => w.wordIndex === nextRequiredIdx);
 
-      // Replace immediately in ref
-      updatedGrid[r][c] = {
-        id: Date.now() + Math.random(),
-        text: words[replacementIndex],
-        row: r,
-        col: c,
-        wordIndex: replacementIndex,
-        isMatched: false,
-        isCorrect: false,
-        isWrong: false
+      // Helper to get a random distractor index
+      const getDistractorIndex = (excludeIndices: Set<number>) => {
+        const candidates = Array.from({ length: words.length }, (_, i) => i)
+          .filter(i => !excludeIndices.has(i));
+        
+        if (candidates.length > 0) {
+          return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+        return Math.floor(Math.random() * words.length);
       };
+
+      if (!isNextOnOtherSlot && nextRequiredIdx < words.length) {
+        // The next word isn't on any OTHER slot. 
+        // We MUST add it, but NOT at [r][c].
+        
+        // 1. Pick a random other slot to receive the next word
+        const targetSlot = otherSlots[Math.floor(Math.random() * otherSlots.length)];
+        const targetR = targetSlot.row;
+        const targetC = targetSlot.col;
+        
+        // 2. Put the next required word at the target slot
+        updatedGrid[targetR][targetC] = {
+          id: Date.now() + Math.random(),
+          text: words[nextRequiredIdx],
+          row: targetR,
+          col: targetC,
+          wordIndex: nextRequiredIdx,
+          isMatched: false,
+          isCorrect: false,
+          isWrong: false
+        };
+
+        // 3. Put a distractor at the clicked slot [r][c]
+        const currentIndices = new Set<number>(updatedGrid.flat().map(w => w.wordIndex));
+        const distractorIdx = getDistractorIndex(currentIndices);
+        
+        updatedGrid[r][c] = {
+          id: Date.now() + Math.random() + 1,
+          text: words[distractorIdx],
+          row: r,
+          col: c,
+          wordIndex: distractorIdx,
+          isMatched: false,
+          isCorrect: false,
+          isWrong: false
+        };
+      } else {
+        // Next word is already elsewhere or we finished.
+        // Just put a distractor at [r][c].
+        const currentIndices = new Set<number>(updatedGrid.flat().map(w => w.wordIndex));
+        const distractorIdx = getDistractorIndex(currentIndices);
+
+        updatedGrid[r][c] = {
+          id: Date.now() + Math.random(),
+          text: words[distractorIdx],
+          row: r,
+          col: c,
+          wordIndex: distractorIdx,
+          isMatched: false,
+          isCorrect: false,
+          isWrong: false
+        };
+      }
       
       gridRef.current = updatedGrid;
       setGrid(updatedGrid);
@@ -773,7 +867,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           {/* Grid */}
           <div className="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0 overflow-hidden pb-8 sm:pb-4">
             <div className="aspect-square w-full h-full max-h-full max-w-full bg-slate-900 rounded-[2rem] sm:rounded-[3rem] p-2 sm:p-6 border-4 border-slate-800 shadow-2xl relative flex items-center justify-center">
-              <div className="grid grid-cols-3 grid-rows-3 gap-2 sm:gap-4 h-full w-full">
+              <div className="grid grid-cols-2 grid-rows-2 gap-2 sm:gap-4 h-full w-full">
                 {grid.map((row, r) => (
                   row.map((word, c) => (
                     <motion.button
@@ -964,7 +1058,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                     <button 
                       onClick={() => {
                         if (customReference) {
-                          onComplete(words.length * 10, time);
+                          const timePerWord = time / words.length;
+                          onComplete(words.length * 10, time, timePerWord);
                         } else if (currentLevelIdx < SPEED_LEVELS.length - 1) {
                           const nextIdx = currentLevelIdx + 1;
                           loadLevel(nextIdx, 1);
@@ -974,7 +1069,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       }}
                       className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
                     >
-                      {customReference ? "Finish Verse" : "Next Level"} <ChevronRight size={24} />
+                      {customReference ? "Next Daily Verse" : "Next Level"} <ChevronRight size={24} />
                     </button>
                   )
                 ) : (
@@ -982,14 +1077,20 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                     onClick={() => loadLevel(currentLevelIdx, round)}
                     className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
                   >
-                    Retry Round {round} <RotateCcw size={24} />
+                    Retry Verse <RotateCcw size={24} />
                   </button>
                 )}
                 <button 
-                  onClick={() => setGameState('LEVEL_SELECT')}
+                  onClick={() => {
+                    if (customReference) {
+                      onExit();
+                    } else {
+                      setGameState('LEVEL_SELECT');
+                    }
+                  }}
                   className="w-full py-4 bg-transparent text-slate-500 rounded-2xl font-black text-lg hover:text-white transition-all uppercase italic"
                 >
-                  Menu
+                  Go Back to Menu
                 </button>
               </div>
             </div>
@@ -1015,7 +1116,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                   onClick={() => loadLevel(currentLevelIdx, round)}
                   className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
                 >
-                  <RotateCcw size={24} /> Try Again
+                  <RotateCcw size={24} /> Retry Verse
                 </button>
                 <button 
                   onClick={() => {
@@ -1027,7 +1128,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                   }}
                   className="w-full py-4 bg-transparent text-slate-500 rounded-2xl font-black text-lg hover:text-white transition-all uppercase italic"
                 >
-                  Menu
+                  Go Back to Menu
                 </button>
               </div>
             </div>

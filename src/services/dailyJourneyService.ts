@@ -1,12 +1,24 @@
 import { db, doc } from '../firebase';
 import { getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { getDailyScheduleDay, saveDailySchedule } from '../lib/bibleDb';
+import { getDailyScheduleDay, saveDailySchedule, getDailyProgress, saveDailyProgress, getAllDailyProgress, initBibleDB } from '../lib/bibleDb';
 
 export interface DailyJourneyDay {
   date: string;
   month: string;
   theme: string;
   references: string[];
+  isCompleted?: boolean;
+  isInitialPass?: boolean;
+}
+
+export interface DailyProgress {
+  id: string; // date_reference
+  date: string;
+  reference: string;
+  bestTimePerWord: number;
+  completedCount: number;
+  lastPlayed: string;
+  isInitialPass: boolean;
 }
 
 const MONTHLY_THEMES: Record<string, string> = {
@@ -123,6 +135,28 @@ export const generateFullYearSchedule = async () => {
   await saveDailySchedule(days);
 };
 
+export const getAllScheduleDays = async (): Promise<DailyJourneyDay[]> => {
+  try {
+    const db = await initBibleDB();
+    const days = await db.getAll('daily_schedule');
+    const progress = await getAllDailyProgress();
+    
+    return days.map(day => {
+      const dayProgress = progress.filter(p => p.date === day.date);
+      const isCompleted = dayProgress.length === day.references.length;
+      const isInitialPass = dayProgress.length > 0 && dayProgress.every(p => p.isInitialPass);
+      
+      return {
+        ...day,
+        isCompleted,
+        isInitialPass
+      };
+    });
+  } catch (e) {
+    return [];
+  }
+};
+
 export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
   // 1. Try local IndexedDB first
   const localDay = await getDailyScheduleDay(dateStr);
@@ -157,6 +191,32 @@ export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyD
   };
 
   return dayData;
+};
+
+export const recordVerseCompletion = async (
+  date: string, 
+  reference: string, 
+  timePerWord: number
+): Promise<{ xp: number; isInitialPass: boolean }> => {
+  const id = `${date}_${reference}`;
+  const existing = await getDailyProgress(id);
+  
+  const isInitialPass = !existing && timePerWord < 1.0;
+  const xpPerWord = isInitialPass ? 3 : 1;
+  
+  const newProgress: DailyProgress = {
+    id,
+    date,
+    reference,
+    bestTimePerWord: existing ? Math.min(existing.bestTimePerWord, timePerWord) : timePerWord,
+    completedCount: (existing?.completedCount || 0) + 1,
+    lastPlayed: new Date().toISOString(),
+    isInitialPass: existing?.isInitialPass || isInitialPass
+  };
+  
+  await saveDailyProgress(newProgress);
+  
+  return { xp: xpPerWord, isInitialPass };
 };
 
 export const updateDailyLeaderboard = async (
