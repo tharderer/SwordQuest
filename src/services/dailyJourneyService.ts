@@ -1,5 +1,6 @@
 import { db, doc } from '../firebase';
 import { getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { getDailyScheduleDay, saveDailySchedule } from '../lib/bibleDb';
 
 export interface DailyJourneyDay {
   date: string;
@@ -87,7 +88,47 @@ const TOPICAL_LIBRARY: Record<string, string[]> = {
   ]
 };
 
+export const generateFullYearSchedule = async () => {
+  const days: DailyJourneyDay[] = [];
+  const startDate = new Date('2026-01-01');
+  
+  for (let i = 0; i < 366; i++) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + i);
+    
+    // Stop if we hit 2027 (handles leap year 366 vs 365)
+    if (date.getFullYear() > 2026) break;
+    
+    const dateStr = date.toISOString().split('T')[0];
+    const monthName = date.toLocaleString('default', { month: 'long' });
+    const theme = MONTHLY_THEMES[monthName] || "Faith";
+    const dayOfYear = i + 1;
+    
+    const monthVerses = TOPICAL_LIBRARY[monthName] || TOPICAL_LIBRARY["January"];
+    
+    // Deterministically pick 2 verses based on the day of the year to ensure variety
+    const idx1 = (dayOfYear * 2) % monthVerses.length;
+    const idx2 = (dayOfYear * 2 + 1) % monthVerses.length;
+    
+    const references = [monthVerses[idx1], monthVerses[idx2]];
+    
+    days.push({
+      date: dateStr,
+      month: monthName,
+      theme,
+      references
+    });
+  }
+  
+  await saveDailySchedule(days);
+};
+
 export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
+  // 1. Try local IndexedDB first
+  const localDay = await getDailyScheduleDay(dateStr);
+  if (localDay) return localDay;
+
+  // 2. Fallback to Firestore (for legacy or if local failed)
   const docRef = doc(db, 'daily_journey_2026', dateStr);
   const docSnap = await getDoc(docRef);
   
@@ -95,18 +136,16 @@ export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyD
     return docSnap.data() as DailyJourneyDay;
   }
   
-  // If not exists, generate it deterministically based on the date
+  // 3. Last resort: Generate on the fly (shouldn't happen if bundled)
   const date = new Date(dateStr);
   const monthName = date.toLocaleString('default', { month: 'long' });
   const theme = MONTHLY_THEMES[monthName] || "Faith";
   const dayOfMonth = date.getDate();
+  const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
   
   const monthVerses = TOPICAL_LIBRARY[monthName] || TOPICAL_LIBRARY["January"];
-  
-  // Deterministically pick 2 verses based on the day of the month
-  // We use modulo to wrap around if the library is smaller than the day
-  const idx1 = (dayOfMonth * 2) % monthVerses.length;
-  const idx2 = (dayOfMonth * 2 + 1) % monthVerses.length;
+  const idx1 = (dayOfYear * 2) % monthVerses.length;
+  const idx2 = (dayOfYear * 2 + 1) % monthVerses.length;
   
   const references = [monthVerses[idx1], monthVerses[idx2]];
   
@@ -117,13 +156,6 @@ export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyD
     references
   };
 
-  // Save to global collection so others can see the same verses
-  try {
-    await setDoc(docRef, dayData);
-  } catch (e) {
-    console.warn("Could not save daily journey day:", e);
-  }
-  
   return dayData;
 };
 

@@ -113,7 +113,7 @@ import { SequenceChomperGame } from './components/SequenceChomperGame';
 import { VerseDartsGame } from './components/VerseDartsGame';
 import { VerseTetrisGame } from './components/VerseTetrisGame';
 import { VerseCrushGame } from './components/VerseCrushGame';
-import { getDailyJourneyDay, updateDailyLeaderboard, DailyJourneyDay } from './services/dailyJourneyService';
+import { getDailyJourneyDay, updateDailyLeaderboard, DailyJourneyDay, generateFullYearSchedule } from './services/dailyJourneyService';
 import { SpeedVerseGame } from './components/SpeedVerseGame';
 import { BibleReader } from './components/BibleReader';
 import { cn } from './lib/utils';
@@ -228,7 +228,8 @@ import {
   getBooks,
   getChapters,
   getBibleVerses,
-  getAllVerses
+  getAllVerses,
+  isScheduleSeeded
 } from './lib/bibleDb';
 import { KJV_LIBRARY } from './lib/bibleData';
 
@@ -8049,24 +8050,27 @@ export default function App() {
         console.log("Starting Bible DB check...");
         const db = await initBibleDB();
         const seeded = await isBibleSeeded();
+        const scheduleSeeded = await isScheduleSeeded();
         setIsSeeded(seeded);
-        console.log("Bible DB check complete. Seeded:", seeded);
+        console.log("Bible DB check complete. Seeded:", seeded, "Schedule Seeded:", scheduleSeeded);
         
-        if (seeded) {
-          console.log("Bible already seeded, loading verses into memory...");
+        if (seeded && scheduleSeeded) {
+          console.log("Bible and Schedule already seeded, loading verses into memory...");
           const verses = await getAllVerses();
           if (verses.length > 0) {
             setAllVerses([...verses, ...(progress?.customVerses || [])]);
           }
           setDownloadProgress(100);
         } else {
-          console.log("Bible not seeded, starting download...");
+          console.log("Bible or Schedule not seeded, starting download...");
           setDownloadProgress(0);
           downloadFullKJV(async (progressVal) => {
             console.log(`Download progress: ${progressVal}%`);
             setDownloadProgress(progressVal);
             if (progressVal === 100) {
-              console.log("Download complete, loading verses into memory...");
+              console.log("Download complete, generating schedule...");
+              await generateFullYearSchedule();
+              console.log("Schedule generated, loading verses into memory...");
               const verses = await getAllVerses();
               if (verses.length > 0) {
                 setAllVerses([...verses, ...(progress?.customVerses || [])]);
@@ -9324,6 +9328,7 @@ export default function App() {
                 setDownloadError(null);
                 setDownloadProgress(0);
                 await downloadFullKJV((p) => setDownloadProgress(p), true);
+                await generateFullYearSchedule();
                 const verses = await getAllVerses();
                 if (verses.length > 0) {
                   setAllVerses([...verses, ...(progress?.customVerses || [])]);

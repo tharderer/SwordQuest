@@ -4,6 +4,7 @@ import { KJV_LIBRARY } from './bibleData';
 
 const DB_NAME = 'bible_db';
 const STORE_NAME = 'verses';
+const SCHEDULE_STORE = 'daily_schedule';
 
 export const BIBLE_BOOKS = [
   'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
@@ -89,8 +90,8 @@ export async function initBibleDB() {
   if (useFallback) throw new Error('Using local library fallback');
 
   try {
-    dbPromise = openDB(DB_NAME, 1, {
-      upgrade(db) {
+    dbPromise = openDB(DB_NAME, 2, {
+      upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, {
             keyPath: 'id',
@@ -98,6 +99,9 @@ export async function initBibleDB() {
           });
           store.createIndex('book', 'book');
           store.createIndex('reference', ['book', 'chapter', 'verse']);
+        }
+        if (!db.objectStoreNames.contains(SCHEDULE_STORE)) {
+          db.createObjectStore(SCHEDULE_STORE, { keyPath: 'date' });
         }
       },
       blocked() {
@@ -412,6 +416,35 @@ export async function clearBibleDB() {
 }
 
 let isDownloading = false;
+
+export async function saveDailySchedule(days: any[]) {
+  const db = await initBibleDB();
+  const tx = db.transaction(SCHEDULE_STORE, 'readwrite');
+  const store = tx.objectStore(SCHEDULE_STORE);
+  for (const day of days) {
+    await store.put(day);
+  }
+  await tx.done;
+}
+
+export async function getDailyScheduleDay(dateStr: string) {
+  try {
+    const db = await initBibleDB();
+    return await db.get(SCHEDULE_STORE, dateStr);
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function isScheduleSeeded(): Promise<boolean> {
+  try {
+    const db = await initBibleDB();
+    const count = await db.count(SCHEDULE_STORE);
+    return count >= 365;
+  } catch (e) {
+    return false;
+  }
+}
 
 export async function downloadFullKJV(onProgress?: (progress: number) => void, force: boolean = false) {
   if (isDownloading) return;
