@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { DailyJourneyDay, getAllScheduleDays, recordVerseCompletion } from '../services/dailyJourneyService';
 import { getAllDailyProgress } from '../lib/bibleDb';
-import { cn } from '../lib/utils';
+import { cn, getLocalDateString } from '../lib/utils';
 
 interface DailyJourneyHubProps {
   onStartDay: (day: DailyJourneyDay) => void;
@@ -37,7 +37,7 @@ export const DailyJourneyHub: React.FC<DailyJourneyHubProps> = ({ onStartDay, on
   useEffect(() => {
     const loadData = async () => {
       const allDays = await getAllScheduleDays();
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString();
       
       // Filter to only show days up to today
       const visibleDays = allDays.filter(d => d.date <= today).sort((a, b) => b.date.localeCompare(a.date));
@@ -88,7 +88,7 @@ export const DailyJourneyHub: React.FC<DailyJourneyHubProps> = ({ onStartDay, on
     );
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const todayDay = days.find(d => d.date === todayStr);
 
   return (

@@ -5,7 +5,7 @@ import { KJV_LIBRARY } from './bibleData';
 const DB_NAME = 'bible_db';
 const STORE_NAME = 'verses';
 const SCHEDULE_STORE = 'daily_schedule';
-const PROGRESS_STORE = 'daily_progress';
+export const PROGRESS_STORE = 'daily_progress';
 
 export const BIBLE_BOOKS = [
   'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',

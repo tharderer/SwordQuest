@@ -1,3 +1,11 @@
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced' | 'master' | 'extreme';
+
+export type Team = {
+  name: string;
+  score: number;
+  color: string;
+};
+
 export interface Verse {
   book: string;
   chapter: number;

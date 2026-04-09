@@ -1,5 +1,6 @@
 import { UserProgress, Verse, DailyQuest, VerseSet } from '../types';
 import { KJV_LIBRARY } from './bibleData';
+import { getLocalDateString } from './utils';
 
 const STORAGE_KEY = 'sword_quest_progress';
 
@@ -143,7 +144,7 @@ export const updateXP = (amount: number) => {
   progress.leaguePoints += amount;
   
   // Update XP history
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const historyIndex = progress.xpHistory.findIndex(h => h.date === today);
   if (historyIndex >= 0) {
     progress.xpHistory[historyIndex].xp += amount;

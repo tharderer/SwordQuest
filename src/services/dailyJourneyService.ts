@@ -1,6 +1,6 @@
-import { db, doc } from '../firebase';
+import { db, doc, auth } from '../firebase';
 import { getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { getDailyScheduleDay, saveDailySchedule, getDailyProgress, saveDailyProgress, getAllDailyProgress, initBibleDB } from '../lib/bibleDb';
+import { getDailyScheduleDay, saveDailySchedule, getDailyProgress, saveDailyProgress, getAllDailyProgress, initBibleDB, PROGRESS_STORE } from '../lib/bibleDb';
 
 export interface DailyJourneyDay {
   date: string;
@@ -216,7 +216,48 @@ export const recordVerseCompletion = async (
   
   await saveDailyProgress(newProgress);
   
+  // Sync to Firebase if logged in
+  if (auth.currentUser) {
+    try {
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userDocRef, {
+        [`dailyJourneyProgress.verses.${id.replace(/\./g, '_')}`]: newProgress,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Failed to sync verse completion to Firebase:", error);
+    }
+  }
+  
   return { xp: xpPerWord, isInitialPass };
+};
+
+export const syncDailyProgress = async (userId: string) => {
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userDocRef);
+    
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      const firebaseVerses = data.dailyJourneyProgress?.verses || {};
+      
+      const db = await initBibleDB();
+      const tx = db.transaction(PROGRESS_STORE, 'readwrite');
+      const store = tx.objectStore(PROGRESS_STORE);
+      
+      for (const key in firebaseVerses) {
+        const progress = firebaseVerses[key];
+        // Ensure ID is correct (Firebase keys might have replaced dots with underscores)
+        await store.put(progress);
+      }
+      
+      await tx.done;
+      return true;
+    }
+  } catch (error) {
+    console.error("Failed to sync daily progress from Firebase:", error);
+  }
+  return false;
 };
 
 export const updateDailyLeaderboard = async (

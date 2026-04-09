@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Trophy, Play, RotateCcw, ChevronRight, Pause, ArrowLeft, Timer, Skull } from 'lucide-react';
-import { getVerseByRef, parseReference } from '../lib/bibleDb';
+import { Heart, Trophy, Play, RotateCcw, ChevronRight, Pause, ArrowLeft, Timer, Skull, CheckCircle2, Zap } from 'lucide-react';
+import { DailyJourneyDay, getAllScheduleDays, recordVerseCompletion } from '../services/dailyJourneyService';
+import { getVerseByRef, parseReference, getDailyProgress, getAllDailyProgress } from '../lib/bibleDb';
 import { cn } from '../lib/utils';
 
 import { auth, db } from '../firebase';
@@ -100,6 +101,9 @@ interface SpeedVerseProps {
   initialLevelIdx?: number;
   initialRound?: number;
   customReference?: string;
+  dailyDate?: string;
+  isReviewMode?: boolean;
+  isLastVerse?: boolean;
 }
 
 interface SpeedVerseWord {
@@ -175,7 +179,10 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   userProfile,
   initialLevelIdx,
   initialRound,
-  customReference
+  customReference,
+  dailyDate,
+  isReviewMode,
+  isLastVerse
 }) => {
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [gameState, setGameState] = useState<'LEVEL_SELECT' | 'PLAYING' | 'VICTORY' | 'GAMEOVER' | 'LOADING'>(
@@ -197,6 +204,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const [round, setRound] = useState(1);
   const [showLeaderboard, setShowLeaderboard] = useState<number | null>(null);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+  const [isAlreadyPassed, setIsAlreadyPassed] = useState(false);
+  const [earnedXP, setEarnedXP] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -205,7 +214,40 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
   const gridRef = useRef<SpeedVerseWord[][]>([]);
   const verseRef = useRef<{ reference: string, text: string } | null>(null);
   const loadingRef = useRef<string | null>(null);
+  const lastLoadedRef = useRef<string | null>(null);
   const didInitialLoad = useRef(false);
+  const customReferenceRef = useRef(customReference);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Update ref when prop changes
+  useEffect(() => {
+    customReferenceRef.current = customReference;
+  }, [customReference]);
+
+  // Auto-scroll current word into view
+  useEffect(() => {
+    const scrollActiveWord = () => {
+      if (scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const activeElement = container.querySelector('[data-active="true"]') as HTMLElement;
+        if (activeElement) {
+          const containerHeight = container.clientHeight;
+          const elementTop = activeElement.offsetTop;
+          const elementHeight = activeElement.offsetHeight;
+          
+          // Center the active element vertically in the scroll container
+          container.scrollTo({
+            top: elementTop - (containerHeight / 2) + (elementHeight / 2),
+            behavior: 'smooth'
+          });
+        }
+      }
+    };
+
+    // Small delay to ensure DOM has updated and layout is stable
+    const timeoutId = setTimeout(scrollActiveWord, 100);
+    return () => clearTimeout(timeoutId);
+  }, [nextWordIndex, gameState]);
 
   // Load progress
   useEffect(() => {
@@ -396,7 +438,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
   // Load Level
   const loadLevel = useCallback(async (idx: number, currentRound: number = 1, customRef?: string) => {
-    const effectiveRef = customRef || (idx === -1 ? customReference : undefined);
+    const effectiveRef = customRef || (idx === -1 ? customReferenceRef.current : undefined);
     const level = effectiveRef ? { id: -1, reference: effectiveRef, title: "Daily Challenge" } : SPEED_LEVELS[idx];
     
     if (!level) {
@@ -405,12 +447,16 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       return;
     }
 
+    // Normalize for comparison
+    const normalize = (s: string | undefined | null) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const normalizedRef = normalize(level.reference);
+
     // Prevent duplicate loading of the same reference
-    if (loadingRef.current === level.reference) return;
-    loadingRef.current = level.reference;
+    if (loadingRef.current === normalizedRef) return;
+    loadingRef.current = normalizedRef;
 
     // If we already have the verse and it's a retry/same level, skip the loading state for a smoother transition
-    const isRetry = verseRef.current && (level.reference === verseRef.current.reference);
+    const isRetry = verseRef.current && (normalize(verseRef.current.reference) === normalizedRef);
     
     if (!isRetry) {
       setGameState('LOADING');
@@ -424,10 +470,20 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     }
     
     try {
+      // Check if already passed for daily/review mode
+      if (customRef && dailyDate) {
+        const id = `${dailyDate}_${customRef}`;
+        const progress = await getDailyProgress(id);
+        setIsAlreadyPassed(!!progress);
+      } else {
+        setIsAlreadyPassed(false);
+      }
+
       const v = isRetry ? verseRef.current : await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
       if (v) {
         setVerse(v);
         verseRef.current = v;
+        lastLoadedRef.current = level.reference;
         const verseWords = v.text.split(/\s+/).filter(w => w.length > 0);
         setWords(verseWords);
         setNextWordIndex(0);
@@ -501,7 +557,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
 
   useEffect(() => {
     // Skip if already loading
-    if (gameState === 'LOADING' && loadingRef.current) return;
+    if (loadingRef.current) return;
 
     // Initial load
     if (!didInitialLoad.current) {
@@ -523,7 +579,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     }
 
     // Handle prop changes for Daily Verse (Next button)
-    if (customReference && verseRef.current && customReference !== verseRef.current.reference) {
+    const normalize = (s: string | undefined | null) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    if (customReference && lastLoadedRef.current && normalize(customReference) !== normalize(lastLoadedRef.current)) {
       loadLevel(-1, 1, customReference);
     }
   }, [gameState, initialLevelIdx, initialRound, customReference, loadLevel]);
@@ -540,6 +597,8 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
     
     // Check if it's the correct next word by text comparison
     const expectedText = words[nextWordIndexRef.current];
+    if (!expectedText) return;
+    
     if (clickedWord.text.toLowerCase().replace(/[^\w]/g, '') === expectedText.toLowerCase().replace(/[^\w]/g, '')) {
       // Correct!
       const newNextIndex = nextWordIndexRef.current + 1;
@@ -626,6 +685,22 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
         if (level && level.id !== -1) {
           saveLevelProgress(level.id, time, round);
         }
+        
+        // Calculate XP for victory screen
+        if (customReference && dailyDate) {
+          const timePerWord = time / words.length;
+          const isInitialPass = !isAlreadyPassed && timePerWord < 1.0;
+          const xpPerWord = isInitialPass ? 3 : 1;
+          setEarnedXP(xpPerWord * words.length);
+          
+          // Record completion immediately so it's saved even if they don't click "Next"
+          recordVerseCompletion(dailyDate, customReference, timePerWord).then(() => {
+            setIsAlreadyPassed(true);
+          });
+        } else {
+          setEarnedXP(words.length * 10);
+        }
+        
         setGameState('VICTORY');
         return;
       }
@@ -773,7 +848,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
       {(gameState === 'PLAYING' || gameState === 'VICTORY' || gameState === 'GAMEOVER') && (
         <>
           {/* HUD */}
-          <div className="flex-shrink-0 p-4 flex justify-between items-start z-20 bg-gradient-to-b from-slate-950/80 to-transparent">
+          <div className="flex-shrink-0 p-4 flex justify-between items-start bg-slate-950 border-b border-white/10 relative z-10">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <button 
@@ -790,7 +865,13 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 </button>
                 <div className="px-3 py-1 bg-amber-500 rounded-full text-slate-950 font-black text-xs uppercase italic">Level {currentLevelIdx + 1}</div>
               </div>
-              <h2 className="font-black text-xl tracking-tighter uppercase italic text-white leading-tight">{verse?.reference}</h2>
+              <h2 className="font-black text-lg sm:text-xl tracking-tighter uppercase italic text-white leading-tight">{verse?.reference}</h2>
+              {isAlreadyPassed && (
+                <div className="flex items-center gap-1 text-emerald-400">
+                  <CheckCircle2 size={12} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Already Passed (1 XP / word)</span>
+                </div>
+              )}
             </div>
             <div className="flex flex-col items-end gap-2">
               <div className="flex gap-2 items-center">
@@ -820,36 +901,40 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           </div>
 
           {/* Verse Progress Display */}
-          <div className="flex-shrink-0 px-2 sm:px-4 mb-1">
-            <div className="bg-slate-900/90 p-2 sm:p-3 rounded-2xl border-2 border-slate-800 shadow-2xl max-h-[20vh] overflow-y-auto custom-scrollbar">
+          <div className="flex-shrink-0 px-2 sm:px-4 my-2">
+            <div 
+              ref={scrollContainerRef}
+              className="bg-slate-900/90 p-2 sm:p-3 rounded-2xl border-2 border-slate-800 shadow-2xl max-h-[20vh] overflow-y-auto custom-scrollbar relative z-20"
+            >
               <div className="flex flex-wrap gap-1 sm:gap-1.5 justify-center">
                 {words.map((word, i) => {
                   const isFound = i < nextWordIndex;
                   const isCurrent = i === nextWordIndex;
-                  // In Round 3, hide the next word and only show found words
-                  const isVisible = round === 1 || isFound || (round === 2 && isCurrent);
-                  const shouldHighlight = isCurrent && round !== 3;
+                  // Ensure the current word is always visible for focus, even in memory rounds
+                  const isVisible = isFound || isCurrent || round === 1;
+                  const shouldHighlight = isCurrent;
                   
                   return (
                     <motion.span 
                       key={i}
+                      data-active={isCurrent}
                       initial={false}
-                      animate={shouldHighlight ? { scale: 1.2, zIndex: 20 } : { scale: 1, zIndex: 10 }}
+                      animate={shouldHighlight ? { scale: 1.25, zIndex: 20 } : { scale: 1, zIndex: 10 }}
                       className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs sm:text-sm md:text-base font-black transition-all duration-300 border-2 uppercase tracking-tighter",
+                        "px-3 py-1.5 rounded-xl text-xs sm:text-sm md:text-base font-black transition-all duration-300 border-2 uppercase tracking-tighter",
                         shouldHighlight 
-                          ? "bg-white text-slate-950 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.6)] animate-pulse" 
+                          ? "bg-white text-slate-950 border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.8)] ring-4 ring-amber-500/20" 
                           : cn(
                               WORD_BG_COLORS[i % WORD_BG_COLORS.length],
                               WORD_TEXT_COLORS[i % WORD_TEXT_COLORS.length],
                               isFound 
                                 ? "border-current opacity-100 shadow-[0_0_10px_rgba(255,255,255,0.1)]"
-                                : "border-transparent opacity-20 grayscale-[0.5]"
+                                : "border-transparent opacity-10 grayscale"
                             ),
                         !isVisible && "opacity-0 pointer-events-none"
                       )}
                     >
-                      {word}
+                      {round === 3 && isCurrent && !isFound ? "???" : word}
                     </motion.span>
                   );
                 })}
@@ -1045,6 +1130,17 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                 Target: Under {words.length}.000s ({time <= words.length * 1000 ? "PASSED" : "FAILED"})
               </p>
               
+              {earnedXP !== null && time <= words.length * 1000 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl py-3 px-4 flex items-center justify-center gap-2"
+                >
+                  <Zap size={20} className="text-amber-500 fill-amber-500" />
+                  <span className="text-xl font-black text-amber-500">+{earnedXP} XP</span>
+                </motion.div>
+              )}
+              
               <div className="space-y-3">
                 {time <= words.length * 1000 ? (
                   (round < 3 && !customReference) ? (
@@ -1059,7 +1155,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       onClick={() => {
                         if (customReference) {
                           const timePerWord = time / words.length;
-                          onComplete(words.length * 10, time, timePerWord);
+                          onComplete(earnedXP || 0, time, timePerWord);
                         } else if (currentLevelIdx < SPEED_LEVELS.length - 1) {
                           const nextIdx = currentLevelIdx + 1;
                           loadLevel(nextIdx, 1);
@@ -1069,7 +1165,7 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
                       }}
                       className="w-full py-4 bg-emerald-500 text-slate-950 rounded-2xl font-black text-xl shadow-lg hover:scale-105 active:scale-95 transition-all uppercase italic flex items-center justify-center gap-2"
                     >
-                      {customReference ? "Next Daily Verse" : "Next Level"} <ChevronRight size={24} />
+                      {customReference ? (isLastVerse ? "Finish Session" : "Next Daily Verse") : "Next Level"} <ChevronRight size={24} />
                     </button>
                   )
                 ) : (
