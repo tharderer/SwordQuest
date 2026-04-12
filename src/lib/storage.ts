@@ -164,6 +164,47 @@ export const updateXP = (amount: number) => {
   return progress;
 };
 
+export const addVerseXP = (verseKey: string, amount: number, isReview: boolean) => {
+  const progress = getProgress();
+  const today = getLocalDateString();
+  
+  if (!progress.dailyReviewCounts) progress.dailyReviewCounts = {};
+  
+  if (isReview) {
+    const reviewData = progress.dailyReviewCounts[verseKey] || { count: 0, lastDate: today };
+    
+    // Reset count if it's a new day
+    if (reviewData.lastDate !== today) {
+      reviewData.count = 0;
+      reviewData.lastDate = today;
+    }
+    
+    if (reviewData.count >= 3) {
+      // Limit reached, no XP awarded
+      return progress;
+    }
+    
+    reviewData.count += 1;
+    progress.dailyReviewCounts[verseKey] = reviewData;
+    saveProgress(progress); // Save the updated count
+  }
+  
+  return updateXP(amount);
+};
+
+export const getRemainingReviewXP = (verseKey: string, wordCount: number): number => {
+  const progress = getProgress();
+  const today = getLocalDateString();
+  
+  if (!progress.dailyReviewCounts) return 3 * wordCount;
+  
+  const reviewData = progress.dailyReviewCounts[verseKey];
+  if (!reviewData || reviewData.lastDate !== today) return 3 * wordCount;
+  
+  const remainingReviews = Math.max(0, 3 - reviewData.count);
+  return remainingReviews * wordCount;
+};
+
 export const checkStreak = () => {
   const progress = getProgress();
   const now = new Date();

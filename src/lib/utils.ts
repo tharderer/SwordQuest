@@ -11,3 +11,12 @@ export function getLocalDateString(date: Date = new Date()) {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+export function parseLocalDate(dateStr: string) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function formatLocalDate(dateStr: string, options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' }) {
+  return parseLocalDate(dateStr).toLocaleDateString('default', options);
+}

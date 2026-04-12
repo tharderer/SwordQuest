@@ -89,6 +89,8 @@ const hymnUrls = [
 interface SpeedVerseProps {
   onComplete: (xp: number, timeMs?: number, timePerWord?: number) => void;
   onUpdateXP: (xp: number) => void;
+  onUpdateVerseXP?: (verseKey: string, xp: number, isReview: boolean) => void;
+  getRemainingReviewXP?: (verseKey: string, wordCount: number) => number;
   onExit: () => void;
   isMusicEnabled: boolean;
   setIsMusicEnabled: (enabled: boolean) => void;
@@ -168,6 +170,8 @@ const WORD_TEXT_COLORS = [
 export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({ 
   onComplete, 
   onUpdateXP,
+  onUpdateVerseXP,
+  getRemainingReviewXP,
   onExit, 
   isMusicEnabled, 
   setIsMusicEnabled, 
@@ -691,7 +695,15 @@ export const SpeedVerseGame: React.FC<SpeedVerseProps> = ({
           const timePerWord = time / words.length;
           const isInitialPass = !isAlreadyPassed && timePerWord < 1.0;
           const xpPerWord = isInitialPass ? 3 : 1;
-          setEarnedXP(xpPerWord * words.length);
+          let calculatedXP = xpPerWord * words.length;
+          
+          // Apply daily limit for reviews
+          if (!isInitialPass && getRemainingReviewXP) {
+            const remaining = getRemainingReviewXP(customReference, words.length);
+            calculatedXP = Math.min(calculatedXP, remaining);
+          }
+          
+          setEarnedXP(calculatedXP);
           
           // Record completion immediately so it's saved even if they don't click "Next"
           recordVerseCompletion(dailyDate, customReference, timePerWord).then(() => {

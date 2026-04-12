@@ -16,6 +16,7 @@ import {
   BookOpen, 
   Play, 
   CheckCircle2, 
+  Circle,
   ChevronRight, 
   Star, 
   Sword,
@@ -132,7 +133,7 @@ import { BibleJeopardyGame } from './components/BibleJeopardyGame';
 import { EndlessBlitzGame } from './components/EndlessBlitzGame';
 import { TriviaHUD, MathHUD, HUD, TowerBlock, TowerStack } from './components/TriviaTowerComponents';
 import { ChronologyTowerGame, SpellingTowerGame, ParableTowerGame, MathTowerGame } from './components/TowerGames';
-import { cn, getLocalDateString } from './lib/utils';
+import { cn, getLocalDateString, formatLocalDate } from './lib/utils';
 import { Verse, UserProgress, VerseSet, Difficulty } from './types';
 import { PROMINENT_REFERENCES } from './constants';
 
@@ -143,6 +144,8 @@ import {
   getProgress, 
   saveProgress, 
   updateXP, 
+  addVerseXP,
+  getRemainingReviewXP,
   checkStreak, 
   addCustomVerse, 
   useHeart, 
@@ -336,6 +339,7 @@ export default function App() {
   const [jeopardyDifficulty, setJeopardyDifficulty] = useState<JeopardyDifficulty>('medium');
   const [jeopardyMode, setJeopardyMode] = useState<JeopardyMode>('bible');
   const [savedJeopardyBoards, setSavedJeopardyBoards] = useState<JeopardyBoard[]>([]);
+  const [potentialXP, setPotentialXP] = useState<number>(0);
   
   // Firebase Auth State
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -411,6 +415,29 @@ export default function App() {
     fetchDaily();
   }, [user]);
 
+  useEffect(() => {
+    const calcXP = async () => {
+      if (!dailyDay) return;
+      let totalXP = 0;
+      for (const ref of dailyDay.references) {
+        const parsed = parseReference(ref);
+        if (parsed) {
+          const v = await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
+          if (v) {
+            const words = v.text.split(/\s+/).filter(w => w.length > 0).length;
+            if (dailyDay.isCompleted) {
+              totalXP += getRemainingReviewXP(ref, words);
+            } else {
+              totalXP += words * 3;
+            }
+          }
+        }
+      }
+      setPotentialXP(totalXP);
+    };
+    calcXP();
+  }, [dailyDay, progress]);
+
   const startDailyJourney = (day: DailyJourneyDay, startIdx: number = 0) => {
     setDailyDay(day);
     setDailyVerseIdx(startIdx);
@@ -422,8 +449,15 @@ export default function App() {
     if (timeMs !== undefined && timePerWord !== undefined && (dailyDay || isReviewMode)) {
       // XP is already recorded in SpeedVerseGame and passed as the 'xp' argument
       if (progress) {
-        const newProgress = updateXP(xp);
-        setProgress(newProgress);
+        const verseRef = isReviewMode ? reviewQueue[dailyVerseIdx]?.reference : dailyDay?.references[dailyVerseIdx];
+        if (verseRef) {
+          const isReview = isReviewMode || dailyDay?.isCompleted;
+          const newProgress = addVerseXP(verseRef, xp, !!isReview);
+          setProgress(newProgress);
+        } else {
+          const newProgress = updateXP(xp);
+          setProgress(newProgress);
+        }
       }
       
       const newTimes = [...dailyTimes, timeMs];
@@ -949,9 +983,23 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <h2 className="text-4xl font-black mb-2 italic uppercase tracking-tighter">Day {new Date(dailyDay.date).getDate()}</h2>
+                    <h2 className="text-4xl font-black mb-2 italic uppercase tracking-tighter">Day {dailyDay.dayOfYear}</h2>
+                    <div className="flex items-center gap-2 mb-4">
+                      {dailyDay.isCompleted ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-500/30">
+                          <CheckCircle2 size={12} /> Passed
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-500/30">
+                          <Circle size={12} /> Not Passed
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20">
+                        <Zap size={12} className="text-amber-400" /> {potentialXP} XP {dailyDay.isCompleted ? 'Available' : 'Potential'}
+                      </div>
+                    </div>
                     <p className="text-indigo-100 mb-8 font-medium max-w-md">
-                      Complete today's 2 verses to climb the {dailyDay.month} leaderboard!
+                      {formatLocalDate(dailyDay.date, { month: 'long', day: 'numeric', year: 'numeric' })} • {dailyDay.isCompleted ? "You've passed today's verses! Review them to earn more XP." : `Complete today's 2 verses to climb the ${dailyDay.month} leaderboard!`}
                     </p>
 
                     <div className="flex flex-wrap gap-4">
@@ -959,7 +1007,7 @@ export default function App() {
                         onClick={() => startDailyJourney(dailyDay)}
                         className="px-8 py-4 bg-white text-indigo-600 rounded-2xl font-black text-lg shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 uppercase italic"
                       >
-                        <Play size={24} fill="currentColor" /> Start Today
+                        <Play size={24} fill="currentColor" /> {dailyDay.isCompleted ? 'Review Today' : 'Start Today'}
                       </button>
                       
                       <div className="flex items-center gap-2 px-6 py-4 bg-black/20 backdrop-blur-md rounded-2xl border border-white/10">
@@ -1181,7 +1229,18 @@ export default function App() {
                 PLAY MATH TOWER
               </motion.button>
 
-// (Removed)
+              {/* Bible Jeopardy Action Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleStartJeopardy}
+                className="w-full py-6 bg-slate-950 text-white rounded-3xl font-black text-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 group border-b-8 border-slate-800"
+              >
+                <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+                  <HelpCircle size={28} className="text-white" />
+                </div>
+                BIBLE JEOPARDY
+              </motion.button>
 
               {/* Missionary Journeys Action Button */}
               <motion.button
@@ -1673,6 +1732,7 @@ export default function App() {
                 setView('daily_journey');
               }}
               onExit={() => setView('dashboard')}
+              progress={progress}
             />
           </motion.div>
         )}
@@ -1690,6 +1750,7 @@ export default function App() {
               onUpdateXP={(xp) => {
                 // XP is handled in handleDailyComplete for Daily Journey
               }}
+              getRemainingReviewXP={getRemainingReviewXP}
               onExit={() => setView('daily_hub')}
               isMusicEnabled={isMusicEnabled}
               setIsMusicEnabled={setIsMusicEnabled}
@@ -1723,19 +1784,38 @@ export default function App() {
             className="h-full flex flex-col bg-slate-950"
           >
             <SpeedVerseGame 
-              onComplete={(xp) => {
+              onComplete={(xp, timeMs, timePerWord) => {
                 if (progress) {
-                  const newProgress = updateXP(xp);
-                  setProgress(newProgress);
+                  // For Daily Journey, we use addVerseXP to handle limits
+                  if (dailyDay || isReviewMode) {
+                    const verseRef = isReviewMode ? reviewQueue[dailyVerseIdx]?.reference : dailyDay?.references[dailyVerseIdx];
+                    if (verseRef) {
+                      const isReview = isReviewMode || dailyDay?.isCompleted;
+                      const newProgress = addVerseXP(verseRef, xp, !!isReview);
+                      setProgress(newProgress);
+                    }
+                  } else {
+                    const newProgress = updateXP(xp);
+                    setProgress(newProgress);
+                  }
                 }
                 setView('dashboard');
               }}
               onUpdateXP={(xp) => {
-                if (progress) {
+                // This is called for individual verse completions in Daily Journey
+                if (progress && (dailyDay || isReviewMode)) {
+                  const verseRef = isReviewMode ? reviewQueue[dailyVerseIdx]?.reference : dailyDay?.references[dailyVerseIdx];
+                  if (verseRef) {
+                    const isReview = isReviewMode || dailyDay?.isCompleted;
+                    const newProgress = addVerseXP(verseRef, xp, !!isReview);
+                    setProgress(newProgress);
+                  }
+                } else if (progress) {
                   const newProgress = updateXP(xp);
                   setProgress(newProgress);
                 }
               }}
+              getRemainingReviewXP={getRemainingReviewXP}
               onExit={() => setView('dashboard')}
               isMusicEnabled={isMusicEnabled}
               setIsMusicEnabled={setIsMusicEnabled}
@@ -2026,11 +2106,20 @@ export default function App() {
                 ) : (
                   progress?.masteredVerses.map((verseRef, i) => {
                     const verse = allVerses.find(v => `${v.book} ${v.chapter}:${v.verse}` === verseRef);
+                    const wordCount = verse ? verse.text.split(/\s+/).filter(Boolean).length : 0;
+                    const remainingXP = getRemainingReviewXP(verseRef, wordCount);
+                    
                     return (
                       <div key={i} className="bg-gray-50 p-4 rounded-2xl border-2 border-gray-100/50">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                          <span className="font-black text-sm tracking-tight">{verseRef}</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                            <span className="font-black text-sm tracking-tight">{verseRef}</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                            <Zap size={10} className="text-blue-500 fill-blue-500" />
+                            <span className="text-[10px] font-black text-blue-600">{remainingXP} XP LEFT</span>
+                          </div>
                         </div>
                         <p className="text-sm text-gray-600 italic leading-relaxed">
                           {verse?.text || "Verse content unavailable"}

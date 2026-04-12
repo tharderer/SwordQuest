@@ -17,17 +17,55 @@ import {
   Zap,
   RotateCcw
 } from 'lucide-react';
-import { DailyJourneyDay, getAllScheduleDays, recordVerseCompletion } from '../services/dailyJourneyService';
-import { getAllDailyProgress } from '../lib/bibleDb';
-import { cn, getLocalDateString } from '../lib/utils';
+import { DailyProgress, DailyJourneyDay, getAllScheduleDays, recordVerseCompletion } from '../services/dailyJourneyService';
+import { getAllDailyProgress, getVerseByRef, parseReference } from '../lib/bibleDb';
+import { cn, getLocalDateString, formatLocalDate } from '../lib/utils';
+import { getRemainingReviewXP, getProgress } from '../lib/storage';
+import { UserProgress } from '../types';
 
 interface DailyJourneyHubProps {
   onStartDay: (day: DailyJourneyDay) => void;
   onStartReview: (queue: { date: string; reference: string }[]) => void;
   onExit: () => void;
+  progress: UserProgress | null;
 }
 
-export const DailyJourneyHub: React.FC<DailyJourneyHubProps> = ({ onStartDay, onStartReview, onExit }) => {
+const DayXP = ({ day, progress }: { day: DailyJourneyDay, progress: UserProgress | null }) => {
+  const [remainingXP, setRemainingXP] = useState<number | null>(null);
+
+  useEffect(() => {
+    const calc = async () => {
+      let total = 0;
+      for (const ref of day.references) {
+        const parsed = parseReference(ref);
+        if (parsed) {
+          const verse = await getVerseByRef(parsed.book, parsed.chapter, parsed.startVerse);
+          if (verse) {
+            const words = verse.text.split(/\s+/).filter(Boolean).length;
+            if (day.isCompleted) {
+              total += getRemainingReviewXP(ref, words);
+            } else {
+              total += words * 3;
+            }
+          }
+        }
+      }
+      setRemainingXP(total);
+    };
+    calc();
+  }, [day, progress]);
+
+  if (remainingXP === null || remainingXP === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1 bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter">
+      <Zap size={8} fill="currentColor" />
+      {remainingXP} XP {day.isCompleted ? 'Available' : 'Potential'}
+    </div>
+  );
+};
+
+export const DailyJourneyHub: React.FC<DailyJourneyHubProps> = ({ onStartDay, onStartReview, onExit, progress }) => {
   const [days, setDays] = useState<DailyJourneyDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState(0);
@@ -139,11 +177,14 @@ export const DailyJourneyHub: React.FC<DailyJourneyHubProps> = ({ onStartDay, on
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <span className="text-xs font-black uppercase tracking-widest opacity-80">
-                      {todayDay.month} {new Date(todayDay.date).getDate()}
+                      Day {todayDay.dayOfYear} • {formatLocalDate(todayDay.date, { month: 'long', day: 'numeric' })}
                     </span>
                     <h3 className="text-3xl font-black italic tracking-tighter uppercase mt-1">
                       {todayDay.theme}
                     </h3>
+                    <div className="mt-2">
+                      <DayXP day={todayDay} progress={progress} />
+                    </div>
                   </div>
                   {todayDay.isCompleted ? (
                     <div className="bg-emerald-500 text-white p-2 rounded-full">
@@ -225,13 +266,14 @@ export const DailyJourneyHub: React.FC<DailyJourneyHubProps> = ({ onStartDay, on
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                      {new Date(day.date).toLocaleDateString('default', { month: 'short', day: 'numeric' })}
+                      Day {day.dayOfYear} • {formatLocalDate(day.date, { month: 'short', day: 'numeric' })}
                     </span>
                     {day.isInitialPass && (
                       <span className="text-[8px] font-black bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">
                         Mastered
                       </span>
                     )}
+                    <DayXP day={day} progress={progress} />
                   </div>
                   <h4 className="font-black italic uppercase tracking-tight truncate group-hover:text-amber-400 transition-colors">
                     {day.theme}

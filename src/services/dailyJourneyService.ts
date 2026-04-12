@@ -1,12 +1,14 @@
 import { db, doc, auth } from '../firebase';
 import { getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDailyScheduleDay, saveDailySchedule, getDailyProgress, saveDailyProgress, getAllDailyProgress, initBibleDB, PROGRESS_STORE } from '../lib/bibleDb';
+import { parseLocalDate } from '../lib/utils';
 
 export interface DailyJourneyDay {
   date: string;
   month: string;
   theme: string;
   references: string[];
+  dayOfYear: number;
   isCompleted?: boolean;
   isInitialPass?: boolean;
 }
@@ -128,7 +130,8 @@ export const generateFullYearSchedule = async () => {
       date: dateStr,
       month: monthName,
       theme,
-      references
+      references,
+      dayOfYear
     });
   }
   
@@ -146,8 +149,17 @@ export const getAllScheduleDays = async (): Promise<DailyJourneyDay[]> => {
       const isCompleted = dayProgress.length === day.references.length;
       const isInitialPass = dayProgress.length > 0 && dayProgress.every(p => p.isInitialPass);
       
+      // Ensure dayOfYear exists for older records
+      let dayOfYear = day.dayOfYear;
+      if (!dayOfYear) {
+        const d = parseLocalDate(day.date);
+        const start = new Date(d.getFullYear(), 0, 1);
+        dayOfYear = Math.floor((d.getTime() - start.getTime()) / 86400000) + 1;
+      }
+
       return {
         ...day,
+        dayOfYear,
         isCompleted,
         isInitialPass
       };
@@ -159,38 +171,56 @@ export const getAllScheduleDays = async (): Promise<DailyJourneyDay[]> => {
 
 export const getDailyJourneyDay = async (dateStr: string): Promise<DailyJourneyDay | null> => {
   // 1. Try local IndexedDB first
-  const localDay = await getDailyScheduleDay(dateStr);
-  if (localDay) return localDay;
-
-  // 2. Fallback to Firestore (for legacy or if local failed)
-  const docRef = doc(db, 'daily_journey_2026', dateStr);
-  const docSnap = await getDoc(docRef);
+  let day = await getDailyScheduleDay(dateStr);
   
-  if (docSnap.exists()) {
-    return docSnap.data() as DailyJourneyDay;
+  if (!day) {
+    // 2. Fallback to Firestore (for legacy or if local failed)
+    const docRef = doc(db, 'daily_journey_2026', dateStr);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      day = docSnap.data() as DailyJourneyDay;
+    }
   }
   
-  // 3. Last resort: Generate on the fly (shouldn't happen if bundled)
-  const date = new Date(dateStr);
-  const monthName = date.toLocaleString('default', { month: 'long' });
-  const theme = MONTHLY_THEMES[monthName] || "Faith";
-  const dayOfMonth = date.getDate();
-  const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
-  
-  const monthVerses = TOPICAL_LIBRARY[monthName] || TOPICAL_LIBRARY["January"];
-  const idx1 = (dayOfYear * 2) % monthVerses.length;
-  const idx2 = (dayOfYear * 2 + 1) % monthVerses.length;
-  
-  const references = [monthVerses[idx1], monthVerses[idx2]];
-  
-  const dayData: DailyJourneyDay = {
-    date: dateStr,
-    month: monthName,
-    theme,
-    references
-  };
+  if (!day) {
+    // 3. Last resort: Generate on the fly (shouldn't happen if bundled)
+    const date = parseLocalDate(dateStr);
+    const monthName = date.toLocaleString('default', { month: 'long' });
+    const theme = MONTHLY_THEMES[monthName] || "Faith";
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / 86400000) + 1;
+    
+    const monthVerses = TOPICAL_LIBRARY[monthName] || TOPICAL_LIBRARY["January"];
+    const idx1 = (dayOfYear * 2) % monthVerses.length;
+    const idx2 = (dayOfYear * 2 + 1) % monthVerses.length;
+    
+    const references = [monthVerses[idx1], monthVerses[idx2]];
+    
+    day = {
+      date: dateStr,
+      month: monthName,
+      theme,
+      references,
+      dayOfYear
+    };
+  }
 
-  return dayData;
+  // Check completion status and ensure dayOfYear exists
+  if (day) {
+    const progress = await getAllDailyProgress();
+    const dayProgress = progress.filter(p => p.date === day.date);
+    day.isCompleted = dayProgress.length >= day.references.length;
+    day.isInitialPass = dayProgress.length > 0 && dayProgress.every(p => p.isInitialPass);
+    
+    if (!day.dayOfYear) {
+      const d = parseLocalDate(day.date);
+      const start = new Date(d.getFullYear(), 0, 1);
+      day.dayOfYear = Math.floor((d.getTime() - start.getTime()) / 86400000) + 1;
+    }
+  }
+
+  return day;
 };
 
 export const recordVerseCompletion = async (

@@ -60,4 +60,5 @@ export interface UserProgress {
   }>;
   verseLevels: Record<string, number>; // "Book Chapter:Verse" -> Level (1-5)
   learningVerses: string[]; // Verses currently being learned
+  dailyReviewCounts?: Record<string, { count: number, lastDate: string }>; // "Book Chapter:Verse" -> { count, lastDate }
 }
